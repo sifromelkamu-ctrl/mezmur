@@ -8,8 +8,8 @@ Ethiopian gospel music app. Vite + React + TypeScript client, Express + Prisma +
 ## Deployment
 
 **Production URLs**
-- Client: your Vercel project's production domain (stable across deploys — see "Rolling back" below)
-- API: your Render service's `.onrender.com` domain
+- Client: https://mezmur-nu.vercel.app (stable across deploys — see "Rolling back" below)
+- API: https://mezmur-api-yt3l.onrender.com/api
 
 ### 1. Run locally
 
@@ -54,3 +54,5 @@ Both the client and the API are connected directly to this GitHub repo — no ma
 2. Vercel: **Add New Project** → import this repo → Root Directory left at repo root → Framework auto-detected as Vite → Environment Variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` → Deploy. Preview Deployments for PRs and Production Deployments for `main` are on by default per-project.
 3. Render: **New → Blueprint** → point at this repo → it reads `render.yaml` at the repo root and provisions the `mezmur-api` Docker web service → fill in the flagged secret env vars (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, optionally `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`) when prompted.
 4. Set the client's `VITE_API_URL` in Vercel to the Render service's public URL + `/api` once it's live.
+
+**Gotcha:** for `DATABASE_URL`, use Supabase's **Session pooler** connection string (Project Settings → Database → Connection String → "Session pooler" tab — host looks like `aws-...pooler.supabase.com`, username `postgres.<project-ref>`), not the direct `db.<project-ref>.supabase.co` connection. The direct host is IPv6-only and Render (like most PaaS compute) has no IPv6 egress, so it fails with `P1001: Can't reach database server`.
