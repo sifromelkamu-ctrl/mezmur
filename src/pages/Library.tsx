@@ -1,7 +1,6 @@
 import { Check, Heart, Mic2, MoreVertical, Play, Plus, Search as SearchIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import AuthModal from "../components/AuthModal";
 import Card from "../components/Card";
 import CreatePlaylistModal from "../components/CreatePlaylistModal";
 import TrackRow from "../components/TrackRow";
@@ -137,7 +136,6 @@ export default function Library() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const [artistSort, setArtistSortState] = useState<ArtistSort>(
@@ -204,7 +202,7 @@ export default function Library() {
         <h1 className="text-2xl font-bold">{t("yourLibrary")}</h1>
         {filter === "playlists" && (
           <button
-            onClick={() => (user ? setShowCreatePlaylist(true) : setShowAuth(true))}
+            onClick={() => (user ? setShowCreatePlaylist(true) : navigate("/auth"))}
             className="flex items-center gap-2 bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform"
           >
             <Plus size={16} />
@@ -394,7 +392,6 @@ export default function Library() {
           }}
         />
       )}
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
 }

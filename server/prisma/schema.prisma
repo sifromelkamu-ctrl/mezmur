@@ -18,15 +18,27 @@ enum Role {
 // that keeps this table populated on signup live in a hand-written migration
 // (Prisma's schema DSL can't express cross-schema FKs or triggers).
 model Profile {
-  id            String               @id @db.Uuid
-  email         String               @unique
-  name          String?
-  role          Role                 @default(user)
-  createdAt     DateTime             @default(now())
-  artists       Artist[]
-  playlists     Playlist[]
-  auditLogs     AuditLog[]
-  importBatches YoutubeImportBatch[]
+  id                String               @id @db.Uuid
+  // Nullable: a phone-only signup has no email, and vice versa — exactly one
+  // of email/phone is guaranteed to be set by the app, never both null.
+  email             String?              @unique
+  phone             String?              @unique
+  // Case-insensitive uniqueness is enforced by a functional index on
+  // lower(username) in the migration (no citext extension needed); always
+  // query/compare usernames via lower() from application code.
+  username          String?
+  name              String?
+  avatarUrl         String?
+  bio               String?
+  country           String?
+  preferredLanguage String               @default("en")
+  lastLoginAt       DateTime?
+  role              Role                 @default(user)
+  createdAt         DateTime             @default(now())
+  artists           Artist[]
+  playlists         Playlist[]
+  auditLogs         AuditLog[]
+  importBatches     YoutubeImportBatch[]
 
   @@map("profiles")
 }

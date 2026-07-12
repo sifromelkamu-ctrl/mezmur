@@ -21,7 +21,6 @@ import {
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthModal from "../components/AuthModal";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
@@ -76,7 +75,6 @@ export default function Settings() {
   const { themeId, setThemeId, mode, setMode } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { lyricsEnabled, setLyricsEnabled } = useLyricsSetting();
-  const [showAuth, setShowAuth] = useState(false);
   const [section, setSection] = useState<Section | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -152,8 +150,8 @@ export default function Settings() {
                 )}
               </div>
               <div>
-                <p className="text-xs text-fg-muted mb-1">Email</p>
-                <p className="text-sm truncate">{user.email}</p>
+                <p className="text-xs text-fg-muted mb-1">{user.email ? "Email" : "Phone"}</p>
+                <p className="text-sm truncate">{user.email ?? user.phone}</p>
               </div>
               <button
                 onClick={logout}
@@ -167,7 +165,7 @@ export default function Settings() {
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <p className="text-sm text-fg-muted">You're not logged in yet.</p>
               <button
-                onClick={() => setShowAuth(true)}
+                onClick={() => navigate("/auth")}
                 className="bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform shrink-0"
               >
                 {t("logIn")}
@@ -333,7 +331,7 @@ export default function Settings() {
           <SettingsRow
             icon={<UserCircle2 size={20} />}
             label="Account"
-            value={user ? user.name || user.email : "Log in"}
+            value={user ? user.name || user.email || user.phone || user.username || "Account" : "Log in"}
             onClick={() => setSection("account")}
           />
           <SettingsRow
@@ -398,10 +396,5 @@ export default function Settings() {
     );
   }
 
-  return (
-    <>
-      {content}
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-    </>
-  );
+  return content;
 }

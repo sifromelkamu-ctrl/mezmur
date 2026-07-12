@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { useLyricsSetting } from "../context/LyricsContext";
@@ -29,7 +30,6 @@ import { emitArtworkChanged } from "../lib/artworkEvents";
 import { formatDuration } from "../utils/format";
 import AddToPlaylistModal from "./AddToPlaylistModal";
 import ArtworkEditor from "./ArtworkEditor";
-import AuthModal from "./AuthModal";
 import CoverArt from "./CoverArt";
 import LyricsPanel from "./LyricsPanel";
 import QueuePanel from "./QueuePanel";
@@ -93,11 +93,11 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
   const { lyricsEnabled } = useLyricsSetting();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { remainingLabel } = useSleepTimer();
   const [showLyrics, setShowLyrics] = useState(initialLyrics);
   const [showQueue, setShowQueue] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
   const [showSongInfo, setShowSongInfo] = useState(false);
   const [likeBurst, setLikeBurst] = useState(false);
@@ -274,7 +274,7 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
         </button>
         <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Now Playing</p>
         <button
-          onClick={() => (user ? setShowAddToPlaylist(true) : setShowAuth(true))}
+          onClick={() => (user ? setShowAddToPlaylist(true) : navigate("/auth"))}
           className="w-11 h-11 -mr-1 rounded-full flex items-center justify-center text-white/90 hover:bg-white/10 active:scale-90 transition-all"
           aria-label="Add to playlist"
         >
@@ -506,7 +506,6 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
     {showAddToPlaylist && (
       <AddToPlaylistModal track={currentTrack} onClose={() => setShowAddToPlaylist(false)} />
     )}
-    {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     {showSleepTimer && <SleepTimerSheet onClose={() => setShowSleepTimer(false)} />}
     {showSongInfo && (
       <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setShowSongInfo(false)}>

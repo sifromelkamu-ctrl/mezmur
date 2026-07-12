@@ -1,9 +1,7 @@
 import { Search, Settings } from "lucide-react";
-import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
-import AuthModal from "./AuthModal";
 import TextField from "./form/TextField";
 
 export default function Topbar() {
@@ -14,7 +12,6 @@ export default function Topbar() {
   const isHome = location.pathname === "/";
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [showAuth, setShowAuth] = useState(false);
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-base/80 backdrop-blur-md gap-3">
@@ -65,7 +62,7 @@ export default function Topbar() {
           </button>
           {!user && (
             <button
-              onClick={() => setShowAuth(true)}
+              onClick={() => navigate("/auth")}
               className="bg-white text-black text-sm font-bold rounded-full px-5 py-2 hover:scale-105 transition-transform"
             >
               {t("logIn")}
@@ -73,8 +70,6 @@ export default function Topbar() {
           )}
         </div>
       )}
-
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </header>
   );
 }

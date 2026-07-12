@@ -2,7 +2,6 @@ import { Bell, Flame, Heart, Music, Shuffle, Sparkles, Ticket, User } from "luci
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
-import AuthModal from "../components/AuthModal";
 import Card from "../components/Card";
 import ConcertCard from "../components/home/ConcertCard";
 import ForYouCard from "../components/home/ForYouCard";
@@ -58,7 +57,6 @@ export default function Home() {
   const [concerts, setConcerts] = useState<ApiAlbum[]>([]);
   const [singles, setSingles] = useState<ApiTrack[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -235,7 +233,7 @@ export default function Home() {
             <Bell size={17} />
           </button>
           <button
-            onClick={() => (user ? navigate("/settings") : setShowAuth(true))}
+            onClick={() => (user ? navigate("/settings") : navigate("/auth"))}
             aria-label={user ? t("settings") : t("logIn")}
             className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-brand to-accent-cyan text-white font-bold text-sm shadow-[0_0_16px_-2px_rgba(124,92,255,0.6)] active:scale-90 transition-all"
           >
@@ -243,8 +241,6 @@ export default function Home() {
           </button>
         </div>
       </div>
-
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
       <HeroCarousel slides={heroSlides} />
 

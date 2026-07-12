@@ -1,7 +1,6 @@
 import { LogIn, Mic2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthModal from "../components/AuthModal";
 import CoverArt from "../components/CoverArt";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
@@ -12,7 +11,6 @@ export default function Artists() {
   const { artists, loading, addArtist, removeArtist } = useCustomArtists();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
   const navigate = useNavigate();
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -39,7 +37,7 @@ export default function Artists() {
           <LogIn size={18} />
           <span className="flex-1">Log in to add and manage your own artists.</span>
           <button
-            onClick={() => setShowAuth(true)}
+            onClick={() => navigate("/auth")}
             className="bg-brand text-black font-bold rounded-full px-4 py-1.5 text-xs hover:scale-105 transition-transform shrink-0"
           >
             Log in
@@ -102,8 +100,6 @@ export default function Artists() {
           ))}
         </div>
       )}
-
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
 }

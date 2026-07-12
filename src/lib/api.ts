@@ -71,9 +71,17 @@ async function postForm<T>(path: string, body: FormData): Promise<T> {
 
 export interface ApiUser {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
+  username: string | null;
   name: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  country: string | null;
+  preferredLanguage: string;
   role?: "user" | "artist" | "admin";
+  createdAt?: string;
+  lastLoginAt?: string | null;
 }
 
 // Non-destructive artwork framing (Universal Artwork System's admin
@@ -241,29 +249,33 @@ export interface ApiSearchResults {
   playlists: ApiPlaylist[];
 }
 
-export interface AuthSession {
-  token: string;
-  refreshToken: string;
-  user: ApiUser;
+export interface UsernameAvailability {
+  available: boolean;
+  suggestions?: string[];
 }
 
+export interface UpdateProfileInput {
+  name?: string;
+  username?: string;
+  bio?: string;
+  country?: string;
+  preferredLanguage?: string;
+  avatarUrl?: string;
+}
+
+// Registration, login, verification, and password reset all go straight
+// from the client to Supabase Auth now (see lib/authService.ts) — this
+// object is left with only what operates on our own `profiles` row.
 export const authApi = {
-  register: (email: string, password: string, name?: string) =>
-    request<AuthSession>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password, name }),
-    }),
-  login: (email: string, password: string) =>
-    request<AuthSession>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
   me: () => request<{ user: ApiUser }>("/auth/me"),
-  updateMe: (name: string) =>
+  updateMe: (input: UpdateProfileInput) =>
     request<{ user: ApiUser }>("/auth/me", {
       method: "PATCH",
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(input),
     }),
+  touchLogin: () => request<{ user: ApiUser }>("/auth/touch-login", { method: "POST" }),
+  usernameAvailability: (username: string) =>
+    request<UsernameAvailability>(`/auth/username-availability?username=${encodeURIComponent(username)}`),
 };
 
 export interface ArtistMetadataInput {

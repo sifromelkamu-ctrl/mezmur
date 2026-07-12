@@ -534,3 +534,30 @@ input[type="range"].seek-xl:active::-webkit-slider-thumb {
 .bg-crossfade {
   animation: bg-crossfade-in 0.8s ease forwards;
 }
+
+/* Auth flow: each step slides/fades in as the user moves forward through
+   sign-up, verification, login, and password-reset. */
+@keyframes auth-step-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.auth-step {
+  animation: auth-step-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes auth-sheet-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.auth-sheet {
+  animation: auth-sheet-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes auth-success-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.auth-success-icon {
+  animation: auth-success-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

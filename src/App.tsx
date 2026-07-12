@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
 import Topbar from "./components/Topbar";
@@ -28,6 +28,7 @@ const AllSingles = lazy(() => import("./pages/AllSingles"));
 const AllSongs = lazy(() => import("./pages/AllSongs"));
 const ArtistDetail = lazy(() => import("./pages/ArtistDetail"));
 const Artists = lazy(() => import("./pages/Artists"));
+const Auth = lazy(() => import("./pages/Auth"));
 const Bible = lazy(() => import("./pages/Bible"));
 const CustomArtistDetail = lazy(() => import("./pages/CustomArtistDetail"));
 const Library = lazy(() => import("./pages/Library"));
@@ -40,6 +41,68 @@ const Settings = lazy(() => import("./pages/Settings"));
 const YoutubeCatalogImport = lazy(() => import("./pages/YoutubeCatalogImport"));
 const YoutubeImport = lazy(() => import("./pages/YoutubeImport"));
 
+// /auth is a full-screen, immersive flow (like Spotify/Apple Music's own
+// sign-in) — it deliberately renders without the persistent Topbar/
+// PlayerBar/MobileNav chrome that every other route gets.
+function AppShell() {
+  const location = useLocation();
+  const isAuthRoute = location.pathname === "/auth";
+
+  const routes = (
+    <Suspense fallback={null}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/artists" element={<Artists />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/sermons" element={<AllSermons />} />
+        <Route path="/podcasts" element={<AllPodcasts />} />
+        <Route path="/concerts" element={<AllConcerts />} />
+        <Route path="/singles" element={<AllSingles />} />
+        <Route path="/songs" element={<AllSongs />} />
+        <Route path="/recommended" element={<Recommended />} />
+        <Route path="/bible" element={<Bible />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/admin/upload" element={<AdminUpload />} />
+        <Route path="/admin/library" element={<AdminLibraryManagement />} />
+        <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
+        <Route path="/admin/youtube-import" element={<YoutubeImport />} />
+        <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
+        <Route path="/playlist/:id" element={<PlaylistDetail />} />
+        <Route path="/album/:id" element={<AlbumDetail />} />
+        <Route path="/artist/:id" element={<ArtistDetail />} />
+        <Route path="/my-artist/:id" element={<CustomArtistDetail />} />
+        <Route path="/sermon/:id" element={<SermonDetail />} />
+        <Route path="/podcast/:id" element={<PodcastDetail />} />
+      </Routes>
+    </Suspense>
+  );
+
+  if (isAuthRoute) {
+    return <div className="h-screen w-screen bg-base overflow-hidden">{routes}</div>;
+  }
+
+  return (
+    <div className="h-screen w-screen flex flex-col bg-base overflow-hidden">
+      <main className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48">
+        <div className="aurora-bg" />
+        <div className="relative z-10">
+          <Topbar />
+          {routes}
+        </div>
+      </main>
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-2"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+      >
+        <PlayerBar />
+        <MobileNav />
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -50,50 +113,9 @@ export default function App() {
               <LyricsProvider>
                 <PlayerProvider>
                   <SleepTimerProvider>
-                  <HashRouter>
-                    <div className="h-screen w-screen flex flex-col bg-base overflow-hidden">
-                      <main className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48">
-                        <div className="aurora-bg" />
-                        <div className="relative z-10">
-                          <Topbar />
-                          <Suspense fallback={null}>
-                            <Routes>
-                              <Route path="/" element={<Home />} />
-                              <Route path="/artists" element={<Artists />} />
-                              <Route path="/search" element={<Search />} />
-                              <Route path="/library" element={<Library />} />
-                              <Route path="/sermons" element={<AllSermons />} />
-                              <Route path="/podcasts" element={<AllPodcasts />} />
-                              <Route path="/concerts" element={<AllConcerts />} />
-                              <Route path="/singles" element={<AllSingles />} />
-                              <Route path="/songs" element={<AllSongs />} />
-                              <Route path="/recommended" element={<Recommended />} />
-                              <Route path="/bible" element={<Bible />} />
-                              <Route path="/settings" element={<Settings />} />
-                              <Route path="/admin/upload" element={<AdminUpload />} />
-                              <Route path="/admin/library" element={<AdminLibraryManagement />} />
-                              <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
-                              <Route path="/admin/youtube-import" element={<YoutubeImport />} />
-                              <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
-                              <Route path="/playlist/:id" element={<PlaylistDetail />} />
-                              <Route path="/album/:id" element={<AlbumDetail />} />
-                              <Route path="/artist/:id" element={<ArtistDetail />} />
-                              <Route path="/my-artist/:id" element={<CustomArtistDetail />} />
-                              <Route path="/sermon/:id" element={<SermonDetail />} />
-                              <Route path="/podcast/:id" element={<PodcastDetail />} />
-                            </Routes>
-                          </Suspense>
-                        </div>
-                      </main>
-                      <div
-                        className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-2"
-                        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
-                      >
-                        <PlayerBar />
-                        <MobileNav />
-                      </div>
-                    </div>
-                  </HashRouter>
+                    <HashRouter>
+                      <AppShell />
+                    </HashRouter>
                   </SleepTimerProvider>
                 </PlayerProvider>
               </LyricsProvider>
