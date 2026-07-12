@@ -56,3 +56,5 @@ Both the client and the API are connected directly to this GitHub repo — no ma
 4. Set the client's `VITE_API_URL` in Vercel to the Render service's public URL + `/api` once it's live.
 
 **Gotcha:** for `DATABASE_URL`, use Supabase's **Session pooler** connection string (Project Settings → Database → Connection String → "Session pooler" tab — host looks like `aws-...pooler.supabase.com`, username `postgres.<project-ref>`), not the direct `db.<project-ref>.supabase.co` connection. The direct host is IPv6-only and Render (like most PaaS compute) has no IPv6 egress, so it fails with `P1001: Can't reach database server`.
+
+<!-- preview deployment test, safe to remove -->
