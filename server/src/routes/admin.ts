@@ -1,0 +1,586 @@
+import { randomUUID } from "node:crypto";
+import { Router } from "express";
+import { z } from "zod";
+import { isAdmin, type AuthedRequest } from "../middleware/auth.js";
+import { prisma } from "../prisma.js";
+import { supabaseAdmin } from "../supabase.js";
+import { toAlbumDTO, toArtistDTO, toTrackDTO } from "./artists.js";
+import { toPlaylistDTO } from "./playlists.js";
+import { uploadImageToStorage, upload } from "../upload.js";
+import {
+  searchSpotifyArtist,
+  extractSpotifyArtistId,
+  getSpotifyArtistById,
+  SpotifyApiError,
+  SpotifyNetworkError,
+  type SpotifyArtistMatch,
+} from "../artwork/spotify.js";
+import { runArtistSpotifySync } from "../spotifySync/sync.js";
+import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../spotifySync/types.js";
+import { Prisma } from "../generated/prisma/client.js";
+
+const router = Router();
+
+// Every route in this file is admin-only.
+router.use(isAdmin);
+
+function logAudit(adminId: string, action: string, metadata?: Prisma.InputJsonValue) {
+  return prisma.auditLog.create({ data: { adminId, action, metadata } });
+}
+
+const GRADIENT_PALETTE: [string, string][] = [
+  ["#f2b705", "#c2410c"],
+  ["#0ea5e9", "#1e3a8a"],
+  ["#22c55e", "#065f46"],
+  ["#ec4899", "#701a75"],
+  ["#f97316", "#7c2d12"],
+  ["#a855f7", "#312e81"],
+  ["#14b8a6", "#134e4a"],
+  ["#f43f5e", "#4c0519"],
+];
+
+export function gradientForSeed(seed: string): [string, string] {
+  let hash = 0;
+  for (const ch of seed) hash = (Math.imul(hash, 31) + ch.charCodeAt(0)) >>> 0;
+  return GRADIENT_PALETTE[hash % GRADIENT_PALETTE.length];
+}
+
+const createCatalogArtistSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
+// POST /api/admin/artists — creates a real catalog artist (ownerId: null),
+// visible to every listener via GET /api/artists. This is distinct from the
+// regular POST /api/artists route, which creates a *personal* artist scoped
+// to the requesting user (ownerId: that user) and never appears in the
+// public catalog — exactly the distinction an admin adding official,
+// licensed catalog content needs.
+router.post("/artists", async (req: AuthedRequest, res) => {
+  const parsed = createCatalogArtistSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const [gradientFrom, gradientTo] = gradientForSeed(parsed.data.name);
+  const artist = await prisma.artist.create({
+    data: { name: parsed.data.name, gradientFrom, gradientTo },
+  });
+  await logAudit(req.userId!, "create_catalog_artist", { artistId: artist.id, name: artist.name });
+  res.status(201).json(toArtistDTO(artist));
+});
+
+const createCatalogAlbumSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  // Chosen up front at creation time — "live" is how a release is marked as
+  // a Concert Album (see Home's Concerts section / GET /api/concerts, both
+  // of which filter on this same field). Defaults to "album" so every
+  // existing caller that doesn't pass it keeps behaving exactly as before.
+  albumType: z.enum(["album", "ep", "single", "live", "compilation"]).default("album"),
+});
+
+// POST /api/admin/artists/:id/albums — same catalog-vs-personal distinction
+// as above, for albums under a catalog artist.
+router.post("/artists/:id/albums", async (req: AuthedRequest, res) => {
+  const parsed = createCatalogAlbumSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const artist = await prisma.artist.findUnique({ where: { id: String(req.params.id) } });
+  if (!artist) {
+    res.status(404).json({ error: "Artist not found" });
+    return;
+  }
+  const album = await prisma.album.create({
+    data: {
+      title: parsed.data.title,
+      albumType: parsed.data.albumType,
+      artistId: artist.id,
+      gradientFrom: artist.gradientFrom,
+      gradientTo: artist.gradientTo,
+    },
+  });
+  await logAudit(req.userId!, "create_catalog_album", { albumId: album.id, artistId: artist.id, title: album.title });
+  res.status(201).json(toAlbumDTO(album));
+});
+
+const uploadTrackSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  artistId: z.string().min(1),
+  albumId: z.string().min(1).optional(),
+  genre: z.string().trim().max(60).optional(),
+  duration: z.number().int().positive().max(3600),
+  fileExt: z
+    .string()
+    .trim()
+    .regex(/^\.?[a-zA-Z0-9]{1,5}$/, "Invalid file extension")
+    .optional(),
+});
+
+// POST /api/admin/upload-track
+//
+// Cloud storage integration point: rather than routing the (potentially
+// large) audio file through this server's memory, we ask Supabase Storage
+// for a one-time signed upload URL and hand it straight back to the client.
+// The browser then uploads the file bytes directly to Supabase, bypassing
+// this server entirely — this is what keeps memory usage flat regardless of
+// how large the audio file is.
+router.post("/upload-track", async (req: AuthedRequest, res) => {
+  const parsed = uploadTrackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { title, artistId, albumId, genre, duration, fileExt } = parsed.data;
+
+  try {
+    const artist = await prisma.artist.findUnique({ where: { id: artistId } });
+    if (!artist) {
+      res.status(404).json({ error: "Artist not found" });
+      return;
+    }
+    if (albumId) {
+      const album = await prisma.album.findUnique({ where: { id: albumId } });
+      if (!album || album.artistId !== artistId) {
+        res.status(404).json({ error: "Album not found for this artist" });
+        return;
+      }
+    }
+
+    const ext = fileExt ? (fileExt.startsWith(".") ? fileExt : `.${fileExt}`) : ".mp3";
+    const path = `${randomUUID()}${ext}`;
+
+    const { data: signed, error: signError } = await supabaseAdmin.storage
+      .from("audio-tracks")
+      .createSignedUploadUrl(path);
+    if (signError || !signed) {
+      res.status(500).json({ error: signError?.message ?? "Could not create upload URL" });
+      return;
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage.from("audio-tracks").getPublicUrl(path);
+
+    const track = await prisma.track.create({
+      data: {
+        title,
+        artistId,
+        albumId,
+        genre,
+        duration,
+        audioUrl: publicUrlData.publicUrl,
+      },
+      include: { artist: true, album: true },
+    });
+
+    await logAudit(req.userId!, "upload_track", { trackId: track.id, title, artistId, albumId });
+
+    res.status(201).json({
+      track: toTrackDTO(track),
+      upload: { signedUrl: signed.signedUrl, token: signed.token, path },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Track upload failed" });
+  }
+});
+
+const uploadCoverTargetSchema = z.object({
+  trackId: z.string().min(1).optional(),
+  albumId: z.string().min(1).optional(),
+});
+
+// POST /api/admin/upload-cover
+//
+// Cover images are small enough to buffer safely in memory for one request
+// (see upload.ts's multer.memoryStorage()), so this route accepts the file
+// directly and uploads the buffer to the `album-art` bucket itself, rather
+// than using the signed-URL indirection used for audio.
+router.post("/upload-cover", upload.single("cover"), async (req: AuthedRequest, res) => {
+  const parsedTarget = uploadCoverTargetSchema.safeParse(req.body);
+  if (!parsedTarget.success) {
+    res.status(400).json({ error: parsedTarget.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { trackId, albumId } = parsedTarget.data;
+  if (!trackId && !albumId) {
+    res.status(400).json({ error: "Provide either trackId or albumId" });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: "No image uploaded" });
+    return;
+  }
+
+  try {
+    const coverUrl = await uploadImageToStorage(req.file.buffer, req.file.mimetype);
+
+    if (trackId) {
+      const track = await prisma.track.findUnique({ where: { id: trackId } });
+      if (!track) {
+        res.status(404).json({ error: "Track not found" });
+        return;
+      }
+      // Album Artwork Is Master Artwork: a track that belongs to an album
+      // has no artwork of its own to replace — its cover always mirrors the
+      // album's. Upload to the album instead.
+      if (track.albumId) {
+        res.status(400).json({ error: "This song's artwork is managed by its album — edit the album's artwork instead." });
+        return;
+      }
+      const updated = await prisma.track.update({
+        where: { id: trackId },
+        data: { coverUrl, artworkFrame: Prisma.JsonNull },
+        include: { artist: true, album: true },
+      });
+      await logAudit(req.userId!, "upload_cover", { trackId, coverUrl });
+      res.json({ track: toTrackDTO(updated) });
+      return;
+    }
+
+    const album = await prisma.album.findUnique({ where: { id: albumId! } });
+    if (!album) {
+      res.status(404).json({ error: "Album not found" });
+      return;
+    }
+    // Every track under this album picks up the new cover instantly —
+    // toTrackDTO always reads it live from the album, so there's nothing to
+    // propagate onto track rows.
+    const updated = await prisma.album.update({
+      where: { id: albumId! },
+      data: { coverUrl, artworkFrame: Prisma.JsonNull },
+    });
+    await logAudit(req.userId!, "upload_cover", { albumId, coverUrl });
+    res.json({ album: toAlbumDTO(updated) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Cover upload failed" });
+  }
+});
+
+const updateUserSchema = z
+  .object({
+    role: z.enum(["user", "artist", "admin"]).optional(),
+    suspended: z.boolean().optional(),
+  })
+  .refine((data) => data.role !== undefined || data.suspended !== undefined, {
+    message: "Provide at least one of role or suspended",
+  });
+
+// PUT /api/admin/users/:id - promote/demote a user's role, or suspend/unsuspend their account
+router.put("/users/:id", async (req: AuthedRequest, res) => {
+  const parsed = updateUserSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const targetId = String(req.params.id);
+
+  try {
+    const profile = await prisma.profile.findUnique({ where: { id: targetId } });
+    if (!profile) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (parsed.data.role) {
+      await prisma.profile.update({ where: { id: targetId }, data: { role: parsed.data.role } });
+      await logAudit(req.userId!, "update_role", { targetId, role: parsed.data.role });
+    }
+
+    if (parsed.data.suspended !== undefined) {
+      // Supabase's ban mechanism takes a duration rather than a boolean;
+      // ~100 years is used as a practical "indefinite" suspension, and
+      // "none" lifts it — the same convention Supabase's own dashboard uses.
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
+        ban_duration: parsed.data.suspended ? "876000h" : "none",
+      });
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+      await logAudit(req.userId!, parsed.data.suspended ? "suspend_user" : "unsuspend_user", { targetId });
+    }
+
+    const updated = await prisma.profile.findUniqueOrThrow({ where: { id: targetId } });
+    res.json({ user: { id: updated.id, email: updated.email, name: updated.name, role: updated.role } });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Update failed" });
+  }
+});
+
+// --- Artwork framing (Universal Artwork System's admin editor) ---
+// Stores only presentation metadata (pan/zoom/rotation/flip) describing how
+// to frame the *existing* photoUrl/coverUrl within a square — never touches
+// the original image. Applies uniformly across every artwork-bearing model
+// via one generic route rather than four near-identical ones.
+const artworkFrameSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  zoom: z.number().min(0.1).max(8),
+  rotation: z.number().min(-180).max(180),
+  flipH: z.boolean(),
+  flipV: z.boolean(),
+});
+
+const setArtworkFrameSchema = z.object({
+  entityType: z.enum(["artist", "album", "track", "playlist"]),
+  entityId: z.string().min(1),
+  frame: artworkFrameSchema.nullable(),
+});
+
+// PATCH /api/admin/artwork-frame - save (or, with frame: null, clear back to
+// the smart-framing default) an artwork's manual crop/pan/zoom/rotation.
+router.patch("/artwork-frame", async (req: AuthedRequest, res) => {
+  const parsed = setArtworkFrameSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { entityType, entityId, frame } = parsed.data;
+  const artworkFrame = frame ?? Prisma.JsonNull;
+
+  try {
+    let dto: unknown;
+    switch (entityType) {
+      case "artist": {
+        const updated = await prisma.artist.update({ where: { id: entityId }, data: { artworkFrame } });
+        dto = toArtistDTO(updated);
+        break;
+      }
+      case "album": {
+        // Every track under this album picks up the new frame instantly —
+        // toTrackDTO always reads it live from the album, so there's
+        // nothing to propagate onto track rows.
+        const updated = await prisma.album.update({ where: { id: entityId }, data: { artworkFrame } });
+        dto = toAlbumDTO(updated);
+        break;
+      }
+      case "track": {
+        // Album Artwork Is Master Artwork: a track that belongs to an album
+        // has no framing of its own to adjust — it always mirrors the
+        // album's. Re-frame the album instead.
+        const existing = await prisma.track.findUnique({ where: { id: entityId } });
+        if (!existing) {
+          res.status(404).json({ error: "Track not found" });
+          return;
+        }
+        if (existing.albumId) {
+          res.status(400).json({ error: "This song's artwork is managed by its album — edit the album's artwork instead." });
+          return;
+        }
+        const updated = await prisma.track.update({
+          where: { id: entityId },
+          data: { artworkFrame },
+          include: { artist: true, album: true },
+        });
+        dto = toTrackDTO(updated);
+        break;
+      }
+      case "playlist": {
+        const updated = await prisma.playlist.update({ where: { id: entityId }, data: { artworkFrame } });
+        dto = toPlaylistDTO(updated);
+        break;
+      }
+    }
+    await logAudit(req.userId!, "set_artwork_frame", { entityType, entityId, cleared: frame === null });
+    res.json({ [entityType]: dto });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to save artwork frame" });
+  }
+});
+
+// --- Manual Spotify artist linking ---
+// Deliberately never a bulk/library-wide action: an admin explicitly
+// confirms the one correct Spotify artist per local artist, and every sync
+// afterward pulls only from that linked ID's own catalog (see
+// runArtistSpotifySync) — never a name search, so it can't drift to a
+// different artist.
+function toArtistSearchDTO(a: SpotifyArtistMatch) {
+  const bestImage = [...a.images].sort((x, y) => y.width * y.height - x.width * x.height)[0];
+  return {
+    id: a.id,
+    name: a.name,
+    imageUrl: bestImage?.url,
+    followers: a.followers,
+    popularity: a.popularity,
+    genres: a.genres,
+    externalUrl: a.externalUrl,
+  };
+}
+
+// Maps the typed errors thrown by the search/lookup layer in
+// artwork/spotify.ts to a response — so a rate limit or network failure
+// never gets displayed to the admin as a misleading "not found".
+const DEFAULT_RETRY_AFTER_SECONDS = 30;
+
+function sendSpotifyError(res: import("express").Response, err: unknown) {
+  if (err instanceof SpotifyApiError) {
+    if (err.status === 429) {
+      const retryAfter = err.retryAfterSeconds ?? DEFAULT_RETRY_AFTER_SECONDS;
+      res.status(429).json({ error: "Spotify rate limit reached.", retryAfter });
+      return;
+    }
+    res.status(502).json({ error: `Spotify search failed (status ${err.status}).` });
+    return;
+  }
+  if (err instanceof SpotifyNetworkError) {
+    res.status(502).json({ error: "Unable to connect to Spotify." });
+    return;
+  }
+  res.status(500).json({ error: err instanceof Error ? err.message : "Spotify request failed" });
+}
+
+router.get("/spotify/search-artist", async (req: AuthedRequest, res) => {
+  const q = String(req.query.q ?? "").trim();
+  if (q.length < 2) {
+    res.json({ results: [] });
+    return;
+  }
+  try {
+    const matches = await searchSpotifyArtist(q);
+    res.json({ results: matches.map(toArtistSearchDTO) });
+  } catch (err) {
+    sendSpotifyError(res, err);
+  }
+});
+
+const resolveArtistSchema = z.object({ input: z.string().trim().min(1) });
+
+router.post("/spotify/resolve-artist", async (req: AuthedRequest, res) => {
+  const parsed = resolveArtistSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const id = extractSpotifyArtistId(parsed.data.input);
+  if (!id) {
+    res.status(404).json({ error: "Not a recognizable Spotify artist URL/URI/ID" });
+    return;
+  }
+  try {
+    const match = await getSpotifyArtistById(id);
+    if (!match) {
+      res.status(404).json({ error: "Spotify artist not found" });
+      return;
+    }
+    res.json({ result: toArtistSearchDTO(match) });
+  } catch (err) {
+    sendSpotifyError(res, err);
+  }
+});
+
+const linkArtistSchema = z.object({ spotifyArtistId: z.string().trim().min(1) });
+
+router.post("/artists/:id/spotify-link", async (req: AuthedRequest, res) => {
+  const parsed = linkArtistSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  let match: SpotifyArtistMatch | null;
+  try {
+    match = await getSpotifyArtistById(parsed.data.spotifyArtistId);
+  } catch (err) {
+    sendSpotifyError(res, err);
+    return;
+  }
+  if (!match) {
+    res.status(404).json({ error: "Spotify artist not found" });
+    return;
+  }
+  try {
+    const updated = await prisma.artist.update({
+      where: { id: String(req.params.id) },
+      data: { spotifyId: match.id, spotifyLastSyncedAt: null, spotifyLastSyncError: null },
+    });
+    await logAudit(req.userId!, "link_spotify_artist", { artistId: updated.id, spotifyArtistId: match.id });
+    res.json({ artist: toArtistDTO(updated) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to link artist" });
+  }
+});
+
+router.delete("/artists/:id/spotify-link", async (req: AuthedRequest, res) => {
+  try {
+    const updated = await prisma.artist.update({
+      where: { id: String(req.params.id) },
+      data: { spotifyId: null, spotifyLastSyncedAt: null, spotifyLastSyncError: null },
+    });
+    await logAudit(req.userId!, "unlink_spotify_artist", { artistId: updated.id });
+    res.json({ artist: toArtistDTO(updated) });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to unlink artist" });
+  }
+});
+
+// --- Artist-scoped Spotify catalog sync ---
+// Runs entirely in memory like the artwork reprocess job above (re-running
+// is always safe, so losing progress on a server restart is a non-issue —
+// just start it again).
+const syncModeSchema = z.object({
+  mode: z.enum(["smart", "force", "metadata_only", "albums_only"]),
+});
+
+interface ArtistSyncJob {
+  id: string;
+  artistId: string;
+  status: "running" | "done";
+  progress: ArtistSyncProgress;
+  summary: ArtistSyncSummary | null;
+  error?: string;
+}
+const syncJobs = new Map<string, ArtistSyncJob>();
+
+router.post("/artists/:id/spotify-sync", async (req: AuthedRequest, res) => {
+  const parsed = syncModeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const artistId = String(req.params.id);
+  const mode: SpotifySyncMode = parsed.data.mode;
+
+  const jobId = randomUUID();
+  const job: ArtistSyncJob = {
+    id: jobId,
+    artistId,
+    status: "running",
+    progress: { phase: "albums", done: 0, total: 0 },
+    summary: null,
+  };
+  syncJobs.set(jobId, job);
+
+  runArtistSpotifySync(artistId, mode, (progress) => {
+    job.progress = progress;
+  })
+    .then(async (summary) => {
+      job.summary = summary;
+      job.status = "done";
+      await prisma.artist.update({ where: { id: artistId }, data: { spotifyLastSyncedAt: new Date(), spotifyLastSyncError: null } });
+      await logAudit(req.userId!, "spotify_artist_sync", {
+        artistId,
+        mode,
+        albumsCreated: summary.albumsCreated,
+        albumsUpdated: summary.albumsUpdated,
+        tracksCreated: summary.tracksCreated,
+        tracksUpdated: summary.tracksUpdated,
+        fieldsUpdated: summary.fieldsUpdated,
+      });
+    })
+    .catch(async (err) => {
+      job.status = "done";
+      job.error = err instanceof Error ? err.message : "Sync failed";
+      await prisma.artist.update({ where: { id: artistId }, data: { spotifyLastSyncError: job.error } }).catch(() => {});
+    });
+
+  res.json({ jobId });
+});
+
+router.get("/spotify-sync/:jobId", (req: AuthedRequest, res) => {
+  const job = syncJobs.get(String(req.params.jobId));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json(job);
+});
+
+export default router;

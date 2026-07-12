@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Track" ADD COLUMN     "moods" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "playCount" INTEGER NOT NULL DEFAULT 0;

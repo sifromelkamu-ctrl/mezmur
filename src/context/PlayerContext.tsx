@@ -1,0 +1,330 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { tracksApi, type ApiTrack } from "../lib/api";
+import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
+import { recordPlayed } from "../lib/recentlyPlayed";
+
+interface PlayerContextValue {
+  currentTrack: ApiTrack | null;
+  queue: ApiTrack[];
+  isPlaying: boolean;
+  progress: number; // seconds
+  volume: number; // 0-1
+  shuffle: boolean;
+  repeat: boolean;
+  playTrack: (track: ApiTrack, queue?: ApiTrack[]) => void;
+  addToQueue: (track: ApiTrack) => void;
+  togglePlay: () => void;
+  next: () => void;
+  prev: () => void;
+  seek: (seconds: number) => void;
+  setVolume: (v: number) => void;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+}
+
+const PlayerContext = createContext<PlayerContextValue | null>(null);
+
+export function PlayerProvider({ children }: { children: ReactNode }) {
+  const [currentTrack, setCurrentTrack] = useState<ApiTrack | null>(null);
+  const [queue, setQueue] = useState<ApiTrack[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [volume, setVolume] = useState(0.75);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  if (!audioRef.current && typeof Audio !== "undefined") {
+    audioRef.current = new Audio();
+  }
+
+  // Without this, an old <audio> element from a previous mount of this
+  // provider (a Fast Refresh reload during dev, or any other unmount/remount)
+  // is never paused — it's a plain browser object with no tie to React's
+  // lifecycle, so it just keeps playing in the background even after being
+  // orphaned, while the newly-mounted provider creates and plays a second
+  // one. That's exactly what "two songs playing at once" was: two separate
+  // Audio elements, only one of which any visible UI still controlled.
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      }
+      audioRef.current = null;
+    };
+  }, []);
+
+  // Most of the catalog has no real audio file yet (only tracks uploaded
+  // through the admin flow do) — those fall back to the simulated timer
+  // below so nothing regresses for existing content.
+  const hasRealAudio = Boolean(currentTrack?.audioUrl);
+
+  const playTrack = useCallback((track: ApiTrack, newQueue?: ApiTrack[]) => {
+    setCurrentTrack(track);
+    setQueue(newQueue && newQueue.length ? newQueue : [track]);
+    setProgress(0);
+    setIsPlaying(true);
+    tracksApi.recordPlay(track.id).catch(() => {});
+    recordPlayed(track.id);
+  }, []);
+
+  // Appends to the existing queue without disturbing playback — playTrack
+  // above still fully replaces the queue, this is purely an additive way to
+  // queue something up next (used by the Songs page's "Add to queue" menu
+  // item; QueuePanel already renders whatever's in `queue` so it picks this
+  // up with no changes of its own).
+  const addToQueue = useCallback((track: ApiTrack) => {
+    setQueue((q) => (q.length ? [...q, track] : [track]));
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    setIsPlaying((p) => {
+      if (!currentTrack) return p;
+      return !p;
+    });
+  }, [currentTrack]);
+
+  const jump = useCallback(
+    (direction: 1 | -1) => {
+      if (!currentTrack || queue.length === 0) return;
+      const idx = queue.findIndex((t) => t.id === currentTrack.id);
+      if (idx === -1) return;
+      let nextIdx: number;
+      if (shuffle) {
+        nextIdx = Math.floor(Math.random() * queue.length);
+      } else {
+        nextIdx = (idx + direction + queue.length) % queue.length;
+      }
+      const nextTrack = queue[nextIdx];
+      setCurrentTrack(nextTrack);
+      setProgress(0);
+      setIsPlaying(true);
+      tracksApi.recordPlay(nextTrack.id).catch(() => {});
+    },
+    [currentTrack, queue, shuffle]
+  );
+
+  const next = useCallback(() => jump(1), [jump]);
+  const prev = useCallback(() => jump(-1), [jump]);
+
+  const seek = useCallback(
+    (seconds: number) => {
+      if (audioRef.current && hasRealAudio) {
+        audioRef.current.currentTime = seconds;
+      }
+      setProgress(seconds);
+    },
+    [hasRealAudio]
+  );
+
+  const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
+  const toggleRepeat = useCallback(() => setRepeat((r) => !r), []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (currentTrack) {
+      root.style.setProperty("--color-ambient-1", currentTrack.gradient[0]);
+      root.style.setProperty("--color-ambient-2", currentTrack.gradient[1]);
+    } else {
+      root.style.removeProperty("--color-ambient-1");
+      root.style.removeProperty("--color-ambient-2");
+    }
+  }, [currentTrack]);
+
+  // Exposes the current track to the OS-level media surface (lock screen,
+  // notification shade, hardware/earbud buttons) — metadata only, no change
+  // to playback itself. Action handlers just call the same functions the
+  // in-app buttons already call.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    if (!currentTrack) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artistName ?? "",
+      album: currentTrack.albumTitle ?? "",
+      artwork: currentTrack.coverUrl ? [{ src: currentTrack.coverUrl, sizes: "512x512", type: "image/jpeg" }] : [],
+    });
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.setActionHandler("play", () => togglePlay());
+    navigator.mediaSession.setActionHandler("pause", () => togglePlay());
+    navigator.mediaSession.setActionHandler("previoustrack", () => prev());
+    navigator.mediaSession.setActionHandler("nexttrack", () => next());
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (details.seekTime != null) seek(details.seekTime);
+    });
+    return () => {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("previoustrack", null);
+      navigator.mediaSession.setActionHandler("nexttrack", null);
+      navigator.mediaSession.setActionHandler("seekto", null);
+    };
+  }, [togglePlay, prev, next, seek]);
+
+  // Load whichever track is current into the real <audio> element. Tracks
+  // without an audioUrl explicitly stop/unload it so stale audio can't keep
+  // playing underneath the simulated-timer fallback.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (currentTrack?.audioUrl) {
+      audio.src = currentTrack.audioUrl;
+      audio.currentTime = 0;
+      audio.volume = volume;
+      if (isPlaying) audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack?.id, currentTrack?.audioUrl]);
+
+  // Play/pause the real audio element in lockstep with isPlaying.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !hasRealAudio) return;
+    if (isPlaying) audio.play().catch(() => {});
+    else audio.pause();
+  }, [isPlaying, hasRealAudio]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
+
+  // Real audio drives progress/ended off its own events rather than a timer.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleTimeUpdate = () => setProgress(audio.currentTime);
+    const handleEnded = () => {
+      if (repeat) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        setProgress(0);
+      } else {
+        next();
+      }
+    };
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [repeat, next]);
+
+  // Simulated playback fallback for tracks with no real audio file.
+  useEffect(() => {
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    if (isPlaying && currentTrack && !hasRealAudio) {
+      intervalRef.current = window.setInterval(() => {
+        setProgress((p) => {
+          const duration = currentTrack.duration ?? 0;
+          if (p + 1 >= duration) {
+            if (repeat) {
+              return 0;
+            }
+            window.setTimeout(() => next(), 0);
+            return 0;
+          }
+          return p + 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+    };
+  }, [isPlaying, currentTrack, repeat, next, hasRealAudio]);
+
+  // "No manual refresh required": patches currentTrack/queue the instant an
+  // album or track's artwork is saved elsewhere in the app (Mini Player,
+  // Now Playing, and the queue panel all read from this same state, so one
+  // patch here reaches all of them) — otherwise a track already loaded into
+  // the player would keep showing its stale artwork until the next natural
+  // re-fetch, which for a currently-playing track might never happen.
+  useEffect(() => {
+    return onArtworkChanged((event) => {
+      const applyPatch = (track: ApiTrack): ApiTrack =>
+        eventAppliesToTrack(event, track)
+          ? {
+              ...track,
+              ...(event.patch.coverUrl !== undefined ? { coverUrl: event.patch.coverUrl ?? undefined } : {}),
+              ...(event.patch.artworkFrame !== undefined ? { artworkFrame: event.patch.artworkFrame ?? undefined } : {}),
+            }
+          : track;
+      setCurrentTrack((track) => (track ? applyPatch(track) : track));
+      setQueue((q) => q.map(applyPatch));
+    });
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      currentTrack,
+      queue,
+      isPlaying,
+      progress,
+      volume,
+      shuffle,
+      repeat,
+      playTrack,
+      addToQueue,
+      togglePlay,
+      next,
+      prev,
+      seek,
+      setVolume,
+      toggleShuffle,
+      toggleRepeat,
+    }),
+    [
+      currentTrack,
+      queue,
+      isPlaying,
+      progress,
+      volume,
+      shuffle,
+      repeat,
+      playTrack,
+      addToQueue,
+      togglePlay,
+      next,
+      prev,
+      seek,
+      toggleShuffle,
+      toggleRepeat,
+    ]
+  );
+
+  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+}
+
+export function usePlayer() {
+  const ctx = useContext(PlayerContext);
+  if (!ctx) throw new Error("usePlayer must be used within PlayerProvider");
+  return ctx;
+}

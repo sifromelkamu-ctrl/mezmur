@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  user
+  artist
+  admin
+}
+
+// Mirrors Supabase Auth's auth.users table (id is the same UUID as the
+// Supabase-managed user). The FK constraint to auth.users and the trigger
+// that keeps this table populated on signup live in a hand-written migration
+// (Prisma's schema DSL can't express cross-schema FKs or triggers).
+model Profile {
+  id            String               @id @db.Uuid
+  email         String               @unique
+  name          String?
+  role          Role                 @default(user)
+  createdAt     DateTime             @default(now())
+  artists       Artist[]
+  playlists     Playlist[]
+  auditLogs     AuditLog[]
+  importBatches YoutubeImportBatch[]
+
+  @@map("profiles")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String   @db.Uuid
+  admin     Profile  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@map("audit_logs")
+}
+
+model Artist {
+  id               String   @id @default(cuid())
+  name             String
+  bio              String?
+  gradientFrom     String
+  gradientTo       String
+  monthlyListeners Int      @default(0)
+  isGroup          Boolean  @default(false)
+  photoUrl         String?
+  ownerId          String?  @db.Uuid
+  owner            Profile? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  albums           Album[]
+  tracks           Track[]
+  createdAt        DateTime @default(now())
+
+  // Admin-only artwork framing (pan/zoom/rotate/flip), applied on top of
+  // photoUrl at render time — never touches the original image. Null means
+  // "no manual edit yet, use the smart-framing default."
+  artworkFrame     Json?
+
+  // Manual Spotify artist link: the admin-confirmed Spotify artist ID this
+  // catalog artist is permanently linked to (see the artist-level "Link to
+  // Spotify" workflow). Null means not linked. Catalog syncs pull directly
+  // from this ID's Spotify albums — never a name search — so the link can
+  // never silently drift to a different artist.
+  spotifyId            String?   @unique
+  spotifyLastSyncedAt  DateTime? // set on every successful catalog sync
+  spotifyLastSyncError String? // set on a failed sync; cleared on the next success, relink, or unlink
+
+  @@index([ownerId])
+}
+
+enum AlbumType {
+  album
+  ep
+  single
+  live
+  compilation
+}
+
+model Album {
+  id           String    @id @default(cuid())
+  title        String
+  year         Int?
+  gradientFrom String?
+  gradientTo   String?
+  coverUrl     String?
+  description  String?
+  albumType    AlbumType @default(album)
+  releaseDate  DateTime?
+  genre        String?
+  artistId     String
+  artist       Artist    @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks       Track[]
+  createdAt    DateTime  @default(now())
+
+  // Admin-only artwork framing — see Artist.artworkFrame for the contract.
+  artworkFrame Json?
+
+  // Spotify Catalog Sync — see Artist.spotifyId for the caching contract.
+  // copyright/recordLabel come from Spotify's per-album copyrights/label
+  // fields (only available via the full album lookup, not search results).
+  spotifyId    String? @unique
+  copyright    String?
+  recordLabel  String?
+
+  @@index([artistId])
+}
+
+model Track {
+  id             String          @id @default(cuid())
+  title          String
+  duration       Int             @default(0)
+  language       String?
+  genre          String?
+  audioUrl       String?
+  coverUrl       String?
+  moods          String[]        @default([])
+  playCount      Int             @default(0)
+  // Nullable — a Single imported from YouTube that doesn't match any
+  // existing artist is left unassigned rather than auto-creating a new
+  // Artist row (see youtube/pipeline.ts's findExistingArtist). Every other
+  // track (regular album/EP/concert tracks, and any Single that does match
+  // an existing artist) still always has one, exactly as before.
+  artistId       String?
+  artist         Artist?         @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  // Plain-text fallback for artistName display (Now Playing, track rows,
+  // etc.) when artistId is null — never a substitute for a real Artist
+  // link, and never read when artist is set.
+  artistNameOverride String?
+  albumId        String?
+  album          Album?          @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  trackNumber    Int?
+  discNumber     Int?
+  playlistTracks PlaylistTrack[]
+  createdAt      DateTime        @default(now())
+
+  // Set only for tracks imported from YouTube (see /api/admin/youtube-import).
+  // sourceId is the YouTube video ID and is unique so the same video can
+  // never be imported twice.
+  sourceUrl   String?
+  sourceId    String?   @unique
+  publishedAt DateTime?
+  waveform    Json?
+
+  // Admin-editable lyrics text (Library Management feature). Nullable —
+  // most tracks won't have this set.
+  lyrics String? @db.Text
+
+  // True only when this track was imported via "Import from YouTube" with
+  // the "Single" destination explicitly chosen (see routes/youtubeImport.ts
+  // and routes/singles.ts) — deliberately NOT inferred from albumId being
+  // null, since a track can end up without an album for other reasons (an
+  // old import from before this flag existed, its album later deleted,
+  // etc.) without the admin ever having meant it to appear in the Home
+  // Singles section. Mirrors how a Concert Album must be deliberately
+  // tagged rather than auto-detected.
+  isSingle Boolean @default(false)
+
+  // Admin-only artwork framing — see Artist.artworkFrame for the contract.
+  // "Album Artwork Is Master Artwork": for a track with an albumId, this
+  // column (and coverUrl above) is never read — toTrackDTO always resolves
+  // artwork live from the album instead. Only meaningful for standalone
+  // singles (albumId: null), which keep their own.
+  artworkFrame Json?
+
+  // Spotify Catalog Sync — see Artist.spotifyId for the caching contract.
+  // popularity is Spotify's 0-100 track popularity score, synced verbatim.
+  spotifyId  String? @unique
+  popularity Int?
+
+  @@index([artistId])
+  @@index([albumId])
+}
+
+model Playlist {
+  id           String          @id @default(cuid())
+  title        String
+  description  String?
+  gradientFrom String
+  gradientTo   String
+  coverUrl     String?
+  ownerId      String?         @db.Uuid
+  owner        Profile?        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tracks       PlaylistTrack[]
+  createdAt    DateTime        @default(now())
+
+  // Admin-only artwork framing — see Artist.artworkFrame for the contract.
+  artworkFrame Json?
+
+  @@index([ownerId])
+}
+
+model PlaylistTrack {
+  id         String   @id @default(cuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  trackId    String
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  position   Int
+
+  @@unique([playlistId, trackId])
+  @@index([trackId])
+}
+
+model Sermon {
+  id           String   @id @default(cuid())
+  title        String
+  speaker      String
+  description  String?
+  duration     Int      @default(0)
+  gradientFrom String
+  gradientTo   String
+  createdAt    DateTime @default(now())
+}
+
+model Podcast {
+  id           String   @id @default(cuid())
+  title        String
+  host         String
+  description  String?
+  duration     Int      @default(0)
+  gradientFrom String
+  gradientTo   String
+  createdAt    DateTime @default(now())
+}
+
+enum YoutubeImportBatchStatus {
+  enumerating
+  ready
+  importing
+  completed
+  completed_with_errors
+  error
+}
+
+enum YoutubeImportItemStatus {
+  pending // enumerated, not yet selected
+  selected // chosen by the admin, queued for processing
+  downloading
+  processing // waveform generation
+  uploading
+  saving
+  done
+  error
+  skipped_duplicate
+}
+
+// One "Import artist catalog" run against a single channel/artist URL. Items
+// are enumerated up front (see youtube/catalogEnumerate.ts), the admin picks
+// which ones to bring in, then the catalog worker (youtube/catalogWorker.ts)
+// processes selected items in the background. Persisting batch/item state in
+// the database (rather than in-memory, as the single-video quick-import job
+// does) is what makes resuming after a server restart possible: on boot, any
+// batch left "importing" gets its unfinished items re-queued.
+model YoutubeImportBatch {
+  id          String                   @id @default(cuid())
+  sourceUrl   String
+  channelName String?
+  status      YoutubeImportBatchStatus @default(enumerating)
+  error       String?
+  createdBy   String                   @db.Uuid
+  admin       Profile                  @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  items       YoutubeImportItem[]
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  // Purely cosmetic, admin-editable display name for the Import History
+  // list — never read or written by the pipeline itself.
+  label String?
+
+  // The artist this whole batch imports into — chosen explicitly by the
+  // admin before enumeration starts (never guessed from the channel name).
+  // Nullable only so pre-existing batches from before this field existed
+  // don't break; every batch created going forward always sets it.
+  targetArtistId String?
+
+  // Normalized titles of albums that already existed under targetArtistId
+  // at the moment this batch was created — captured once, up front, so
+  // "was this album new or already there" (see YoutubeImportItem.albumWasNew)
+  // reflects state *before* this import run touched anything, and stays
+  // correct even if the batch is interrupted and resumed later.
+  existingAlbumTitlesSnapshot Json?
+
+  // "Allow duplicate imports" — off by default (skip anything that already
+  // exists, the historical behavior). When on, existing albums/singles/
+  // tracks are never reused or modified; everything imports as a brand-new
+  // row with its own id instead of being matched/skipped.
+  allowDuplicates Boolean @default(false)
+
+  // Only used when allowDuplicates is true: maps a normalized album title to
+  // the id of the new duplicate Album created for it *during this batch
+  // run*, so all N tracks of one re-imported album land together in one
+  // freshly-created duplicate album, rather than each track spawning its own
+  // separate one-track album. Read-modify-write is safe without locking
+  // because the worker (catalogWorker.ts) only ever processes one item at a
+  // time, globally, across every batch.
+  duplicateAlbumMap Json?
+
+  @@index([createdBy])
+}
+
+// What entity kind a FeaturedBanner points at. Only "album" is wired up to
+// an actual admin flow today — the others exist so the Home hero carousel's
+// architecture (one polymorphic collection, entityType + entityId) never has
+// to change shape to support them later, only the resolver + admin picker.
+enum FeaturedBannerEntityType {
+  album
+  single
+  artist
+  playlist
+  concert
+}
+
+// A hand-curated slot in the Home screen's top hero carousel. Deliberately
+// NOT a field on Album (or any other entity) — the carousel is a fully
+// separate, admin-curated collection that merely *references* an existing
+// album (etc.) by id, so featuring/unfeaturing something never touches the
+// entity itself and normal album artwork (cover, "New Releases", "Albums",
+// Now Playing, ...) is never affected by what's in here.
+model FeaturedBanner {
+  id         String                   @id @default(cuid())
+  entityType FeaturedBannerEntityType @default(album)
+  entityId   String
+
+  // Independent from the entity's own artwork (e.g. Album.coverUrl) — null
+  // means "no custom banner image set", in which case callers fall back to
+  // the entity's own cover image at render time.
+  bannerImageUrl String?
+
+  // Optional overrides of the entity's own display fields — null means "use
+  // the entity's own title/artist name" at render time.
+  title      String?
+  subtitle   String?
+  badgeText  String?
+  buttonText String?
+
+  displayOrder Int     @default(0)
+  enabled      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([enabled, displayOrder])
+  @@map("featured_banners")
+}
+
+model YoutubeImportItem {
+  id            String                  @id @default(cuid())
+  batchId       String
+  batch         YoutubeImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  videoId       String
+  title         String
+  albumTitle    String?
+  position      Int
+  thumbnailUrl  String?
+  duration      Int?
+  selected      Boolean                 @default(false)
+  status        YoutubeImportItemStatus @default(pending)
+  progress      Int                     @default(0)
+  message       String?
+  error         String?
+  trackId       String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  // Set once this item finishes processing (success or skipped-duplicate),
+  // used only to compute the import summary — see YoutubeCatalogImport.tsx.
+  // trackWasNew: true if a new Track row was created, false if it matched
+  // an existing one (sourceId or fuzzy title) and was skipped.
+  // albumWasNew: for album items only — whether this item's albumTitle was
+  // absent from the batch's existingAlbumTitlesSnapshot; null for singles.
+  trackWasNew Boolean?
+  albumWasNew Boolean?
+
+  @@unique([batchId, videoId])
+  @@index([batchId])
+}

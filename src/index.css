@@ -1,0 +1,536 @@
+@import "tailwindcss";
+
+@keyframes verse-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes verse-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.22;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(12px, -14px) scale(1.1);
+  }
+}
+
+@keyframes icon-ring-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 22px rgba(242, 183, 5, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 42px rgba(242, 183, 5, 0.55);
+  }
+}
+
+@keyframes title-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes icon-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes flame-flicker {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12) translateY(-1px);
+  }
+}
+
+@keyframes word-wave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes word-glow-sweep {
+  0%,
+  100% {
+    opacity: 0.55;
+    text-shadow: none;
+    color: inherit;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(255, 210, 63, 0.85), 0 0 18px rgba(242, 183, 5, 0.45);
+    color: #ffe9a8;
+  }
+}
+
+.text-shimmer-gold {
+  background-image: linear-gradient(100deg, #c9a34a 20%, #f3c969 40%, #fff3d6 50%, #f3c969 60%, #c9a34a 80%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shimmer 4s linear infinite;
+}
+
+@theme {
+  /* Primary brand: royal purple. Premium 2026 rebrand — replaces the
+     previous emerald-green identity across the whole app (every consumer
+     reads these as semantic tokens, e.g. bg-brand/text-brand/ring-brand). */
+  --color-brand: #7c5cff;
+  --color-brand-dark: #5b3fe0;
+  --color-brand-glow: #a78bfa;
+  /* Soft gold: dedicated "premium" accent (Go Premium, Bible section, etc.),
+     independent of the primary brand purple. */
+  --color-gold: #f3c969;
+  --color-gold-dark: #c9a34a;
+  --color-gold-glow: #ffe3a3;
+  --color-accent-cyan: #31d7ff;
+  --color-accent-green: #2ed47a;
+  --color-accent-red: #e0483c;
+  --color-accent-violet: #8b5cf6;
+  --color-accent-sky: #31d7ff;
+  /* Deep near-black navy — the premium "expensive" dark base the redesign
+     calls for, with cards a touch lighter so they lift off the background
+     without a hard border. */
+  --color-base: #070a14;
+  --color-panel: #0a0e1c;
+  --color-elevated: #101726;
+  --color-elevated-hover: #161f33;
+  --color-fg: #ffffff;
+  --color-fg-muted: #9ba6b5;
+  --color-fg-subtle: #6b7482;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-hover: rgba(255, 255, 255, 0.06);
+  --color-hover-strong: rgba(255, 255, 255, 0.14);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-ethiopic: "Abyssinica SIL", serif;
+  --font-noto-sans-ethiopic: "Noto Sans Ethiopic", sans-serif;
+  --font-noto-serif-ethiopic: "Noto Serif Ethiopic", serif;
+  --font-abyssinica: "Abyssinica SIL", serif;
+  --font-menbere: "Menbere", sans-serif;
+  --font-agbalumo: "Agbalumo", cursive;
+  --font-google-sans: "Google Sans", sans-serif;
+  --font-nyala: "Nyala", "Noto Sans Ethiopic", sans-serif;
+}
+
+:root.light {
+  /* Warm creamy-paper palette — deliberately not a cool gray/white theme.
+     Base is a warm cream page tint, elevated surfaces step up toward pure
+     white for cards, and text uses warm near-black/brown/taupe tones rather
+     than neutral grays, so the whole theme reads as one warm family instead
+     of "dark mode's grays, inverted." */
+  --color-base: #faf8f3;
+  --color-panel: #f9f7f2;
+  --color-elevated: #ffffff;
+  --color-elevated-hover: #f1ece3;
+  --color-fg: #1f1a17;
+  --color-fg-muted: #6b5e4a;
+  --color-fg-subtle: #9e9688;
+  --color-border: rgba(107, 94, 74, 0.16);
+  --color-hover: rgba(107, 94, 74, 0.06);
+  --color-hover-strong: rgba(107, 94, 74, 0.1);
+  --color-gold: #d4af37;
+  --color-gold-dark: #a9862b;
+  --color-gold-glow: #e4c765;
+}
+
+/* Ties native form-control rendering (autofill colors, <select> popups,
+   checkboxes, the text caret) to the app's own theme instead of the OS/
+   browser default — without this, a browser can render those pieces of UI
+   chrome using its own light/dark guess, independent of --color-fg/-base
+   below, which is the main cause of "invisible" native form controls. */
+:root {
+  color-scheme: dark;
+}
+:root.light {
+  color-scheme: light;
+}
+
+/* Form controls inherit `color` from body by default (Tailwind Preflight),
+   which is fragile — autofill and native <select> popups override inherited
+   color in ways that can leave typed text unreadable. Stated explicitly here
+   instead, plus placeholder/caret/disabled/option colors that have no
+   Tailwind utility equivalent. */
+input,
+textarea,
+select {
+  color: var(--color-fg);
+  caret-color: var(--color-fg);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-fg-subtle);
+  opacity: 1; /* Firefox default is a faded version of the placeholder color */
+}
+input:disabled,
+textarea:disabled,
+select:disabled {
+  color: var(--color-fg-muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+select option {
+  background-color: var(--color-elevated);
+  color: var(--color-fg);
+}
+/* Chrome/Safari/Edge autofill forces its own text/background colors that
+   ignore the rules above entirely unless overridden like this. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-fg);
+  box-shadow: 0 0 0px 1000px var(--color-elevated) inset;
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-elevated) inset;
+  transition: background-color 9999s ease-in-out 0s;
+  caret-color: var(--color-fg);
+}
+
+/* The Bible section keeps its exact current colors regardless of the app's
+   theme — pinned here rather than left to inherit, so redesigns of the
+   global background/text tokens above never change how it looks. */
+.bible-scope {
+  --color-base: #0b0b0d;
+  --color-panel: #121214;
+  --color-elevated: #1a1a1d;
+  --color-elevated-hover: #26262a;
+  --color-fg: #ffffff;
+  --color-fg-muted: #a3a3a3;
+  --color-fg-subtle: #737373;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-hover: rgba(255, 255, 255, 0.1);
+  --color-hover-strong: rgba(255, 255, 255, 0.2);
+}
+:root.light .bible-scope {
+  --color-base: #ffffff;
+  --color-panel: #f7f7f8;
+  --color-elevated: #efeff1;
+  --color-elevated-hover: #e3e3e6;
+  --color-fg: #0b0b0d;
+  --color-fg-muted: #56565b;
+  --color-fg-subtle: #7c7c82;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-hover: rgba(0, 0, 0, 0.06);
+  --color-hover-strong: rgba(0, 0, 0, 0.1);
+}
+
+:root.light .text-shimmer-gold {
+  background-image: linear-gradient(100deg, #a9862b 20%, #d4af37 40%, #f0dba3 50%, #d4af37 60%, #a9862b 80%);
+}
+
+@property --color-ambient-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7c5cff;
+}
+@property --color-ambient-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #31d7ff;
+}
+:root {
+  --color-ambient-1: var(--color-brand);
+  --color-ambient-2: var(--color-accent-cyan);
+  transition: --color-ambient-1 1.2s ease, --color-ambient-2 1.2s ease;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--color-base);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  position: relative;
+}
+
+/* Fine grain texture on the app shell for a more tactile, premium finish —
+   subtle enough to read as "considered" rather than noticeable. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: radial-gradient(circle, #fff 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+:root.light body::before {
+  opacity: 0.035;
+  background-image: radial-gradient(circle, #000 1px, transparent 1px);
+}
+
+::selection {
+  background: var(--color-brand);
+  color: #000;
+}
+
+/* Slow-drifting aurora backdrop, sits behind page content. Tints toward the
+   currently playing track's cover colors via --color-ambient-1/2. */
+.aurora-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(38rem 24rem at 12% -8%, color-mix(in oklab, var(--color-ambient-1) 32%, transparent), transparent 60%),
+    radial-gradient(30rem 22rem at 88% 4%, color-mix(in oklab, var(--color-ambient-2) 22%, transparent), transparent 60%),
+    radial-gradient(26rem 26rem at 50% 30%, color-mix(in oklab, var(--color-gold) 10%, transparent), transparent 65%);
+  background-repeat: no-repeat;
+  animation: aurora-drift 22s ease-in-out infinite alternate;
+  transition: background-image 1.2s ease;
+}
+
+@keyframes aurora-drift {
+  0% {
+    background-position: 0% 0%, 100% 0%, 50% 20%;
+  }
+  100% {
+    background-position: 6% 8%, 92% 10%, 46% 32%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-bg {
+    animation: none;
+  }
+}
+
+/* Vivid ambient color reads as "too strong" against a light background —
+   tone it down so light mode stays gentle rather than garish. */
+:root.light .aurora-bg {
+  opacity: 0.25;
+}
+
+/* Equalizer bars — shown on a currently playing track */
+.eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.eq-bars span {
+  width: 3px;
+  background: var(--color-brand);
+  border-radius: 1px;
+  animation: eq-bounce 0.9s ease-in-out infinite;
+}
+.eq-bars span:nth-child(1) {
+  animation-delay: -0.6s;
+}
+.eq-bars span:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.eq-bars span:nth-child(3) {
+  animation-delay: 0s;
+}
+@keyframes eq-bounce {
+  0%, 100% {
+    height: 3px;
+  }
+  50% {
+    height: 14px;
+  }
+}
+
+/* Glow pulse for the active play button */
+.glow-pulse {
+  animation: glow-pulse 2.2s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-brand) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-brand) 0%, transparent);
+  }
+}
+
+.card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -12px color-mix(in oklab, var(--color-brand) 35%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3a3a3d;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #545458;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+input[type="range"].seek {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  transition: height 0.15s ease, box-shadow 0.15s ease;
+  background: linear-gradient(
+    to right,
+    var(--color-brand) 0%,
+    var(--color-brand) var(--progress, 0%),
+    #4d4d4f var(--progress, 0%),
+    #4d4d4f 100%
+  );
+}
+input[type="range"].seek:hover {
+  height: 6px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-brand) 12%, transparent);
+}
+input[type="range"].seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+input[type="range"].seek:hover::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1);
+}
+
+input[type="range"].seek-lg {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand) 0%,
+    var(--color-brand) var(--progress, 0%),
+    #4d4d4f var(--progress, 0%),
+    #4d4d4f 100%
+  );
+}
+input[type="range"].seek-lg::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease;
+}
+input[type="range"].seek-lg:active::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+
+/* Premium Now Playing progress bar: thicker track, larger circular thumb
+   that's invisible until interaction, matching Spotify/Apple Music. */
+input[type="range"].seek-xl {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #fff 0%,
+    #fff var(--progress, 0%),
+    rgba(255, 255, 255, 0.25) var(--progress, 0%),
+    rgba(255, 255, 255, 0.25) 100%
+  );
+  transition: height 0.15s ease;
+}
+input[type="range"].seek-xl::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+input[type="range"].seek-xl:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+}
+
+@keyframes marquee-scroll {
+  0%, 15% {
+    transform: translateX(0);
+  }
+  85%, 100% {
+    transform: translateX(calc(-100% + var(--marquee-viewport, 100%)));
+  }
+}
+.marquee-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll 8s ease-in-out infinite;
+}
+
+@keyframes bg-crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.bg-crossfade {
+  animation: bg-crossfade-in 0.8s ease forwards;
+}

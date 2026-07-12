@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/index.ts", "prisma/seed.ts"],
+  "project": ["src/**/*.ts"],
+  "ignore": ["src/generated/**", "src/youtube/**", "src/routes/youtubeImport.ts", "src/routes/youtubeCatalogImport.ts"]
+}

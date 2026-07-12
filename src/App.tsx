@@ -1,0 +1,106 @@
+import { lazy, Suspense } from "react";
+import { HashRouter, Route, Routes } from "react-router-dom";
+import MobileNav from "./components/MobileNav";
+import PlayerBar from "./components/PlayerBar";
+import Topbar from "./components/Topbar";
+import { AuthProvider } from "./context/AuthContext";
+import { CustomArtistsProvider } from "./context/CustomArtistsContext";
+import { FavoritesProvider } from "./context/FavoritesContext";
+import { LanguageProvider } from "./context/LanguageContext";
+import { LyricsProvider } from "./context/LyricsContext";
+import { PlayerProvider } from "./context/PlayerContext";
+import { SleepTimerProvider } from "./context/SleepTimerContext";
+import { ThemeProvider } from "./context/ThemeContext";
+// Home is the initial route on every fresh load, so it stays a static
+// import — lazy-loading it would only add an extra async hop with no
+// benefit. Every other route is code-split into its own chunk so the first
+// paint only ships the JS the landing page actually needs.
+import Home from "./pages/Home";
+
+const AlbumDetail = lazy(() => import("./pages/AlbumDetail"));
+const AdminFeaturedBanners = lazy(() => import("./pages/AdminFeaturedBanners"));
+const AdminLibraryManagement = lazy(() => import("./pages/AdminLibraryManagement"));
+const AdminUpload = lazy(() => import("./pages/AdminUpload"));
+const AllConcerts = lazy(() => import("./pages/AllConcerts"));
+const AllPodcasts = lazy(() => import("./pages/AllPodcasts"));
+const AllSermons = lazy(() => import("./pages/AllSermons"));
+const AllSingles = lazy(() => import("./pages/AllSingles"));
+const AllSongs = lazy(() => import("./pages/AllSongs"));
+const ArtistDetail = lazy(() => import("./pages/ArtistDetail"));
+const Artists = lazy(() => import("./pages/Artists"));
+const Bible = lazy(() => import("./pages/Bible"));
+const CustomArtistDetail = lazy(() => import("./pages/CustomArtistDetail"));
+const Library = lazy(() => import("./pages/Library"));
+const PlaylistDetail = lazy(() => import("./pages/PlaylistDetail"));
+const PodcastDetail = lazy(() => import("./pages/PodcastDetail"));
+const Recommended = lazy(() => import("./pages/Recommended"));
+const Search = lazy(() => import("./pages/Search"));
+const SermonDetail = lazy(() => import("./pages/SermonDetail"));
+const Settings = lazy(() => import("./pages/Settings"));
+const YoutubeCatalogImport = lazy(() => import("./pages/YoutubeCatalogImport"));
+const YoutubeImport = lazy(() => import("./pages/YoutubeImport"));
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <CustomArtistsProvider>
+            <FavoritesProvider>
+              <LyricsProvider>
+                <PlayerProvider>
+                  <SleepTimerProvider>
+                  <HashRouter>
+                    <div className="h-screen w-screen flex flex-col bg-base overflow-hidden">
+                      <main className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48">
+                        <div className="aurora-bg" />
+                        <div className="relative z-10">
+                          <Topbar />
+                          <Suspense fallback={null}>
+                            <Routes>
+                              <Route path="/" element={<Home />} />
+                              <Route path="/artists" element={<Artists />} />
+                              <Route path="/search" element={<Search />} />
+                              <Route path="/library" element={<Library />} />
+                              <Route path="/sermons" element={<AllSermons />} />
+                              <Route path="/podcasts" element={<AllPodcasts />} />
+                              <Route path="/concerts" element={<AllConcerts />} />
+                              <Route path="/singles" element={<AllSingles />} />
+                              <Route path="/songs" element={<AllSongs />} />
+                              <Route path="/recommended" element={<Recommended />} />
+                              <Route path="/bible" element={<Bible />} />
+                              <Route path="/settings" element={<Settings />} />
+                              <Route path="/admin/upload" element={<AdminUpload />} />
+                              <Route path="/admin/library" element={<AdminLibraryManagement />} />
+                              <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
+                              <Route path="/admin/youtube-import" element={<YoutubeImport />} />
+                              <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
+                              <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                              <Route path="/album/:id" element={<AlbumDetail />} />
+                              <Route path="/artist/:id" element={<ArtistDetail />} />
+                              <Route path="/my-artist/:id" element={<CustomArtistDetail />} />
+                              <Route path="/sermon/:id" element={<SermonDetail />} />
+                              <Route path="/podcast/:id" element={<PodcastDetail />} />
+                            </Routes>
+                          </Suspense>
+                        </div>
+                      </main>
+                      <div
+                        className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-2"
+                        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+                      >
+                        <PlayerBar />
+                        <MobileNav />
+                      </div>
+                    </div>
+                  </HashRouter>
+                  </SleepTimerProvider>
+                </PlayerProvider>
+              </LyricsProvider>
+            </FavoritesProvider>
+          </CustomArtistsProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
+  );
+}
