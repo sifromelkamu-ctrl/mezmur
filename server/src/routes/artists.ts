@@ -133,7 +133,9 @@ function toTrackDTO(track: {
     trackNumber: track.trackNumber ?? undefined,
     discNumber: track.discNumber ?? undefined,
     artistId: track.artistId,
-    artistName: track.artist?.name,
+    // Linked artist wins when present; otherwise fall back to the per-track
+    // override (unassigned Single imports — see Track.artistNameOverride).
+    artistName: track.artist?.name ?? track.artistNameOverride ?? undefined,
     albumId: track.albumId,
     albumTitle: track.album?.title,
     gradient,

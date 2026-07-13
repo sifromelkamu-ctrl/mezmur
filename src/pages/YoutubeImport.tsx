@@ -195,10 +195,15 @@ export default function YoutubeImport() {
         isSingle: destination === "single",
         ...(destination === "single"
           ? {
+              // Never sets createArtist — a Single either links to an exact
+              // existing-name match (resolvedArtistId) or is imported with
+              // artistId left null and this typed name stored as a
+              // per-track override (see youtube/pipeline.ts's
+              // findExistingArtist). It must never silently create a new
+              // Artist row / Artist page just because the typed name is new.
               titleOverride: metaTitle.trim(),
               artistId: resolvedArtistId ?? undefined,
               artistName: resolvedArtistId ? undefined : typedArtistName,
-              createArtist: resolvedArtistId ? undefined : true,
             }
           : {}),
       });
@@ -459,7 +464,7 @@ export default function YoutubeImport() {
                     {artists.find((a) => a.id === resolvedArtistId)?.name ?? typedArtistName}"
                   </span>
                 ) : (
-                  <span>Will create a new artist "{typedArtistName}"</span>
+                  <span>No matching artist — this single will show as "{typedArtistName}" without an Artist page</span>
                 )}
               </p>
             )}

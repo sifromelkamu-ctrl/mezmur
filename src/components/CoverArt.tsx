@@ -97,6 +97,12 @@ export default function CoverArt({
   const showPhoto = Boolean(photoUrl) && !photoFailed;
   const palette = useArtworkPalette(showPhoto ? photoUrl : undefined, gradient);
 
+  // A track's own artwork only exists at all when it has no album ("Album
+  // Artwork Is Master Artwork" — see readOnlyArtwork's doc above): every
+  // editable (!readOnlyArtwork) track CoverArt is therefore always a
+  // standalone Single, never an album/artist's shared image. That's the
+  // "Singles only" gate for the freeform crop floor below.
+  const allowFreeformCrop = entityType === "track" && !readOnlyArtwork;
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
   const smartFrame = useSmartFrame(canFrame ? photoUrl : undefined);
   const activeFrame = savedOverride ?? artworkFrame ?? smartFrame;
@@ -249,6 +255,7 @@ export default function CoverArt({
         <ArtworkEditor
           photoUrl={photoUrl}
           initialFrame={artworkFrame}
+          allowFreeform={allowFreeformCrop}
           onClose={() => setEditing(false)}
           onSave={async (frame) => {
             await adminApi.setArtworkFrame(entityType, entityId, frame);
