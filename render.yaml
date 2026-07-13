@@ -20,3 +20,14 @@ services:
         sync: false
       - key: SPOTIFY_CLIENT_SECRET
         sync: false
+      # Optional. A real YouTube account's cookies.txt (Netscape format),
+      # base64-encoded — without it, YouTube's bot-check blocks virtually all
+      # datacenter IPs (Render's included) with "Sign in to confirm you're
+      # not a bot" on every download. Export via a browser extension like
+      # "Get cookies.txt LOCALLY" while logged into YouTube, then:
+      #   base64 -i cookies.txt | tr -d '\n'
+      # and paste the result as this var's value in the Render dashboard.
+      # Leave unset and the importer runs exactly as it does today (no
+      # cookies, same as before this var existed).
+      - key: YTDLP_COOKIES_B64
+        sync: false

@@ -1,8 +1,34 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { readdir } from "node:fs/promises";
+import { existsSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
+
+// Optional: a real YouTube account's cookies (Netscape cookies.txt format,
+// base64-encoded into this env var), so every yt-dlp request carries an
+// authenticated session instead of an anonymous one. Without this, YouTube's
+// "Sign in to confirm you're not a bot" bot-check blocks essentially all
+// datacenter/cloud IP ranges (confirmed in production — see the deploy
+// runbook) — that's a property of the requesting IP's reputation, not of
+// Render specifically or of this app's architecture, so no amount of
+// re-platforming fixes it on its own. Decoded once at module load, not
+// per-request, since the value never changes during the process's lifetime.
+// Absent entirely (the default) yt-dlp just runs cookie-less exactly as
+// before — existing behavior for anyone who hasn't set this yet.
+const COOKIES_PATH = path.join(os.tmpdir(), "yt-dlp-cookies.txt");
+const cookiesArgs: string[] = (() => {
+  const b64 = process.env.YTDLP_COOKIES_B64?.trim();
+  if (!b64) return [];
+  try {
+    writeFileSync(COOKIES_PATH, Buffer.from(b64, "base64"));
+    return existsSync(COOKIES_PATH) ? ["--cookies", COOKIES_PATH] : [];
+  } catch (err) {
+    console.error("[yt-dlp] failed to write cookies file from YTDLP_COOKIES_B64:", err);
+    return [];
+  }
+})();
 
 export interface YoutubeMetadata {
   id: string;
@@ -59,7 +85,7 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
 
@@ -163,7 +189,7 @@ const MAX_VIDEOS_PER_LIST = 200;
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -244,7 +270,7 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
