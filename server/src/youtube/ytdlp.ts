@@ -39,6 +39,25 @@ const cookiesArgs: string[] = (() => {
   }
 })();
 
+// YouTube's "Sign in to confirm you're not a bot" check increasingly
+// requires a proof-of-origin token for the default "web" player client,
+// which cookies alone don't satisfy (confirmed in production: valid,
+// complete auth cookies — SID/HSID/LOGIN_INFO/etc. — still hit this exact
+// error). The "android" client uses a different, token-less auth flow and
+// doesn't enforce that check; falling back to "web" after it keeps the
+// existing behavior for anything android can't resolve. This is a
+// widely-documented community workaround (yt-dlp's own "sign in to confirm
+// you're not a bot" tracking issue), not a fix on this app's side of things.
+// NOTE: "tv" and "ios" were tried first and rejected — both make even a
+// bare --dump-json fail locally with "Requested format is not available",
+// a real regression, not a YouTube-side block (reproduced with yt-dlp
+// directly, no app code involved). android's own formats also skew
+// towards combined video+audio (e.g. itag 18) rather than audio-only —
+// harmless here since downloadYoutubeAudio always runs everything through
+// `-x --audio-format mp3` anyway, which extracts just the audio track
+// regardless of what the source container held.
+const CLIENT_ARGS = ["--extractor-args", "youtube:player_client=android,web"];
+
 export interface YoutubeMetadata {
   id: string;
   title: string;
@@ -94,7 +113,7 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
 
@@ -198,7 +217,7 @@ const MAX_VIDEOS_PER_LIST = 200;
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -279,7 +298,7 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
