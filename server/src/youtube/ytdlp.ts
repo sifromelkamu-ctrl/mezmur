@@ -58,6 +58,21 @@ const cookiesArgs: string[] = (() => {
 // regardless of what the source container held.
 const CLIENT_ARGS = ["--extractor-args", "youtube:player_client=android,web"];
 
+// The bgutil-ytdlp-pot-provider plugin (server/Dockerfile clones/builds it
+// into /opt/bgutil-provider) generates a real proof-of-origin token via its
+// sidecar server on localhost:4416 — the actual fix for what cookies/
+// player-client alone couldn't fully solve, rather than a workaround.
+// existsSync-gated because that directory only exists inside the Docker
+// image; local dev (Homebrew yt-dlp, no Dockerfile involved) just never
+// passes this flag and runs exactly as before.
+const PLUGIN_DIR = "/opt/bgutil-provider/plugin";
+const pluginArgs: string[] = existsSync(PLUGIN_DIR) ? ["--plugin-dirs", PLUGIN_DIR] : [];
+if (pluginArgs.length) {
+  console.log(`[yt-dlp] loaded PO-token plugin from ${PLUGIN_DIR} (expects its server sidecar on localhost:4416)`);
+} else {
+  console.log(`[yt-dlp] ${PLUGIN_DIR} not found — running without the PO-token plugin (expected outside the Docker image).`);
+}
+
 // Optional: routes every yt-dlp request through a proxy (expects a
 // residential/ISP proxy, not another datacenter one — a datacenter proxy
 // just swaps one flagged IP for another). This is the actual root-cause
@@ -141,7 +156,9 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
 
@@ -245,7 +262,9 @@ const MAX_VIDEOS_PER_LIST = 200;
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -326,7 +345,9 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
