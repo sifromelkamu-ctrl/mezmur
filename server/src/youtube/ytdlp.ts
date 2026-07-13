@@ -25,18 +25,28 @@ export class YtDlpError extends Error {
   }
 }
 
-// Every yt-dlp invocation funnels its failure through here, so an OS/
-// environment-level failure (missing binary, missing interpreter, a
-// permissions error, ...) is logged with full detail server-side but never
-// reaches a job row or an API response as raw stderr — see safeError.ts.
-// A genuine yt-dlp content error ("Video unavailable", a copyright claim,
-// a geo-block, ...) is left exactly as yt-dlp worded it, since that IS
-// actionable for whoever's looking at the import screen.
-function toYtDlpError(rawStderr: string, exitCode: number | null, context: string): YtDlpError {
+// Every yt-dlp invocation funnels its failure through here. The message
+// stored on a job row / returned to the client is always short (yt-dlp's
+// own last stderr line, or a generic fallback for OS/environment failures —
+// see safeError.ts) — but the COMPLETE stderr/stdout and the exact command
+// that was run are always logged server-side first, in full, regardless of
+// classification. yt-dlp's fatal line is rarely the whole story (format
+// selection attempts, retries, and throttling notices all print before it),
+// so the short message alone is often not enough to actually diagnose a
+// failure — this is where the full picture is preserved (Render → service →
+// Logs). A genuine yt-dlp content error ("Video unavailable", a copyright
+// claim, a geo-block, bot-check, ...) is left exactly as yt-dlp worded it in
+// the short message too, since that IS actionable on its own.
+function toYtDlpError(rawStderr: string, rawStdout: string, exitCode: number | null, context: string, args: string[]): YtDlpError {
   const lastLine = rawStderr.trim().split("\n").pop();
   const message = lastLine ? lastLine.replace(/^ERROR:\s*/, "") : `yt-dlp exited with code ${exitCode}`;
+  console.error(
+    `[yt-dlp:${context}] failed (exit ${exitCode})\n` +
+      `command: yt-dlp ${args.join(" ")}\n` +
+      `stderr:\n${rawStderr.trim() || "(empty)"}` +
+      (rawStdout.trim() ? `\nstdout:\n${rawStdout.trim()}` : "")
+  );
   if (isInternalErrorMessage(message)) {
-    console.error(`[yt-dlp:${context}] internal/environment failure (exit ${exitCode}):`, rawStderr.trim() || "(no stderr)");
     return new YtDlpError(GENERIC_IMPORT_ERROR);
   }
   return new YtDlpError(message);
@@ -68,7 +78,7 @@ function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "st
       if (code === 0) {
         resolve(stdout);
       } else {
-        reject(toYtDlpError(stderr, code, "runYtDlp"));
+        reject(toYtDlpError(stderr, stdout, code, "runYtDlp", args));
       }
     });
   });
@@ -152,11 +162,8 @@ const MAX_VIDEOS_PER_LIST = 200;
 
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      "yt-dlp",
-      ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url],
-      { stdio: ["ignore", "pipe", "pipe"] }
-    );
+    const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
+    const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -164,7 +171,7 @@ function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> 
     child.on("error", (err) => reject(ytDlpSpawnError(err, "runFlatPlaylistDump")));
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(toYtDlpError(stderr, code, "runFlatPlaylistDump"));
+        reject(toYtDlpError(stderr, stdout, code, "runFlatPlaylistDump", args));
         return;
       }
       try {
@@ -236,11 +243,8 @@ export interface ChannelSearchResult {
 export function searchChannelsByName(query: string, limit = 5): Promise<ChannelSearchResult[]> {
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
-    const child = spawn(
-      "yt-dlp",
-      ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url],
-      { stdio: ["ignore", "pipe", "pipe"] }
-    );
+    const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
+    const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -248,7 +252,7 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
     child.on("error", (err) => reject(ytDlpSpawnError(err, "searchChannelsByName")));
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(toYtDlpError(stderr, code, "searchChannelsByName"));
+        reject(toYtDlpError(stderr, stdout, code, "searchChannelsByName", args));
         return;
       }
       try {

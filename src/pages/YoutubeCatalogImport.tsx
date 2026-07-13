@@ -858,7 +858,11 @@ export default function YoutubeCatalogImport() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm truncate">{item.title}</p>
                             {phase !== "selecting" && item.message && (
-                              <p className="text-xs text-fg-muted truncate">{item.error ?? item.message}</p>
+                              // Not truncated (unlike the title above) — an error here is the
+                              // full backend reason (see server/src/youtube/safeError.ts) and
+                              // getting cut off with "..." is exactly what made the last
+                              // reported failure unreadable/undiagnosable from the UI alone.
+                              <p className="text-xs text-fg-muted break-words">{item.error ?? item.message}</p>
                             )}
                             {item.status === "skipped_duplicate" && (
                               <p className="text-xs text-fg-subtle">Already in catalog</p>
