@@ -20,10 +20,19 @@ import { GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
 const COOKIES_PATH = path.join(os.tmpdir(), "yt-dlp-cookies.txt");
 const cookiesArgs: string[] = (() => {
   const b64 = process.env.YTDLP_COOKIES_B64?.trim();
-  if (!b64) return [];
+  if (!b64) {
+    console.log("[yt-dlp] YTDLP_COOKIES_B64 not set — running without cookies (anonymous requests, likely to hit YouTube's bot-check on datacenter IPs).");
+    return [];
+  }
   try {
     writeFileSync(COOKIES_PATH, Buffer.from(b64, "base64"));
-    return existsSync(COOKIES_PATH) ? ["--cookies", COOKIES_PATH] : [];
+    if (!existsSync(COOKIES_PATH)) {
+      console.error("[yt-dlp] YTDLP_COOKIES_B64 was set but the cookies file didn't end up on disk after writing — running without cookies.");
+      return [];
+    }
+    const byteLength = Buffer.from(b64, "base64").byteLength;
+    console.log(`[yt-dlp] loaded cookies from YTDLP_COOKIES_B64 (${byteLength} bytes) -> ${COOKIES_PATH}`);
+    return ["--cookies", COOKIES_PATH];
   } catch (err) {
     console.error("[yt-dlp] failed to write cookies file from YTDLP_COOKIES_B64:", err);
     return [];
