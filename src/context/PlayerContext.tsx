@@ -11,6 +11,7 @@ import {
 import { tracksApi, type ApiTrack } from "../lib/api";
 import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
 import { recordPlayed } from "../lib/recentlyPlayed";
+import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
 
 interface PlayerContextValue {
   currentTrack: ApiTrack | null;
@@ -279,6 +280,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           : track;
       setCurrentTrack((track) => (track ? applyPatch(track) : track));
       setQueue((q) => q.map(applyPatch));
+    });
+  }, []);
+
+  // Same "no manual refresh required" reasoning as the artwork subscription
+  // above, for a title/artist-name edit instead of a cover image.
+  useEffect(() => {
+    return onTrackMetadataChanged((event) => {
+      setCurrentTrack((track) => (track ? applyTrackMetadataPatch(event, track) : track));
+      setQueue((q) => q.map((track) => applyTrackMetadataPatch(event, track)));
     });
   }, []);
 

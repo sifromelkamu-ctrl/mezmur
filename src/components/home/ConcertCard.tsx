@@ -1,5 +1,6 @@
-import { Disc3 } from "lucide-react";
+import { Disc3, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import EqualizerBars from "../EqualizerBars";
 
 interface ConcertCardProps {
   title: string;
@@ -8,9 +9,20 @@ interface ConcertCardProps {
   gradient: [string, string];
   photoUrl?: string;
   to: string;
+  playing?: boolean;
+  onPlay?: () => void;
 }
 
-export default function ConcertCard({ title, artistName, dateLabel, gradient, photoUrl, to }: ConcertCardProps) {
+export default function ConcertCard({
+  title,
+  artistName,
+  dateLabel,
+  gradient,
+  photoUrl,
+  to,
+  playing = false,
+  onPlay,
+}: ConcertCardProps) {
   const navigate = useNavigate();
 
   return (
@@ -39,6 +51,24 @@ export default function ConcertCard({ title, artistName, dateLabel, gradient, ph
       <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-accent-violet/25 backdrop-blur-md ring-1 ring-accent-violet/40 flex items-center justify-center">
         <Disc3 size={13} className="text-accent-violet" />
       </span>
+
+      {playing && (
+        <span className="absolute bottom-3 left-3 bg-black/70 rounded-full p-1.5 flex items-center justify-center">
+          <EqualizerBars />
+        </span>
+      )}
+      {onPlay && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 active:scale-90 transition-all"
+          aria-label={`Play ${title}`}
+        >
+          <Play size={14} fill="white" className="ml-0.5" />
+        </button>
+      )}
 
       <div className="relative h-36 flex flex-col justify-end p-4">
         <p className="text-base font-bold text-white leading-tight truncate">{title}</p>

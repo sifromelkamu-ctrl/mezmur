@@ -111,6 +111,93 @@
   animation: title-shimmer 4s linear infinite;
 }
 
+@keyframes splash-icon-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(8px);
+    filter: drop-shadow(0 0 0 rgba(201, 163, 74, 0));
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: drop-shadow(0 6px 24px rgba(201, 163, 74, 0.35));
+  }
+}
+
+@keyframes splash-ring-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes splash-letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    letter-spacing: 0.3em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: 0.06em;
+  }
+}
+
+@keyframes splash-tagline-in {
+  from {
+    opacity: 0;
+    letter-spacing: 0.6em;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: 0.28em;
+  }
+}
+
+@keyframes splash-progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes splash-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(6px);
+  }
+}
+
+.splash-letter {
+  display: inline-block;
+  opacity: 0;
+  animation: splash-letter-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-exiting {
+  animation: splash-exit 0.55s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
 @theme {
   /* Primary brand: royal purple. Premium 2026 rebrand — replaces the
      previous emerald-green identity across the whole app (every consumer
@@ -141,7 +228,14 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-hover: rgba(255, 255, 255, 0.06);
   --color-hover-strong: rgba(255, 255, 255, 0.14);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Abyssinica SIL sits between Inter and the generic fallbacks so it only
+     ever kicks in for Ethiopic glyphs Inter itself doesn't have — Latin
+     text throughout the app keeps rendering in Inter untouched. This is
+     the one place that needs to change to make Amharic text everywhere
+     (Home, Now Playing, artists, albums, ...) render in Abyssinica SIL;
+     Bible.tsx sets its own font-family explicitly per element, so it
+     already overrides this and is unaffected. */
+  --font-sans: "Inter", "Abyssinica SIL", ui-sans-serif, system-ui, sans-serif;
   --font-ethiopic: "Abyssinica SIL", serif;
   --font-noto-sans-ethiopic: "Noto Sans Ethiopic", sans-serif;
   --font-noto-serif-ethiopic: "Noto Serif Ethiopic", serif;
@@ -150,6 +244,7 @@
   --font-agbalumo: "Agbalumo", cursive;
   --font-google-sans: "Google Sans", sans-serif;
   --font-nyala: "Nyala", "Noto Sans Ethiopic", sans-serif;
+  --font-playfair: "Playfair Display", serif;
 }
 
 :root.light {

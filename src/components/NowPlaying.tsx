@@ -28,9 +28,11 @@ import { useSleepTimer } from "../context/SleepTimerContext";
 import { adminApi, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
 import { formatDuration } from "../utils/format";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 import AddToPlaylistModal from "./AddToPlaylistModal";
 import ArtworkEditor from "./ArtworkEditor";
 import CoverArt from "./CoverArt";
+import EditTrackMetadataModal from "./EditTrackMetadataModal";
 import LyricsPanel from "./LyricsPanel";
 import QueuePanel from "./QueuePanel";
 import SleepTimerSheet from "./SleepTimerSheet";
@@ -63,7 +65,7 @@ function MarqueeTitle({ text }: { text: string }) {
         ref={textRef}
         className={`text-2xl font-bold ${overflowing ? "marquee-text" : "inline-block truncate max-w-full"}`}
       >
-        {text}
+        {renderWithAmharicStyle(text, "font-abyssinica text-[0.85em]")}
       </span>
     </div>
   );
@@ -103,6 +105,7 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
   const [likeBurst, setLikeBurst] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showArtworkEditor, setShowArtworkEditor] = useState(false);
+  const [showMetadataEditor, setShowMetadataEditor] = useState(false);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
 
   // Admin-only, and only for a standalone Single — a track that belongs to
@@ -110,6 +113,10 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
   // the album's own cover is what CoverArt shows here already, via
   // readOnlyArtwork below), so there's nothing of its own to add or replace.
   const canEditSingleCover = user?.role === "admin" && Boolean(currentTrack) && !currentTrack?.albumId;
+  // Same admin/single scoping as above, for title/artist name instead of
+  // artwork — an album track's metadata is edited from Admin Library
+  // Management instead, where the whole album is in view.
+  const canEditSingleMeta = canEditSingleCover;
 
   const handleCoverFilePick = async (file: File) => {
     if (!currentTrack) return;
@@ -381,13 +388,36 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
           />
         )}
 
+        {showMetadataEditor && currentTrack && (
+          <EditTrackMetadataModal
+            track={currentTrack}
+            onClose={() => setShowMetadataEditor(false)}
+            onSaved={() => setShowMetadataEditor(false)}
+          />
+        )}
+
         <div className="w-full max-w-xs mx-auto shrink-0">
           {!showLyrics && (
-            <div className="mb-6">
-              <MarqueeTitle text={currentTrack.title} />
-              <p className="text-base text-white/70 truncate mt-1">{currentTrack.artistName}</p>
-              {currentTrack.albumTitle && (
-                <p className="text-xs text-white/45 truncate mt-0.5">{currentTrack.albumTitle}</p>
+            <div className="mb-6 flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <MarqueeTitle text={currentTrack.title} />
+                <p className="text-base text-white/70 truncate mt-1">
+                  {renderWithAmharicStyle(currentTrack.artistName ?? "", "font-abyssinica text-[0.85em]")}
+                </p>
+                {currentTrack.albumTitle && (
+                  <p className="text-xs text-white/45 truncate mt-0.5">
+                    {renderWithAmharicStyle(currentTrack.albumTitle, "font-abyssinica text-[0.85em]")}
+                  </p>
+                )}
+              </div>
+              {canEditSingleMeta && (
+                <button
+                  onClick={() => setShowMetadataEditor(true)}
+                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors mt-0.5"
+                  aria-label="Edit song details"
+                >
+                  <Pencil size={15} />
+                </button>
               )}
             </div>
           )}
@@ -522,16 +552,22 @@ export default function NowPlaying({ onClose, initialLyrics = false }: NowPlayin
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-white/50">Title</dt>
-              <dd className="text-white text-right">{currentTrack.title}</dd>
+              <dd className="text-white text-right">
+                {renderWithAmharicStyle(currentTrack.title, "font-abyssinica text-[0.85em]")}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-white/50">Artist</dt>
-              <dd className="text-white text-right">{currentTrack.artistName}</dd>
+              <dd className="text-white text-right">
+                {renderWithAmharicStyle(currentTrack.artistName ?? "", "font-abyssinica text-[0.85em]")}
+              </dd>
             </div>
             {currentTrack.albumTitle && (
               <div className="flex justify-between gap-4">
                 <dt className="text-white/50">Album</dt>
-                <dd className="text-white text-right">{currentTrack.albumTitle}</dd>
+                <dd className="text-white text-right">
+                  {renderWithAmharicStyle(currentTrack.albumTitle, "font-abyssinica text-[0.85em]")}
+                </dd>
               </div>
             )}
             {currentTrack.genre && (

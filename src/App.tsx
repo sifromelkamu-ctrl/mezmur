@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
+import SplashScreen from "./components/SplashScreen";
 import Topbar from "./components/Topbar";
 import { AuthProvider } from "./context/AuthContext";
 import { CustomArtistsProvider } from "./context/CustomArtistsContext";
@@ -104,6 +105,8 @@ function AppShell() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <ThemeProvider>
       <LanguageProvider>
@@ -123,6 +126,7 @@ export default function App() {
           </CustomArtistsProvider>
         </AuthProvider>
       </LanguageProvider>
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </ThemeProvider>
   );
 }

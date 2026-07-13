@@ -91,6 +91,14 @@ export default function Home() {
 
   const devotionalLine = useMemo(() => devotionalLineOfTheDay(), []);
 
+  // Concerts (unlike Singles) aren't fetched with their tracks inline, so the
+  // bottom play button fetches the full album on demand — same pattern as
+  // AllConcerts.tsx's playAlbum.
+  const playConcert = async (albumId: string) => {
+    const full = await albumsApi.get(albumId);
+    if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
+  };
+
   // Regular Albums/New Releases must never include Concert Albums — Concerts
   // is a dedicated category fetched separately above (concertsApi.list(),
   // see server/src/routes/concerts.ts), never derived from this list. This
@@ -223,7 +231,7 @@ export default function Home() {
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-xl font-black tracking-tight text-fg leading-tight">{t(greetingKey())}</h1>
-          <p className="text-xs text-fg-muted italic truncate mt-0.5 max-w-[220px]">{devotionalLine}</p>
+          <p className="text-xs text-fg-muted italic mt-0.5">{devotionalLine}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -400,6 +408,8 @@ export default function Home() {
                 gradient={album.gradient}
                 photoUrl={album.coverUrl}
                 to={`/album/${album.id}`}
+                playing={isPlaying && currentTrack?.albumId === album.id}
+                onPlay={() => playConcert(album.id)}
               />
             ))}
           </div>
