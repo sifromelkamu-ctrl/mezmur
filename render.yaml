@@ -31,3 +31,15 @@ services:
       # cookies, same as before this var existed).
       - key: YTDLP_COOKIES_B64
         sync: false
+      # Optional. Routes yt-dlp's requests through a proxy — must be a
+      # residential/ISP proxy, not another datacenter one (a datacenter
+      # proxy just swaps one flagged IP for another). Confirmed in
+      # production that cookies + player-client alone couldn't fully
+      # resolve YouTube's bot-check for lower-traffic channel content from
+      # Render's IP, while the exact same video/cookies worked instantly
+      # from a residential IP — this is the actual root-cause fix. Format:
+      # http://user:pass@host:port or socks5://user:pass@host:port, from
+      # whatever residential-proxy provider you use. Leave unset and yt-dlp
+      # runs on Render's own IP exactly as before this var existed.
+      - key: YTDLP_PROXY_URL
+        sync: false

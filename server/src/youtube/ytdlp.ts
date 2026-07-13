@@ -58,6 +58,34 @@ const cookiesArgs: string[] = (() => {
 // regardless of what the source container held.
 const CLIENT_ARGS = ["--extractor-args", "youtube:player_client=android,web"];
 
+// Optional: routes every yt-dlp request through a proxy (expects a
+// residential/ISP proxy, not another datacenter one — a datacenter proxy
+// just swaps one flagged IP for another). This is the actual root-cause
+// fix for what cookies/player-client alone couldn't fully solve: verified
+// in production that YouTube blocks Render's IP probabilistically based on
+// IP reputation combined with per-video signals (a popular reference video
+// succeeded, real lower-traffic channel content failed consistently — same
+// video worked instantly from a residential IP with the exact same
+// cookies). Format: a standard proxy URL, e.g.
+// http://user:pass@host:port or socks5://user:pass@host:port — whatever
+// your proxy provider gives you. Unset (the default) is a complete no-op.
+const proxyArgs: string[] = (() => {
+  const url = process.env.YTDLP_PROXY_URL?.trim();
+  if (!url) {
+    console.log("[yt-dlp] YTDLP_PROXY_URL not set — requests go out on Render's own IP.");
+    return [];
+  }
+  let host = "(unparsed)";
+  try {
+    host = new URL(url).host;
+  } catch {
+    // still usable by yt-dlp even if the URL module can't parse it (e.g. a
+    // bare socks5h:// scheme it doesn't recognize) — this is just for the log
+  }
+  console.log(`[yt-dlp] routing requests through proxy host ${host} (from YTDLP_PROXY_URL)`);
+  return ["--proxy", url];
+})();
+
 export interface YoutubeMetadata {
   id: string;
   title: string;
@@ -113,7 +141,7 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
 
@@ -217,7 +245,7 @@ const MAX_VIDEOS_PER_LIST = 200;
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
@@ -298,7 +326,7 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...proxyArgs, ...args], { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
