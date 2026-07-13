@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
 
 export interface YoutubeMetadata {
   id: string;
@@ -24,6 +25,28 @@ export class YtDlpError extends Error {
   }
 }
 
+// Every yt-dlp invocation funnels its failure through here, so an OS/
+// environment-level failure (missing binary, missing interpreter, a
+// permissions error, ...) is logged with full detail server-side but never
+// reaches a job row or an API response as raw stderr — see safeError.ts.
+// A genuine yt-dlp content error ("Video unavailable", a copyright claim,
+// a geo-block, ...) is left exactly as yt-dlp worded it, since that IS
+// actionable for whoever's looking at the import screen.
+function toYtDlpError(rawStderr: string, exitCode: number | null, context: string): YtDlpError {
+  const lastLine = rawStderr.trim().split("\n").pop();
+  const message = lastLine ? lastLine.replace(/^ERROR:\s*/, "") : `yt-dlp exited with code ${exitCode}`;
+  if (isInternalErrorMessage(message)) {
+    console.error(`[yt-dlp:${context}] internal/environment failure (exit ${exitCode}):`, rawStderr.trim() || "(no stderr)");
+    return new YtDlpError(GENERIC_IMPORT_ERROR);
+  }
+  return new YtDlpError(message);
+}
+
+function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpError {
+  console.error(`[yt-dlp:${context}] spawn error:`, err);
+  return new YtDlpError(GENERIC_IMPORT_ERROR);
+}
+
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -39,20 +62,13 @@ function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "st
       onLine?.(line, "stderr");
     });
 
-    child.on("error", (err) => {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new YtDlpError("yt-dlp is not installed or not on PATH"));
-        return;
-      }
-      reject(new YtDlpError(err.message));
-    });
+    child.on("error", (err) => reject(ytDlpSpawnError(err, "runYtDlp")));
 
     child.on("close", (code) => {
       if (code === 0) {
         resolve(stdout);
       } else {
-        const message = stderr.trim().split("\n").pop() || `yt-dlp exited with code ${code}`;
-        reject(new YtDlpError(message.replace(/^ERROR:\s*/, "")));
+        reject(toYtDlpError(stderr, code, "runYtDlp"));
       }
     });
   });
@@ -145,17 +161,10 @@ function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> 
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on("error", (err) => {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new YtDlpError("yt-dlp is not installed or not on PATH"));
-        return;
-      }
-      reject(new YtDlpError(err.message));
-    });
+    child.on("error", (err) => reject(ytDlpSpawnError(err, "runFlatPlaylistDump")));
     child.on("close", (code) => {
       if (code !== 0) {
-        const message = stderr.trim().split("\n").pop() || `yt-dlp exited with code ${code}`;
-        reject(new YtDlpError(message.replace(/^ERROR:\s*/, "")));
+        reject(toYtDlpError(stderr, code, "runFlatPlaylistDump"));
         return;
       }
       try {
@@ -236,17 +245,10 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on("error", (err) => {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        reject(new YtDlpError("yt-dlp is not installed or not on PATH"));
-        return;
-      }
-      reject(new YtDlpError(err.message));
-    });
+    child.on("error", (err) => reject(ytDlpSpawnError(err, "searchChannelsByName")));
     child.on("close", (code) => {
       if (code !== 0) {
-        const message = stderr.trim().split("\n").pop() || `yt-dlp exited with code ${code}`;
-        reject(new YtDlpError(message.replace(/^ERROR:\s*/, "")));
+        reject(toYtDlpError(stderr, code, "searchChannelsByName"));
         return;
       }
       try {

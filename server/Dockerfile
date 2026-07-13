@@ -7,7 +7,14 @@ FROM node:22-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+    # yt-dlp's plain "yt-dlp" release asset is a Python zipapp (its shebang
+    # execs python3 at runtime) — this image never installed python3, so
+    # every invocation failed with "/usr/bin/env: 'python3': No such file or
+    # directory". "yt-dlp_linux" is yt-dlp's own PyInstaller-frozen
+    # standalone build: it bundles its own interpreter, needs nothing else
+    # on the image, and is a drop-in replacement (still just `yt-dlp <args>`
+    # on PATH) for every existing spawn("yt-dlp", ...) call in this app.
+    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /app

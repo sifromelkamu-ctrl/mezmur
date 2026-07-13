@@ -1,6 +1,7 @@
 import { prisma } from "../prisma.js";
 import { DuplicateImportError, importYoutubeVideo } from "./pipeline.js";
 import { normalizeForMatch } from "../artwork/matching.js";
+import { toSafeErrorMessage } from "./safeError.js";
 import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 
 // A single global FIFO of item ids, processed one at a time. yt-dlp/ffmpeg
@@ -120,7 +121,7 @@ async function processItem(itemId: string) {
         },
       });
     } else {
-      const message = err instanceof Error ? err.message : "Import failed";
+      const message = toSafeErrorMessage(err, "Import failed", "youtube-catalog-import");
       await prisma.youtubeImportItem.update({
         where: { id: itemId },
         data: { status: "error", progress: 0, message: "Failed", error: message },

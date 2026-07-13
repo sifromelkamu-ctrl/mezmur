@@ -63,8 +63,12 @@ router.post("/preview", async (req: AuthedRequest, res) => {
       duration: metadata.duration,
     });
   } catch (err) {
-    const message = err instanceof YtDlpError ? `Could not fetch video info: ${err.message}` : "Could not fetch video info";
-    res.status(400).json({ error: message });
+    if (err instanceof YtDlpError) {
+      res.status(400).json({ error: `Could not fetch video info: ${err.message}` });
+      return;
+    }
+    console.error("[youtube-import:preview] unexpected error:", err);
+    res.status(400).json({ error: "Could not fetch video info" });
   }
 });
 

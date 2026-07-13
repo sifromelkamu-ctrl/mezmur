@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { toTrackDTO } from "../routes/artists.js";
 import { DuplicateImportError, importYoutubeVideo } from "./pipeline.js";
+import { toSafeErrorMessage } from "./safeError.js";
 
 type ImportJobStatus = "pending" | "downloading" | "processing" | "uploading" | "saving" | "done" | "error";
 
@@ -66,7 +67,8 @@ export function startYoutubeImport(params: StartImportParams): string {
   })
     .then(({ dto }) => update(jobId, { status: "done", progress: 100, message: "Done", track: dto }))
     .catch((err) => {
-      const message = err instanceof DuplicateImportError ? err.message : err instanceof Error ? err.message : "Import failed";
+      const message =
+        err instanceof DuplicateImportError ? err.message : toSafeErrorMessage(err, "Import failed", "youtube-import");
       update(jobId, { status: "error", progress: 0, message: "Failed", error: message });
     });
 

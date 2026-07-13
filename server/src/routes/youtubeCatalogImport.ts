@@ -10,6 +10,7 @@ import {
 import { resumeBatch, startBatchImport } from "../youtube/catalogWorker.js";
 import { extractYoutubePlaylistId, normalizeYoutubeChannelUrl } from "../youtube/validate.js";
 import { normalizeForMatch } from "../artwork/matching.js";
+import { toSafeErrorMessage } from "../youtube/safeError.js";
 import { gradientForSeed } from "./admin.js";
 
 const router = Router();
@@ -159,7 +160,7 @@ router.post("/", async (req: AuthedRequest, res) => {
     .catch(async (err) => {
       await prisma.youtubeImportBatch.update({
         where: { id: batch.id },
-        data: { status: "error", error: err instanceof Error ? err.message : "Enumeration failed" },
+        data: { status: "error", error: toSafeErrorMessage(err, "Enumeration failed", "youtube-catalog-enumerate") },
       });
     });
 
@@ -205,7 +206,7 @@ router.post("/:batchId/add-urls", async (req, res) => {
     });
     res.status(201).json({ added: newItems.length });
   } catch (err) {
-    res.status(400).json({ error: err instanceof Error ? err.message : "Could not read those URLs" });
+    res.status(400).json({ error: toSafeErrorMessage(err, "Could not read those URLs", "youtube-catalog-add-urls") });
   }
 });
 
