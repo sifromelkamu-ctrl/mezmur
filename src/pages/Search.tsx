@@ -33,10 +33,11 @@ interface BrowseTile {
   icon: LucideIcon;
 }
 
-// Only the two auto-generated tiles live here — every other "section" is a
-// curated Playlist (ownerId: null, see server/src/routes/playlists.ts),
-// built by an admin via Add to Playlist, and fetched below instead of
-// hardcoded so a newly-curated section shows up here automatically.
+// Only the two auto-generated tiles live here — Celebration/Devotional/
+// Repentance are no longer hardcoded: they're now real curated Playlists
+// (ownerId: null, see server/src/routes/playlists.ts), fed by whatever an
+// admin adds via Add to Playlist's "Sections" list, and rendered below
+// alongside any other section an admin creates the same way.
 const BROWSE_TILES: BrowseTile[] = [
   { name: "Most Played", kind: "trending", gradient: ["#f2b705", "#7c2d12"], icon: TrendingUp },
   { name: "New Releases", kind: "era", value: "new", gradient: ["#14b866", "#052e16"], icon: Sparkles },
