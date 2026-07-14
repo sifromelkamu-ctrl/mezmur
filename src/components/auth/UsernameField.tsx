@@ -20,7 +20,7 @@ export default function UsernameField({ value, onChange }: UsernameFieldProps) {
           placeholder="Username"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="px-4 py-2.5 pr-10 text-base w-full"
+          className="px-4 py-2 pr-10 text-base w-full"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           {status === "checking" && <Loader2 size={16} className="animate-spin text-fg-subtle" />}

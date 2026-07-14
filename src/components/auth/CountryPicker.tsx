@@ -25,7 +25,7 @@ export default function CountryPicker({ value, onChange }: CountryPickerProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 bg-panel rounded-md px-3 py-2.5 text-base shrink-0 hover:bg-hover transition-colors"
+        className="flex items-center gap-2 bg-panel rounded-md px-3 py-2 text-base shrink-0 hover:bg-hover transition-colors"
       >
         <span className="text-lg leading-none">{countryFlagEmoji(value.code)}</span>
         <span className="font-medium tabular-nums">{value.dialCode}</span>

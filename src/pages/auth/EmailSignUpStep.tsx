@@ -60,7 +60,7 @@ export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSign
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 flex-1">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 flex-1">
       <UsernameField value={username} onChange={setUsername} />
       <TextField
         type="email"
@@ -69,7 +69,7 @@ export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSign
         placeholder="Email address"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="px-4 py-2.5 text-base w-full"
+        className="px-4 py-2 text-base w-full"
       />
       <PasswordField value={password} onChange={setPassword} placeholder="Password" />
       <PasswordStrengthMeter password={password} />
@@ -80,12 +80,12 @@ export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSign
         autoComplete="new-password"
       />
 
-      {error && <p className="text-sm text-accent-red">{error}</p>}
+      {error && <p className="text-xs text-accent-red">{error}</p>}
 
       <button
         type="submit"
         disabled={submitting || !canSubmit}
-        className="mt-2 bg-brand text-black font-bold rounded-full py-3.5 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-50 disabled:hover:scale-100"
+        className="mt-1 bg-brand text-black font-bold rounded-full py-3 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-50 disabled:hover:scale-100"
       >
         {submitting ? "Creating account..." : "Sign Up"}
       </button>
@@ -93,7 +93,7 @@ export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSign
       <button
         type="button"
         onClick={onSwitchToPhone}
-        className="text-sm text-fg-muted hover:text-fg transition-colors text-center py-2"
+        className="text-sm text-fg-muted hover:text-fg transition-colors text-center py-1"
       >
         Use phone number instead
       </button>

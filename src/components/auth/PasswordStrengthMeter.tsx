@@ -15,7 +15,7 @@ export default function PasswordStrengthMeter({ password }: { password: string }
   if (!password) return null;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <div className="flex gap-1 flex-1">
           {[0, 1, 2, 3].map((i) => (
@@ -27,7 +27,7 @@ export default function PasswordStrengthMeter({ password }: { password: string }
         </div>
         <span className="text-[11px] font-semibold text-fg-muted shrink-0">{config.label}</span>
       </div>
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-fg-subtle">
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-fg-subtle">
         <RuleItem met={rules.minLength} label="8+ characters" />
         <RuleItem met={rules.hasUppercase} label="Uppercase letter" />
         <RuleItem met={rules.hasLowercase} label="Lowercase letter" />

@@ -26,7 +26,7 @@ export default function PasswordField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-4 py-2.5 pr-11 text-base w-full"
+        className="px-4 py-2 pr-11 text-base w-full"
       />
       <button
         type="button"

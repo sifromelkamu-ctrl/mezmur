@@ -4,6 +4,7 @@ import {
   Link2,
   MoreHorizontal,
   Music2,
+  Pause,
   Pencil,
   Play,
   Share2,
@@ -12,18 +13,35 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
-import TrackRow from "../components/TrackRow";
+import EqualizerBars from "../components/EqualizerBars";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
-import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail } from "../lib/api";
+import { useTheme } from "../context/ThemeContext";
+import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail, type ApiTrack } from "../lib/api";
+import { formatDuration } from "../utils/format";
 
-// The one accent this page's premium redesign is built around.
+// The hero stays this one fixed teal gradient regardless of the app's
+// light/dark toggle (explicitly kept "exactly as it is" per the split-theme
+// redesign) — only the content surface below it now follows the real theme.
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#134e4a";
+
+// The bright content surface's own palette — split by the real light/dark
+// mode, unlike the hero above. Values as specified: white/#121212 surface,
+// #ECECEC/#1A1A1A cards, #111111/#6B7280/#9CA3AF text in light mode (dark
+// mode isn't specified, so those three mirror the app's own existing
+// dark-theme text tones for sensible contrast against the #1A1A1A cards).
+const SURFACE = { light: "#ffffff", dark: "#121212" };
+const CARD_BG = { light: "#ffffff", dark: "#1A1A1A" };
+const CARD_BORDER = { light: "#ECECEC", dark: "rgba(255,255,255,0.08)" };
+const SONG_CARD_BORDER = { light: "#F2F2F2", dark: "rgba(255,255,255,0.06)" };
+const TEXT_TITLE = { light: "#111111", dark: "#ffffff" };
+const TEXT_SUBTLE = { light: "#6B7280", dark: "#9ba6b5" };
+const TEXT_FAINT = { light: "#9CA3AF", dark: "#6b7482" };
 
 // "live" (Concert Albums) is deliberately excluded — concerts are a
 // completely separate content type and must never appear in an artist's
@@ -59,23 +77,31 @@ function albumSubtitle(album: ApiAlbum): string {
 // just a sliver of a third peeking in to signal it scrolls) rather than the
 // shared Card component, whose non-portrait variant does the opposite
 // (1-line title, 2-line subtitle). Same shadow/hover-scale/play-button
-// language as Card, snap-x child.
+// language as Card, snap-x child. Wrapped in its own light/dark card surface
+// per the split-theme redesign (white+#ECECEC border / #1A1A1A card).
 function AlbumCard({
   album,
   to,
   playing,
   onPlay,
+  isLight,
 }: {
   album: ApiAlbum;
   to: string;
   playing: boolean;
   onPlay: () => void;
+  isLight: boolean;
 }) {
   const navigate = useNavigate();
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150"
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150 rounded-[20px] p-2.5"
+      style={{
+        backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
+        border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
+        boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
+      }}
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
         <CoverArt
@@ -85,7 +111,7 @@ function AlbumCard({
           entityType="album"
           entityId={album.id}
           artworkFrame={album.artworkFrame}
-          className={`w-40 h-40 transition-transform duration-300 group-hover:scale-105 ${
+          className={`w-full aspect-square transition-transform duration-300 group-hover:scale-105 ${
             playing ? "ring-2 ring-[#14b8a6] shadow-[0_0_14px_rgba(20,184,166,0.55)]" : ""
           }`}
         />
@@ -102,9 +128,85 @@ function AlbumCard({
         </button>
       </div>
       <div className="mt-2 px-0.5">
-        <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{album.title}</p>
-        <p className="text-xs text-white/60 truncate mt-1">{albumSubtitle(album)}</p>
+        <p
+          className="text-sm font-semibold leading-snug line-clamp-2"
+          style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}
+        >
+          {album.title}
+        </p>
+        <p className="text-xs truncate mt-1" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
+          {albumSubtitle(album)}
+        </p>
       </div>
+    </div>
+  );
+}
+
+// Bespoke Popular Songs row for the split-theme content surface — the
+// shared TrackRow reads the app's generic text-fg/text-fg-muted tokens,
+// which don't match this section's exact spec'd hex values (#111111 title /
+// #6B7280 artist / #9CA3AF duration in light mode), so this mirrors
+// TrackRow's play/pause/queue behavior with its own themed markup instead.
+function SongRow({
+  track,
+  index,
+  queue,
+  isLight,
+}: {
+  track: ApiTrack;
+  index: number;
+  queue: ApiTrack[];
+  isLight: boolean;
+}) {
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const isCurrent = currentTrack?.id === track.id;
+
+  const handleClick = () => {
+    if (isCurrent) togglePlay();
+    else playTrack(track, queue);
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0"
+      style={{
+        backgroundColor: isLight ? CARD_BG.light : "#1A1A1A",
+        border: `1px solid ${isLight ? SONG_CARD_BORDER.light : SONG_CARD_BORDER.dark}`,
+        boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.05)" : "none",
+        paddingBlock: "10px",
+      }}
+    >
+      <div className="flex items-center justify-center text-sm w-6" style={{ color: TEXT_FAINT[isLight ? "light" : "dark"] }}>
+        <span className="group-hover:hidden">{isCurrent && isPlaying ? <EqualizerBars /> : index}</span>
+        <span className="hidden group-hover:flex">
+          {isCurrent && isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3 min-w-0">
+        <CoverArt
+          gradient={track.gradient}
+          size="sm"
+          photoUrl={track.coverUrl}
+          entityType="track"
+          entityId={track.id}
+          artworkFrame={track.artworkFrame}
+        />
+        <p
+          className="text-sm font-medium truncate"
+          style={{ color: isCurrent ? TEAL : isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}
+        >
+          {track.title}
+        </p>
+      </div>
+
+      <span
+        className="text-sm tabular-nums text-right"
+        style={{ color: isLight ? TEXT_FAINT.light : TEXT_FAINT.dark }}
+      >
+        {formatDuration(track.duration)}
+      </span>
     </div>
   );
 }
@@ -127,28 +229,8 @@ export default function ArtistDetail() {
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
-
-  // This page's background is always dark by design, but every shared
-  // component on it (TrackRow's Popular Songs rows, the "..." menu, the
-  // edit-name-&-bio form, and any modal it opens) reads the app-wide light/
-  // dark theme tokens for its own text/background colors — in light theme
-  // those resolve to near-black, invisible against this permanently-dark
-  // backdrop. Overriding the CSS variables on a wrapper div only reaches
-  // elements that explicitly reference them in a class *and* are actual DOM
-  // descendants (a modal rendered via createPortal escapes the DOM subtree
-  // entirely) — so instead this forces the real light/dark toggle (the
-  // "light" class on <html>, same one ThemeContext's own effect sets) off
-  // for as long as this page is mounted, restoring whatever it was on
-  // unmount. That fixes every current and future themed element at the
-  // actual source, not just the ones this file happens to style by hand.
-  useEffect(() => {
-    const root = document.documentElement;
-    const wasLight = root.classList.contains("light");
-    root.classList.remove("light");
-    return () => {
-      if (wasLight) root.classList.add("light");
-    };
-  }, []);
+  const { mode } = useTheme();
+  const isLight = mode === "light";
 
   useEffect(() => {
     if (!id) return;
@@ -393,7 +475,7 @@ export default function ArtistDetail() {
         </div>
       </div>
 
-      <div className="px-6 py-6">
+      <div className="px-6 pt-6">
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={handlePlayAll}
@@ -428,7 +510,23 @@ export default function ArtistDetail() {
             {copied ? <Check size={18} style={{ color: TEAL }} /> : <Share2 size={18} />}
           </button>
         </div>
+      </div>
 
+      {/* Bright content surface — everything from here down follows the
+          app's real light/dark theme (unlike the hero above, which stays
+          this one fixed teal gradient always). The negative top margin
+          exactly cancels the action row's own mb-6 above, so the rounded
+          top corners sit flush against the buttons with no dead gap, while
+          the gradient still shows through the rounded corners themselves
+          (it extends behind this whole container). */}
+      <div
+        className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10"
+        style={{
+          marginTop: "-24px",
+          backgroundColor: isLight ? SURFACE.light : SURFACE.dark,
+          boxShadow: "0 -12px 32px rgba(0,0,0,0.28)",
+        }}
+      >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
             <div>
@@ -468,28 +566,54 @@ export default function ArtistDetail() {
             </div>
           </div>
         ) : (
-          artist.bio && <p className="text-white/75 text-sm max-w-2xl mb-6">{artist.bio}</p>
+          artist.bio && (
+            <p className="text-sm max-w-2xl mb-6" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
+              {artist.bio}
+            </p>
+          )
         )}
 
-        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/10 p-4 mb-8" style={{ backgroundColor: `${TEAL_DEEP}33` }}>
+        <div
+          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8"
+          style={{
+            backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
+            border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
+            boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none",
+          }}
+        >
           <div className="flex flex-col items-center gap-1 text-center">
             <div className="flex items-center gap-1.5">
               <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-white">{artist.albums.length}</span>
+              <span className="text-lg font-bold" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+                {artist.albums.length}
+              </span>
             </div>
-            <span className="text-xs text-white/60">Albums</span>
+            <span className="text-xs" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
+              Albums
+            </span>
           </div>
           <div className="flex flex-col items-center gap-1 text-center">
             <div className="flex items-center gap-1.5">
               <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-white">{totalSongCount}</span>
+              <span className="text-lg font-bold" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+                {totalSongCount}
+              </span>
             </div>
-            <span className="text-xs text-white/60">Songs</span>
+            <span className="text-xs" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
+              Songs
+            </span>
           </div>
         </div>
 
         {artist.albums.length === 0 && (
-          <div className="flex items-center gap-3 text-white/60 text-sm bg-white/5 rounded-lg p-4 max-w-md mb-10">
+          <div
+            className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10"
+            style={{
+              color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark,
+              backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
+              border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
+            }}
+          >
             <Music2 size={18} />
             No albums yet — check back soon.
           </div>
@@ -499,15 +623,18 @@ export default function ArtistDetail() {
           <section key={type} className="mb-8">
             <div className="flex items-center gap-2.5 mb-3">
               <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
-              <h2 className="text-xl font-bold tracking-tight text-white">{ALBUM_TYPE_SECTION_LABEL[type]}</h2>
+              <h2 className="text-xl font-bold tracking-tight" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+                {ALBUM_TYPE_SECTION_LABEL[type]}
+              </h2>
             </div>
-            {/* Breaks out of the page's own px-6 (24px) to a smaller, 16px
-                edge inset of its own — -24px cancels the parent's padding
-                (bleeding the scrollable hit-area to the true viewport
-                edge), +16px brings the visible cards back in from there. */}
+            {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
+                edge inset of its own — negative margin cancels the parent's
+                padding (bleeding the scrollable hit-area to the true
+                viewport edge), +16px brings the visible cards back in from
+                there. */}
             <div
-              className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-3 pb-1"
-              style={{ marginInline: "-24px", paddingInline: "16px", scrollPaddingInline: "16px" }}
+              className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-4 pb-1"
+              style={{ marginInline: "-20px", paddingInline: "16px", scrollPaddingInline: "16px" }}
             >
               {albumsByType[type].map((album) => (
                 <AlbumCard
@@ -516,6 +643,7 @@ export default function ArtistDetail() {
                   to={`/album/${album.id}`}
                   playing={isPlaying && currentTrack?.albumId === album.id}
                   onPlay={() => handlePlayAlbum(album.id)}
+                  isLight={isLight}
                 />
               ))}
             </div>
@@ -523,11 +651,13 @@ export default function ArtistDetail() {
         ))}
 
         {artist.topTracks.length > 0 && (
-          <section className="mb-8">
+          <section className="mb-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                <h2 className="text-xl font-bold tracking-tight text-white">Popular Songs</h2>
+                <h2 className="text-xl font-bold tracking-tight" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+                  Popular Songs
+                </h2>
               </div>
               {artist.topTracks.length > 5 && (
                 <button
@@ -539,7 +669,7 @@ export default function ArtistDetail() {
               )}
             </div>
             {visibleTopTracks.map((track, i) => (
-              <TrackRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} showArtistName={false} />
+              <SongRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} isLight={isLight} />
             ))}
           </section>
         )}

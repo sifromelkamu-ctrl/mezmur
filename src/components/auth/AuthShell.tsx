@@ -17,8 +17,11 @@ interface AuthShellProps {
 // continuous, elegant surface rather than a patchwork of separate screens.
 export default function AuthShell({ title, subtitle, onBack, children, stepKey }: AuthShellProps) {
   return (
-    <div className="min-h-screen w-full flex flex-col bg-base">
-      <div className="flex items-center px-4 pt-[calc(env(safe-area-inset-top)+14px)] pb-2 shrink-0">
+    // Fixed to the viewport (h-dvh, not min-h-screen) with overflow-hidden
+    // so the whole flow is always one non-scrolling screen — every step's
+    // own spacing is kept compact enough to fit within it.
+    <div className="h-dvh w-full flex flex-col bg-base overflow-hidden">
+      <div className="flex items-center px-4 pt-[calc(env(safe-area-inset-top)+8px)] pb-1 shrink-0">
         {onBack ? (
           <button
             onClick={onBack}
@@ -32,10 +35,10 @@ export default function AuthShell({ title, subtitle, onBack, children, stepKey }
         )}
       </div>
 
-      <div key={stepKey} className="flex-1 flex flex-col px-6 pb-10 auth-step">
-        <div className="max-w-sm w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-2xl font-bold mb-1.5">{title}</h1>
-          {subtitle && <p className="text-sm text-fg-muted mb-6">{subtitle}</p>}
+      <div key={stepKey} className="flex-1 min-h-0 flex flex-col px-6 pb-[calc(env(safe-area-inset-bottom)+16px)] auth-step">
+        <div className="max-w-sm w-full mx-auto flex-1 min-h-0 flex flex-col">
+          <h1 className="text-xl font-bold mb-1">{title}</h1>
+          {subtitle && <p className="text-sm text-fg-muted mb-4">{subtitle}</p>}
           {children}
         </div>
       </div>

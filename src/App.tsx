@@ -87,7 +87,7 @@ function AppShell() {
   );
 
   if (isAuthRoute) {
-    return <div className="h-screen w-screen bg-base overflow-hidden">{routes}</div>;
+    return <div className="h-dvh w-screen bg-base overflow-hidden">{routes}</div>;
   }
 
   return (
