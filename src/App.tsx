@@ -28,6 +28,7 @@ const AllSermons = lazy(() => import("./pages/AllSermons"));
 const AllSingles = lazy(() => import("./pages/AllSingles"));
 const AllSongs = lazy(() => import("./pages/AllSongs"));
 const ArtistDetail = lazy(() => import("./pages/ArtistDetail"));
+const ConcertDetail = lazy(() => import("./pages/ConcertDetail"));
 const Artists = lazy(() => import("./pages/Artists"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Bible = lazy(() => import("./pages/Bible"));
@@ -72,10 +73,11 @@ function AppShell() {
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
         <Route path="/playlist/:id" element={<PlaylistDetail />} />
         <Route path="/album/:id" element={<AlbumDetail />} />
-        {/* Same page as /album/:id — a Concert is still an Album row
-            (albumType "live"), but gets its own URL so every place that
-            links to a concert can point at a dedicated Concert route. */}
-        <Route path="/concert/:id" element={<AlbumDetail />} />
+        {/* Its own dedicated page (not AlbumDetail) — a Concert is still an
+            Album row under the hood (albumType "live"), but the detail page
+            now has concert-only UI (the horizontal concert switcher,
+            Like/Download/Share) that a regular Album page must never grow. */}
+        <Route path="/concert/:id" element={<ConcertDetail />} />
         <Route path="/artist/:id" element={<ArtistDetail />} />
         <Route path="/my-artist/:id" element={<CustomArtistDetail />} />
         <Route path="/sermon/:id" element={<SermonDetail />} />

@@ -31,6 +31,12 @@ router.get("/", async (req, res) => {
       // youtube/pipeline.ts) has no owner concept either — it can only ever
       // be catalog content, so it counts as "non-user-owned" here too.
       OR: [{ artist: { ownerId: null } }, { artistId: null }],
+      // Concerts are a completely separate content type from every other
+      // track-based surface (Continue Listening, Recommended, Random Play,
+      // trending/mood/era browsing, ...) — a track belonging to a
+      // "live"-tagged album never leaks into any of them. `album` being
+      // null (an unassigned single) always passes this check untouched.
+      NOT: { album: { albumType: "live" } },
       ...(mood ? { moods: { has: mood } } : {}),
       ...(language ? { language: { equals: language, mode: "insensitive" } } : {}),
       ...(era === "classic" ? { album: { year: { lt: ERA_CUTOFF_YEAR } } } : {}),
@@ -46,7 +52,10 @@ router.get("/", async (req, res) => {
 router.get("/trending", async (req, res) => {
   const limit = Math.min(50, Number(req.query.limit) || 12);
   const tracks = await prisma.track.findMany({
-    where: { OR: [{ artist: { ownerId: null } }, { artistId: null }] },
+    where: {
+      OR: [{ artist: { ownerId: null } }, { artistId: null }],
+      NOT: { album: { albumType: "live" } },
+    },
     include: { artist: true, album: true },
     orderBy: { playCount: "desc" },
     take: limit,

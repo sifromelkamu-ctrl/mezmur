@@ -370,25 +370,6 @@ export default function Home() {
         </SectionRow>
       )}
 
-      {concerts.length > 0 && (
-        <SectionRow title={t("concerts")} onShowAll={() => navigate("/concerts")} accent="violet" large edgeInset={20} scroll>
-          {concerts.map((album) => (
-            <ArtTile
-              key={album.id}
-              title={album.title}
-              subtitle={album.artistName}
-              gradient={album.gradient}
-              to={`/concert/${album.id}`}
-              photoUrl={album.coverUrl}
-              entityType="album"
-              entityId={album.id}
-              artworkFrame={album.artworkFrame}
-              playing={isPlaying && currentTrack?.albumId === album.id}
-            />
-          ))}
-        </SectionRow>
-      )}
-
       {sermons.length > 0 && (
         <SectionRow title={t("sermons")} onShowAll={() => navigate("/sermons")} accent="sky" dense edgeInset={20} scroll>
           {sermons.map((sermon) => (
@@ -416,6 +397,48 @@ export default function Home() {
           ))}
         </SectionRow>
       )}
+
+      {/* Always shown, even with zero concerts — pinned to the very bottom
+          of Home per the Concert-experience spec, unlike every other
+          section above which only renders once it has content. */}
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-violet to-indigo-900" />
+            <h2 className="font-bold tracking-tight text-2xl">{t("concerts")}</h2>
+          </div>
+          <button
+            onClick={() => navigate("/concerts")}
+            className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors shrink-0"
+          >
+            Show all
+          </button>
+        </div>
+        {concerts.length > 0 ? (
+          <div
+            className="flex overflow-x-auto overscroll-x-contain no-scrollbar gap-3 pb-1 scroll-smooth"
+            style={{ marginInline: "-20px", paddingInline: "20px" }}
+          >
+            {concerts.map((album) => (
+              <div key={album.id} className="shrink-0 w-40">
+                <ArtTile
+                  title={album.title}
+                  subtitle={album.artistName}
+                  gradient={album.gradient}
+                  to={`/concert/${album.id}`}
+                  photoUrl={album.coverUrl}
+                  entityType="album"
+                  entityId={album.id}
+                  artworkFrame={album.artworkFrame}
+                  playing={isPlaying && currentTrack?.albumId === album.id}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-fg-muted text-sm bg-elevated/50 rounded-lg p-4">No concerts available yet.</div>
+        )}
+      </section>
     </div>
   );
 }

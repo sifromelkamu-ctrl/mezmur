@@ -31,7 +31,11 @@ import {
 } from "../lib/api";
 import { renderWithAmharicStyle } from "../utils/scriptText";
 
-const ALBUM_TYPE_ORDER: ApiAlbumType[] = ["album", "ep", "single", "live", "compilation"];
+// "live" (Concert Albums) is deliberately excluded — concerts are a
+// completely separate content type and must never appear in an artist's
+// own discography (see Home's dedicated Concerts section / /concert/:id
+// instead).
+const ALBUM_TYPE_ORDER: ApiAlbumType[] = ["album", "ep", "single", "compilation"];
 const ALBUM_TYPE_SECTION_LABEL: Record<ApiAlbumType, string> = {
   album: "Albums",
   ep: "EPs",

@@ -180,8 +180,20 @@ router.get("/:id", optionalAuth, async (req, res) => {
   const artist = await prisma.artist.findUnique({
     where: { id: String(req.params.id) },
     include: {
-      albums: { include: { tracks: { select: { duration: true } } }, orderBy: { year: "desc" } },
-      tracks: { include: { album: true }, orderBy: { playCount: "desc" }, take: 10 },
+      // Concerts are a completely separate content type — never merged into
+      // an artist's own discography or Popular Songs, even though a
+      // concert's tracks/album still technically belong to this artist.
+      albums: {
+        where: { albumType: { not: "live" } },
+        include: { tracks: { select: { duration: true } } },
+        orderBy: { year: "desc" },
+      },
+      tracks: {
+        where: { NOT: { album: { albumType: "live" } } },
+        include: { album: true },
+        orderBy: { playCount: "desc" },
+        take: 10,
+      },
     },
   });
   if (!artist) {
