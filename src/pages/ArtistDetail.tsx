@@ -55,9 +55,11 @@ function albumSubtitle(album: ApiAlbum): string {
 }
 
 // Purpose-built for this carousel's exact spec (2-line title, 1-line
-// metadata, 144px square art) rather than the shared Card component, whose
-// non-portrait variant does the opposite (1-line title, 2-line subtitle).
-// Same shadow/hover-scale/play-button language as Card, snap-x child.
+// metadata, 160px square art — sized so ~2 cards fill the viewport, with
+// just a sliver of a third peeking in to signal it scrolls) rather than the
+// shared Card component, whose non-portrait variant does the opposite
+// (1-line title, 2-line subtitle). Same shadow/hover-scale/play-button
+// language as Card, snap-x child.
 function AlbumCard({
   album,
   to,
@@ -73,7 +75,7 @@ function AlbumCard({
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-36 group cursor-pointer active:scale-[0.97] transition-transform duration-150"
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150"
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
         <CoverArt
@@ -83,7 +85,7 @@ function AlbumCard({
           entityType="album"
           entityId={album.id}
           artworkFrame={album.artworkFrame}
-          className={`w-36 h-36 transition-transform duration-300 group-hover:scale-105 ${
+          className={`w-40 h-40 transition-transform duration-300 group-hover:scale-105 ${
             playing ? "ring-2 ring-[#14b8a6] shadow-[0_0_14px_rgba(20,184,166,0.55)]" : ""
           }`}
         />
@@ -537,15 +539,7 @@ export default function ArtistDetail() {
               )}
             </div>
             {visibleTopTracks.map((track, i) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                index={i + 1}
-                queue={visibleTopTracks}
-                showArtistName={false}
-                showPlayCount
-                showActions
-              />
+              <TrackRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} showArtistName={false} />
             ))}
           </section>
         )}
