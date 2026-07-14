@@ -9,7 +9,7 @@ const dict = {
   home: { en: "Home", am: "መነሻ" },
   artists: { en: "Artists", am: "አርቲስቶች" },
   search: { en: "Search", am: "ፈልግ" },
-  yourLibrary: { en: "Your Library", am: "ቤተ-መጻሕፍትዎ" },
+  yourLibrary: { en: "Library", am: "ቤተ-መጻሕፍት" },
   settings: { en: "Settings", am: "ቅንብሮች" },
   createPlaylist: { en: "Create Playlist", am: "ፕሌይሊስት ፍጠር" },
   likedSongs: { en: "Liked Songs", am: "የወደድኳቸው ዘፈኖች" },
