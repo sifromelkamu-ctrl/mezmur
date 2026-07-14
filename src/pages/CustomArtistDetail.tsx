@@ -5,6 +5,7 @@ import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import TextField from "../components/form/TextField";
 import { useCustomArtists } from "../context/CustomArtistsContext";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 export default function CustomArtistDetail() {
   const { id } = useParams();
@@ -56,7 +57,7 @@ export default function CustomArtistDetail() {
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-wide">Artist</p>
           <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">
-            {artist.name}
+            {renderWithAmharicStyle(artist.name)}
           </h1>
           <p className="text-sm text-fg-muted">
             {artist.albums.length} album{artist.albums.length === 1 ? "" : "s"}
@@ -112,7 +113,7 @@ export default function CustomArtistDetail() {
                     artworkFrame={album.artworkFrame}
                   />
                 </div>
-                <p className="text-sm font-semibold truncate">{album.title}</p>
+                <p className="text-sm font-semibold truncate">{renderWithAmharicStyle(album.title)}</p>
                 <p className="text-xs text-fg-muted mt-1">Album</p>
               </div>
             ))}

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import TextField from "./form/TextField";
 import { playlistsApi, type ApiPlaylist, type ApiTrack } from "../lib/api";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 interface AddToPlaylistModalProps {
   track: ApiTrack;
@@ -77,7 +78,7 @@ export default function AddToPlaylistModal({ track, onClose }: AddToPlaylistModa
             <X size={18} />
           </button>
         </div>
-        <p className="text-sm text-fg-muted truncate mb-4">{track.title}</p>
+        <p className="text-sm text-fg-muted truncate mb-4">{renderWithAmharicStyle(track.title)}</p>
 
         <form onSubmit={createAndAdd} className="flex items-center gap-2 mb-3 shrink-0">
           <TextField

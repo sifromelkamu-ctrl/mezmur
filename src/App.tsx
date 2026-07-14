@@ -72,6 +72,10 @@ function AppShell() {
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
         <Route path="/playlist/:id" element={<PlaylistDetail />} />
         <Route path="/album/:id" element={<AlbumDetail />} />
+        {/* Same page as /album/:id — a Concert is still an Album row
+            (albumType "live"), but gets its own URL so every place that
+            links to a concert can point at a dedicated Concert route. */}
+        <Route path="/concert/:id" element={<AlbumDetail />} />
         <Route path="/artist/:id" element={<ArtistDetail />} />
         <Route path="/my-artist/:id" element={<CustomArtistDetail />} />
         <Route path="/sermon/:id" element={<SermonDetail />} />

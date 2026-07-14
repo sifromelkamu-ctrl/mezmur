@@ -5,6 +5,7 @@ import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import type { ArtworkEntityType, ArtworkFrame } from "../lib/api";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 interface CardProps {
   title: string;
@@ -123,8 +124,8 @@ export default function Card({
         )}
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-3">
-          <p className={`font-semibold text-sm text-white truncate ${titleClassName}`}>{title}</p>
-          {shouldShowSubtitle && <p className="text-xs text-white/70 truncate mt-0.5">{subtitle}</p>}
+          <p className={`font-semibold text-sm text-white truncate ${titleClassName}`}>{renderWithAmharicStyle(title)}</p>
+          {shouldShowSubtitle && <p className="text-xs text-white/70 truncate mt-0.5">{renderWithAmharicStyle(subtitle)}</p>}
         </div>
         {playing && (
           <span className="absolute top-2 left-2 bg-black/70 rounded-full p-1.5 flex items-center justify-center">
@@ -181,9 +182,11 @@ export default function Card({
         </button>
       </div>
       <div className={large ? "text-center" : ""}>
-        <p className={`font-semibold truncate ${large ? "text-sm" : "text-sm"}`}>{title}</p>
+        <p className={`font-semibold truncate ${large ? "text-sm" : "text-sm"}`}>{renderWithAmharicStyle(title)}</p>
         {shouldShowSubtitle && (
-          <p className={`text-xs text-fg-muted mt-1 truncate ${dense ? "" : "line-clamp-2"}`}>{subtitle}</p>
+          <p className={`text-xs text-fg-muted mt-1 truncate ${dense ? "" : "line-clamp-2"}`}>
+            {renderWithAmharicStyle(subtitle)}
+          </p>
         )}
       </div>
     </div>

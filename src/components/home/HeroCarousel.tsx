@@ -1,5 +1,6 @@
 import { Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { renderWithAmharicStyle } from "../../utils/scriptText";
 
 export interface HeroSlide {
   id: string;
@@ -77,9 +78,9 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
                   {slide.tag}
                 </span>
                 <h2 className="text-2xl font-black tracking-tight text-white leading-tight mb-1 drop-shadow-sm">
-                  {slide.title}
+                  {renderWithAmharicStyle(slide.title)}
                 </h2>
-                <p className="text-sm font-semibold text-accent-cyan mb-4">{slide.subtitle}</p>
+                <p className="text-sm font-semibold text-accent-cyan mb-4">{renderWithAmharicStyle(slide.subtitle)}</p>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

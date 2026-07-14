@@ -1,9 +1,8 @@
-import { Bell, Flame, Heart, Music, Shuffle, Sparkles, Ticket, User } from "lucide-react";
+import { Bell, Flame, Heart, Music, Shuffle, Sparkles, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
 import Card from "../components/Card";
-import ConcertCard from "../components/home/ConcertCard";
 import ForYouCard from "../components/home/ForYouCard";
 import HeroCarousel, { type HeroSlide } from "../components/home/HeroCarousel";
 import QuickActionGrid, { type QuickAction } from "../components/home/QuickActionGrid";
@@ -90,14 +89,6 @@ export default function Home() {
   }, [user]);
 
   const devotionalLine = useMemo(() => devotionalLineOfTheDay(), []);
-
-  // Concerts (unlike Singles) aren't fetched with their tracks inline, so the
-  // bottom play button fetches the full album on demand — same pattern as
-  // AllConcerts.tsx's playAlbum.
-  const playConcert = async (albumId: string) => {
-    const full = await albumsApi.get(albumId);
-    if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
-  };
 
   // Regular Albums/New Releases must never include Concert Albums — Concerts
   // is a dedicated category fetched separately above (concertsApi.list(),
@@ -191,10 +182,6 @@ export default function Home() {
     { id: "new", label: t("newReleases"), icon: Sparkles, glow: "cyan", onClick: () => navigate("/library?filter=albums") },
     { id: "favorites", label: t("favorites"), icon: Heart, glow: "brand", onClick: () => navigate("/library?filter=favorites") },
     { id: "shuffle", label: t("shuffle"), icon: Shuffle, glow: "gold", onClick: shufflePlay },
-    // Concert Albums are a dedicated category (see concertsApi above) —
-    // this button, like the Concerts section further down, only ever shows
-    // what's fetched from that separate endpoint.
-    { id: "concerts", label: t("concert"), icon: Ticket, glow: "violet", onClick: () => navigate("/concerts") },
   ];
 
   if (loading) {
@@ -385,35 +372,22 @@ export default function Home() {
       )}
 
       {concerts.length > 0 && (
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-violet to-indigo-900" />
-              <h2 className="font-bold tracking-tight text-2xl">{t("concert")}</h2>
-            </div>
-            <button
-              onClick={() => navigate("/concerts")}
-              className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors shrink-0"
-            >
-              Show all
-            </button>
-          </div>
-          <div className="flex overflow-x-auto overscroll-x-contain no-scrollbar gap-4 -mx-5 px-5 pb-1 scroll-smooth">
-            {concerts.map((album) => (
-              <ConcertCard
-                key={album.id}
-                title={album.title}
-                artistName={album.artistName}
-                dateLabel={album.year ? String(album.year) : undefined}
-                gradient={album.gradient}
-                photoUrl={album.coverUrl}
-                to={`/album/${album.id}`}
-                playing={isPlaying && currentTrack?.albumId === album.id}
-                onPlay={() => playConcert(album.id)}
-              />
-            ))}
-          </div>
-        </section>
+        <SectionRow title={t("concerts")} onShowAll={() => navigate("/concerts")} accent="violet" large edgeInset={20} scroll>
+          {concerts.map((album) => (
+            <ArtTile
+              key={album.id}
+              title={album.title}
+              subtitle={album.artistName}
+              gradient={album.gradient}
+              to={`/concert/${album.id}`}
+              photoUrl={album.coverUrl}
+              entityType="album"
+              entityId={album.id}
+              artworkFrame={album.artworkFrame}
+              playing={isPlaying && currentTrack?.albumId === album.id}
+            />
+          ))}
+        </SectionRow>
       )}
 
       {sermons.length > 0 && (

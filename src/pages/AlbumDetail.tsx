@@ -1,4 +1,4 @@
-import { Check, Clock, GripVertical, Pencil, Play, Shuffle, Trash2, Upload, X } from "lucide-react";
+import { Check, Clock, Download, GripVertical, Pencil, Play, Shuffle, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
@@ -9,6 +9,7 @@ import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { adminApi, albumsApi, type ApiAlbumDetail, type ApiAlbumType } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 function formatDuration(totalSeconds: number): string {
   const totalMinutes = Math.round(totalSeconds / 60);
@@ -287,20 +288,24 @@ export default function AlbumDetail() {
           ) : (
             <>
               <div className="flex items-center justify-center gap-2">
-                <p className="text-sm font-semibold uppercase tracking-wide">Album</p>
+                <p className="text-sm font-semibold uppercase tracking-wide">
+                  {album.albumType === "live" ? "Concert" : "Album"}
+                </p>
                 {isAdmin && (
                   <button onClick={startEditing} className="text-fg-muted hover:text-fg transition-colors" aria-label="Edit album">
                     <Pencil size={14} />
                   </button>
                 )}
               </div>
-              <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">{album.title}</h1>
+              <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">
+                {renderWithAmharicStyle(album.title)}
+              </h1>
               <p className="text-sm text-fg-muted">
                 <span
                   className="font-semibold text-fg hover:underline cursor-pointer"
                   onClick={() => navigate(`/artist/${album.artistId}`)}
                 >
-                  {album.artistName}
+                  {renderWithAmharicStyle(album.artistName ?? "")}
                 </span>{" "}
                 {album.year ? `· ${album.year} ` : ""}· {orderedTracks.length} songs, {formatDuration(totalDuration)}
                 {album.genre ? ` · ${album.genre}` : ""}
@@ -329,6 +334,16 @@ export default function AlbumDetail() {
           >
             <Shuffle size={18} />
           </button>
+          {album.albumType === "live" && (
+            <button
+              disabled
+              title="Download coming soon"
+              className="w-11 h-11 rounded-full flex items-center justify-center border border-border text-fg-subtle opacity-50 cursor-not-allowed"
+              aria-label="Download (coming soon)"
+            >
+              <Download size={18} />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 py-2 text-xs text-fg-muted border-b border-border mb-2">

@@ -127,7 +127,7 @@ export default function AllConcerts() {
               title={album.title}
               subtitle={album.year ? `${album.year} · Concert` : "Concert"}
               gradient={album.gradient}
-              to={`/album/${album.id}`}
+              to={`/concert/${album.id}`}
               photoUrl={album.coverUrl}
               large
               entityType="album"

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import CoverArt from "../CoverArt";
 import EqualizerBars from "../EqualizerBars";
 import type { ArtworkEntityType, ArtworkFrame } from "../../lib/api";
+import { renderWithAmharicStyle } from "../../utils/scriptText";
 
 interface ArtTileProps {
   title: string;
@@ -83,8 +84,8 @@ export default function ArtTile({
         )}
       </div>
       <div className="mt-3 px-0.5">
-        <p className="text-sm font-semibold text-fg truncate">{title}</p>
-        {subtitle && <p className="text-xs text-fg-muted truncate mt-0.5">{subtitle}</p>}
+        <p className="text-sm font-semibold text-fg truncate">{renderWithAmharicStyle(title)}</p>
+        {subtitle && <p className="text-xs text-fg-muted truncate mt-0.5">{renderWithAmharicStyle(subtitle)}</p>}
       </div>
     </div>
   );

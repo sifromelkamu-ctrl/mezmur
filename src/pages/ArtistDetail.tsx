@@ -29,6 +29,7 @@ import {
   type ApiArtistDetail,
   type ApiPlaylist,
 } from "../lib/api";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 const ALBUM_TYPE_ORDER: ApiAlbumType[] = ["album", "ep", "single", "live", "compilation"];
 const ALBUM_TYPE_SECTION_LABEL: Record<ApiAlbumType, string> = {
@@ -307,7 +308,7 @@ export default function ArtistDetail() {
             </span>
             <span className="text-xs font-bold uppercase tracking-wide text-brand">Artist</span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight break-words">{artist.name}</h1>
+          <h1 className="text-4xl font-black tracking-tight break-words">{renderWithAmharicStyle(artist.name)}</h1>
           <p className="text-sm text-fg-muted mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
       </div>
@@ -406,7 +407,7 @@ export default function ArtistDetail() {
                 title={album.title}
                 subtitle={albumSubtitle(album)}
                 gradient={album.gradient}
-                to={`/album/${album.id}`}
+                to={type === "live" ? `/concert/${album.id}` : `/album/${album.id}`}
                 photoUrl={album.coverUrl}
                 large
                 entityType="album"

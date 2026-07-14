@@ -10,6 +10,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import { albumsApi, artistsApi, playlistsApi, type ApiAlbum, type ApiArtist, type ApiPlaylist } from "../lib/api";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 
 type Filter = "artists" | "albums" | "playlists" | "favorites";
 type ArtistSort = "name" | "popular";
@@ -90,7 +91,7 @@ function ArtistCard({
             onClick={(e) => e.stopPropagation()}
           >
             <p className="px-3 py-2.5 text-sm font-semibold text-fg truncate border-b border-white/10">
-              {artist.name}
+              {renderWithAmharicStyle(artist.name)}
             </p>
             <button
               onClick={() => {

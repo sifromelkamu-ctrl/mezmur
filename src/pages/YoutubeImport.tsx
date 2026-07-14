@@ -37,7 +37,7 @@ type Destination = "album" | "single" | "live";
 const DESTINATIONS: { id: Destination; label: string; icon: typeof Disc3 }[] = [
   { id: "album", label: "Album", icon: Disc3 },
   { id: "single", label: "Single", icon: Music2 },
-  { id: "live", label: "Concert Album", icon: Ticket },
+  { id: "live", label: "Concert", icon: Ticket },
 ];
 
 // The URL/destination form vs. the Single-only "Edit Metadata" review step —
@@ -136,7 +136,7 @@ export default function YoutubeImport() {
     if (!url.trim()) return "Paste a YouTube URL first";
     if (!confirmRights) return "You must confirm you have permission to use this content";
     if (destination === "album" && !albumId) return "Select which album this track belongs to";
-    if (destination === "live" && !albumId) return "Select which concert album this track belongs to";
+    if (destination === "live" && !albumId) return "Select which concert this track belongs to";
     return null;
   };
 
@@ -324,7 +324,7 @@ export default function YoutubeImport() {
                 className="px-3 py-2 text-base"
               >
                 <option value="">
-                  {destination === "live" ? "Select a concert album..." : "Select an album..."}
+                  {destination === "live" ? "Select a concert..." : "Select an album..."}
                 </option>
                 {destinationAlbums.map((al) => (
                   <option key={al.id} value={al.id}>
@@ -336,7 +336,7 @@ export default function YoutubeImport() {
             {destination !== "single" && destinationAlbums.length === 0 && (
               <p className="text-xs text-fg-subtle -mt-1">
                 {destination === "live"
-                  ? "No concert albums yet — create one first from Bulk Upload Tracks."
+                  ? "No concerts yet — create one first from Bulk Upload Tracks."
                   : "No albums yet — create one first from Bulk Upload Tracks."}
               </p>
             )}

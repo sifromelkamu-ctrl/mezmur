@@ -7,12 +7,12 @@ import { Fragment, type ReactNode } from "react";
 const ETHIOPIC_RUN = new RegExp("[\\u1200-\\u137F\\u1380-\\u139F\\u2D80-\\u2DDF\\uAB00-\\uAB2F]+", "g");
 
 // Splits mixed Amharic/Latin text (e.g. "Yidnekachew Teka · ኢየሱስ") into runs
-// and wraps only the Amharic runs in `amharicClassName` — Abyssinica SIL
-// renders noticeably larger than Inter at the same font-size, so pairing an
-// explicit font with a slightly smaller size keeps mixed-script lines (very
-// common here: artist names, "Title · Album") visually even instead of the
-// Amharic half looming over the Latin half.
-export function renderWithAmharicStyle(text: string, amharicClassName: string): ReactNode[] {
+// and shrinks only the Latin runs — Abyssinica SIL (the font --font-sans
+// falls back to for Ethiopic glyphs) renders noticeably larger than Inter at
+// the same declared font-size, so scaling the Latin side down instead of
+// pushing Amharic down further keeps mixed-script lines visually even
+// without ever making the Amharic side harder to read.
+export function renderWithAmharicStyle(text: string): ReactNode[] {
   const parts: { text: string; amharic: boolean }[] = [];
   let lastIndex = 0;
   for (const match of text.matchAll(ETHIOPIC_RUN)) {
@@ -25,11 +25,11 @@ export function renderWithAmharicStyle(text: string, amharicClassName: string): 
 
   return parts.map((part, i) =>
     part.amharic ? (
-      <span key={i} className={amharicClassName}>
+      <Fragment key={i}>{part.text}</Fragment>
+    ) : (
+      <span key={i} className="text-[0.85em]">
         {part.text}
       </span>
-    ) : (
-      <Fragment key={i}>{part.text}</Fragment>
     )
   );
 }
