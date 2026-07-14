@@ -13,18 +13,15 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
-import Card from "../components/Card";
-import SectionRow from "../components/SectionRow";
+import CoverArt from "../components/CoverArt";
 import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail } from "../lib/api";
 
-// The one accent this page's premium redesign is built around — not yet a
-// shared design-system token (see SectionRow's "teal" accent, added for
-// this page), so used directly here for anything SectionRow doesn't cover.
+// The one accent this page's premium redesign is built around.
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#134e4a";
 
@@ -57,6 +54,59 @@ function albumSubtitle(album: ApiAlbum): string {
   return parts.join(" · ");
 }
 
+// Purpose-built for this carousel's exact spec (2-line title, 1-line
+// metadata, 144px square art) rather than the shared Card component, whose
+// non-portrait variant does the opposite (1-line title, 2-line subtitle).
+// Same shadow/hover-scale/play-button language as Card, snap-x child.
+function AlbumCard({
+  album,
+  to,
+  playing,
+  onPlay,
+}: {
+  album: ApiAlbum;
+  to: string;
+  playing: boolean;
+  onPlay: () => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      onClick={() => navigate(to)}
+      className="snap-start shrink-0 w-36 group cursor-pointer active:scale-[0.97] transition-transform duration-150"
+    >
+      <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
+        <CoverArt
+          gradient={album.gradient}
+          size="md"
+          photoUrl={album.coverUrl}
+          entityType="album"
+          entityId={album.id}
+          artworkFrame={album.artworkFrame}
+          className={`w-36 h-36 transition-transform duration-300 group-hover:scale-105 ${
+            playing ? "ring-2 ring-[#14b8a6] shadow-[0_0_14px_rgba(20,184,166,0.55)]" : ""
+          }`}
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className="absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center text-black opacity-0 group-hover:opacity-100 active:scale-90 transition-all shadow-lg"
+          style={{ backgroundColor: TEAL }}
+          aria-label={`Play ${album.title}`}
+        >
+          <Play size={14} fill="black" className="ml-0.5" />
+        </button>
+      </div>
+      <div className="mt-2 px-0.5">
+        <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{album.title}</p>
+        <p className="text-xs text-white/60 truncate mt-1">{albumSubtitle(album)}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function ArtistDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -75,6 +125,28 @@ export default function ArtistDetail() {
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
+
+  // This page's background is always dark by design, but every shared
+  // component on it (TrackRow's Popular Songs rows, the "..." menu, the
+  // edit-name-&-bio form, and any modal it opens) reads the app-wide light/
+  // dark theme tokens for its own text/background colors — in light theme
+  // those resolve to near-black, invisible against this permanently-dark
+  // backdrop. Overriding the CSS variables on a wrapper div only reaches
+  // elements that explicitly reference them in a class *and* are actual DOM
+  // descendants (a modal rendered via createPortal escapes the DOM subtree
+  // entirely) — so instead this forces the real light/dark toggle (the
+  // "light" class on <html>, same one ThemeContext's own effect sets) off
+  // for as long as this page is mounted, restoring whatever it was on
+  // unmount. That fixes every current and future themed element at the
+  // actual source, not just the ones this file happens to style by hand.
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasLight = root.classList.contains("light");
+    root.classList.remove("light");
+    return () => {
+      if (wasLight) root.classList.add("light");
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -206,33 +278,9 @@ export default function ArtistDetail() {
 
   return (
     <div
-      style={
-        {
-          backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
-          // This page's background is always dark, regardless of the
-          // app-wide light/dark theme toggle — pinning the theme tokens
-          // here too so shared components that read them (TrackRow's
-          // Popular Songs rows, the edit-name-&-bio form, the "..." menu)
-          // stay legible instead of rendering light-theme dark text
-          // against this always-dark backdrop. `color` itself has to be set
-          // explicitly too (not just the --color-fg variable) — `color`
-          // inherits as an already-resolved value from the app's own body
-          // rule, so an element with no color class of its own (SectionRow's
-          // <h2>, Card's title/subtitle) would otherwise keep inheriting
-          // body's light-theme color straight through this override.
-          color: "#ffffff",
-          "--color-fg": "#ffffff",
-          "--color-fg-muted": "#9ba6b5",
-          "--color-fg-subtle": "#6b7482",
-          "--color-base": "#070a14",
-          "--color-panel": "#0a0e1c",
-          "--color-elevated": "#101726",
-          "--color-elevated-hover": "#161f33",
-          "--color-border": "rgba(255, 255, 255, 0.08)",
-          "--color-hover": "rgba(255, 255, 255, 0.06)",
-          "--color-hover-strong": "rgba(255, 255, 255, 0.14)",
-        } as React.CSSProperties
-      }
+      style={{
+        backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
+      }}
     >
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
@@ -446,23 +494,30 @@ export default function ArtistDetail() {
         )}
 
         {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
-          <SectionRow key={type} title={ALBUM_TYPE_SECTION_LABEL[type]} accent="teal" scroll>
-            {albumsByType[type].map((album) => (
-              <Card
-                key={album.id}
-                title={album.title}
-                subtitle={albumSubtitle(album)}
-                gradient={album.gradient}
-                to={`/album/${album.id}`}
-                photoUrl={album.coverUrl}
-                entityType="album"
-                entityId={album.id}
-                artworkFrame={album.artworkFrame}
-                playing={isPlaying && currentTrack?.albumId === album.id}
-                onPlay={() => handlePlayAlbum(album.id)}
-              />
-            ))}
-          </SectionRow>
+          <section key={type} className="mb-8">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
+              <h2 className="text-xl font-bold tracking-tight text-white">{ALBUM_TYPE_SECTION_LABEL[type]}</h2>
+            </div>
+            {/* Breaks out of the page's own px-6 (24px) to a smaller, 16px
+                edge inset of its own — -24px cancels the parent's padding
+                (bleeding the scrollable hit-area to the true viewport
+                edge), +16px brings the visible cards back in from there. */}
+            <div
+              className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-3 pb-1"
+              style={{ marginInline: "-24px", paddingInline: "16px", scrollPaddingInline: "16px" }}
+            >
+              {albumsByType[type].map((album) => (
+                <AlbumCard
+                  key={album.id}
+                  album={album}
+                  to={`/album/${album.id}`}
+                  playing={isPlaying && currentTrack?.albumId === album.id}
+                  onPlay={() => handlePlayAlbum(album.id)}
+                />
+              ))}
+            </div>
+          </section>
         ))}
 
         {artist.topTracks.length > 0 && (
