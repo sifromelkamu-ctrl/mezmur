@@ -19,6 +19,11 @@ router.get("/", async (req, res) => {
   const language = typeof req.query.language === "string" ? req.query.language : undefined;
   const era = typeof req.query.era === "string" ? req.query.era : undefined;
   const ERA_CUTOFF_YEAR = 2023;
+  // "new" means newly posted to Mezmur (sorted by createdAt), not a
+  // manually-curated content-year cutoff — an old recording imported today
+  // still counts as a new release. "classic" is unaffected, still a
+  // genuine content-year cutoff for browsing older catalog.
+  const NEW_RELEASES_LIMIT = 30;
 
   const tracks = await prisma.track.findMany({
     where: {
@@ -29,10 +34,10 @@ router.get("/", async (req, res) => {
       ...(mood ? { moods: { has: mood } } : {}),
       ...(language ? { language: { equals: language, mode: "insensitive" } } : {}),
       ...(era === "classic" ? { album: { year: { lt: ERA_CUTOFF_YEAR } } } : {}),
-      ...(era === "new" ? { album: { year: { gte: ERA_CUTOFF_YEAR } } } : {}),
     },
     include: { artist: true, album: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: era === "new" ? "desc" : "asc" },
+    ...(era === "new" ? { take: NEW_RELEASES_LIMIT } : {}),
   });
   res.json(tracks.map((t) => toTrackDTO(t)));
 });

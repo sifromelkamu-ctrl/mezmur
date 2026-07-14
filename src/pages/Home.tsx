@@ -96,14 +96,13 @@ export default function Home() {
   // filter is a belt-and-suspenders guard in case a "live"-tagged album ever
   // shows up in the general albums response.
   const catalogAlbums = useMemo(() => albums.filter((a) => a.albumType !== "live"), [albums]);
+  // "New Releases" means newly posted to Mezmur, not the content's own
+  // nominal release year — sorts by createdAt (when it was actually
+  // imported) so an old recording imported today still surfaces here.
   const newReleases = useMemo(
     () =>
       [...catalogAlbums]
-        .sort((a, b) => {
-          const av = a.releaseDate ? Date.parse(a.releaseDate) : (a.year ?? 0);
-          const bv = b.releaseDate ? Date.parse(b.releaseDate) : (b.year ?? 0);
-          return bv - av;
-        })
+        .sort((a, b) => (b.createdAt ? Date.parse(b.createdAt) : 0) - (a.createdAt ? Date.parse(a.createdAt) : 0))
         .slice(0, 12),
     [catalogAlbums]
   );

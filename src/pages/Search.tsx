@@ -1,20 +1,11 @@
-import {
-  BookOpen,
-  ChevronLeft,
-  Clock,
-  HandHeart,
-  PartyPopper,
-  Sparkles,
-  TrendingUp,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronLeft, Clock, ListMusic, Sparkles, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/Card";
 import TrackRow from "../components/TrackRow";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
+import { renderWithAmharicStyle } from "../utils/scriptText";
 import {
   albumsApi,
   artistsApi,
@@ -25,6 +16,7 @@ import {
   sermonsApi,
   sermonToTrack,
   tracksApi,
+  type ApiPlaylist,
   type ApiPodcast,
   type ApiSearchResults,
   type ApiSermon,
@@ -41,11 +33,12 @@ interface BrowseTile {
   icon: LucideIcon;
 }
 
+// Only the two auto-generated tiles live here — every other "section" is a
+// curated Playlist (ownerId: null, see server/src/routes/playlists.ts),
+// built by an admin via Add to Playlist, and fetched below instead of
+// hardcoded so a newly-curated section shows up here automatically.
 const BROWSE_TILES: BrowseTile[] = [
   { name: "Most Played", kind: "trending", gradient: ["#f2b705", "#7c2d12"], icon: TrendingUp },
-  { name: "Celebration", kind: "mood", value: "celebration", gradient: ["#f97316", "#7c2d12"], icon: PartyPopper },
-  { name: "Devotional", kind: "mood", value: "devotional", gradient: ["#0ea5e9", "#0c4a6e"], icon: BookOpen },
-  { name: "Repentance", kind: "mood", value: "repentance", gradient: ["#a855f7", "#1e1b4b"], icon: HandHeart },
   { name: "New Releases", kind: "era", value: "new", gradient: ["#14b866", "#052e16"], icon: Sparkles },
 ];
 
@@ -71,6 +64,7 @@ const emptyResults: ApiSearchResults = { tracks: [], artists: [], albums: [], pl
 
 export default function Search() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const browseKind = searchParams.get("browse") as BrowseKind | null;
@@ -81,11 +75,16 @@ export default function Search() {
   const [browseTracks, setBrowseTracks] = useState<ApiTrack[] | null>(null);
   const [browseSermons, setBrowseSermons] = useState<ApiSermon[] | null>(null);
   const [browsePodcasts, setBrowsePodcasts] = useState<ApiPodcast[] | null>(null);
+  const [sections, setSections] = useState<ApiPlaylist[]>([]);
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
 
   const q = query.trim();
   const activeTile = BROWSE_TILES.find((tile) => tile.kind === browseKind && tile.value === browseValue);
+
+  useEffect(() => {
+    playlistsApi.list().then(setSections);
+  }, []);
 
   useEffect(() => {
     if (!q) {
@@ -413,6 +412,19 @@ export default function Search() {
                   <tile.icon size={18} className="text-white" />
                 </div>
                 <p className="font-bold text-base text-white truncate">{tile.name}</p>
+              </div>
+            ))}
+            {sections.map((pl) => (
+              <div
+                key={pl.id}
+                onClick={() => navigate(`/playlist/${pl.id}`)}
+                className="card-hover relative h-16 rounded-xl overflow-hidden cursor-pointer px-4 shadow-lg flex items-center gap-3"
+                style={{ backgroundImage: `linear-gradient(135deg, ${pl.gradient[0]}, ${pl.gradient[1]})` }}
+              >
+                <div className="w-9 h-9 shrink-0 rounded-full bg-white/15 ring-1 ring-white/25 backdrop-blur-sm flex items-center justify-center">
+                  <ListMusic size={18} className="text-white" />
+                </div>
+                <p className="font-bold text-base text-white truncate">{renderWithAmharicStyle(pl.title)}</p>
               </div>
             ))}
           </div>

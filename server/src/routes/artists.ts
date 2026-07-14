@@ -62,6 +62,7 @@ function toAlbumDTO(album: {
   tracks?: { duration: number }[];
   _count?: { tracks: number };
   artworkFrame?: unknown;
+  createdAt?: Date;
 }) {
   const trackCount = album._count?.tracks ?? album.tracks?.length;
   const totalDuration = album.tracks?.reduce((sum, t) => sum + t.duration, 0);
@@ -79,6 +80,11 @@ function toAlbumDTO(album: {
     trackCount,
     totalDuration,
     artworkFrame: album.artworkFrame ?? undefined,
+    // When this catalog item was actually imported/added — what "New
+    // Releases" sorts by (Home.tsx), as opposed to releaseDate/year, which
+    // is the content's own nominal release year and says nothing about when
+    // it was posted to Mezmur.
+    createdAt: album.createdAt ? album.createdAt.toISOString() : undefined,
   };
 }
 

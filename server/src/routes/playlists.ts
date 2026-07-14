@@ -84,14 +84,27 @@ router.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
 const createPlaylistSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(300).optional(),
+  // Admin-only, explicit opt-in: creates a catalog/"section" playlist
+  // (ownerId: null) instead of one owned by the requesting user — the same
+  // curated playlists Search's "Browse all" grid and Home surface to every
+  // listener. Silently ignored (falls back to owned) for a non-admin, so a
+  // regular user's own "Create playlist" flow can never accidentally post a
+  // section-visible playlist.
+  curated: z.boolean().optional(),
 });
 
-// POST /api/playlists - create a personalized playlist owned by the current user
+// POST /api/playlists - create a personalized playlist owned by the current
+// user, or (admin + curated: true) a catalog "section" playlist
 router.post("/", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = createPlaylistSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
+  }
+  let ownerId: string | null = req.userId!;
+  if (parsed.data.curated) {
+    const profile = await prisma.profile.findUnique({ where: { id: req.userId! } });
+    if (profile?.role === "admin") ownerId = null;
   }
   const [gradientFrom, gradientTo] = gradientForSeed(parsed.data.title);
   const playlist = await prisma.playlist.create({
@@ -100,7 +113,7 @@ router.post("/", requireAuth, async (req: AuthedRequest, res) => {
       description: parsed.data.description,
       gradientFrom,
       gradientTo,
-      ownerId: req.userId!,
+      ownerId,
     },
   });
   res.status(201).json({ ...toPlaylistDTO(playlist), trackIds: [] });
@@ -145,14 +158,19 @@ const addTrackSchema = z.object({
   trackId: z.string().min(1),
 });
 
-// POST /api/playlists/:id/tracks - add a track to a user-owned playlist
+// POST /api/playlists/:id/tracks - add a track to a user-owned playlist, or
+// (admin) a curated section playlist
 router.post("/:id/tracks", requireAuth, async (req: AuthedRequest, res) => {
   const playlist = await prisma.playlist.findUnique({
     where: { id: String(req.params.id) },
     include: { tracks: true },
   });
-  if (!playlist || playlist.ownerId !== req.userId) {
+  if (!playlist) {
     res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+  if (!(await canEditOwned(req.userId!, playlist.ownerId))) {
+    res.status(403).json({ error: "You don't have permission to edit this playlist" });
     return;
   }
   const parsed = addTrackSchema.safeParse(req.body);
@@ -174,11 +192,16 @@ router.post("/:id/tracks", requireAuth, async (req: AuthedRequest, res) => {
   res.status(201).json({ ok: true });
 });
 
-// DELETE /api/playlists/:id/tracks/:trackId - remove a track from a user-owned playlist
+// DELETE /api/playlists/:id/tracks/:trackId - remove a track from a
+// user-owned playlist, or (admin) a curated section playlist
 router.delete("/:id/tracks/:trackId", requireAuth, async (req: AuthedRequest, res) => {
   const playlist = await prisma.playlist.findUnique({ where: { id: String(req.params.id) } });
-  if (!playlist || playlist.ownerId !== req.userId) {
+  if (!playlist) {
     res.status(404).json({ error: "Playlist not found" });
+    return;
+  }
+  if (!(await canEditOwned(req.userId!, playlist.ownerId))) {
+    res.status(403).json({ error: "You don't have permission to edit this playlist" });
     return;
   }
   await prisma.playlistTrack.deleteMany({

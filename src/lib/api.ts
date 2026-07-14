@@ -138,6 +138,7 @@ export interface ApiAlbum {
   trackCount?: number;
   totalDuration?: number;
   artworkFrame?: ArtworkFrame;
+  createdAt?: string;
 }
 
 export interface ApiTrack {
@@ -330,8 +331,11 @@ export const playlistsApi = {
   list: () => request<ApiPlaylist[]>("/playlists"),
   mine: () => request<ApiPlaylist[]>("/playlists/mine"),
   get: (id: string) => request<ApiPlaylist>(`/playlists/${id}`),
-  create: (title: string, description?: string) =>
-    request<ApiPlaylist>("/playlists", { method: "POST", body: JSON.stringify({ title, description }) }),
+  create: (title: string, options?: { description?: string; curated?: boolean }) =>
+    request<ApiPlaylist>("/playlists", {
+      method: "POST",
+      body: JSON.stringify({ title, description: options?.description, curated: options?.curated }),
+    }),
   remove: (id: string) => request<void>(`/playlists/${id}`, { method: "DELETE" }),
   addTrack: (playlistId: string, trackId: string) =>
     request<void>(`/playlists/${playlistId}/tracks`, { method: "POST", body: JSON.stringify({ trackId }) }),
