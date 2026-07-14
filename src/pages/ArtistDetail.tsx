@@ -206,9 +206,33 @@ export default function ArtistDetail() {
 
   return (
     <div
-      style={{
-        backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
-      }}
+      style={
+        {
+          backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
+          // This page's background is always dark, regardless of the
+          // app-wide light/dark theme toggle — pinning the theme tokens
+          // here too so shared components that read them (TrackRow's
+          // Popular Songs rows, the edit-name-&-bio form, the "..." menu)
+          // stay legible instead of rendering light-theme dark text
+          // against this always-dark backdrop. `color` itself has to be set
+          // explicitly too (not just the --color-fg variable) — `color`
+          // inherits as an already-resolved value from the app's own body
+          // rule, so an element with no color class of its own (SectionRow's
+          // <h2>, Card's title/subtitle) would otherwise keep inheriting
+          // body's light-theme color straight through this override.
+          color: "#ffffff",
+          "--color-fg": "#ffffff",
+          "--color-fg-muted": "#9ba6b5",
+          "--color-fg-subtle": "#6b7482",
+          "--color-base": "#070a14",
+          "--color-panel": "#0a0e1c",
+          "--color-elevated": "#101726",
+          "--color-elevated-hover": "#161f33",
+          "--color-border": "rgba(255, 255, 255, 0.08)",
+          "--color-hover": "rgba(255, 255, 255, 0.06)",
+          "--color-hover-strong": "rgba(255, 255, 255, 0.14)",
+        } as React.CSSProperties
+      }
     >
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
@@ -422,7 +446,7 @@ export default function ArtistDetail() {
         )}
 
         {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
-          <SectionRow key={type} title={ALBUM_TYPE_SECTION_LABEL[type]} accent="teal" large scroll>
+          <SectionRow key={type} title={ALBUM_TYPE_SECTION_LABEL[type]} accent="teal" scroll>
             {albumsByType[type].map((album) => (
               <Card
                 key={album.id}
@@ -431,7 +455,6 @@ export default function ArtistDetail() {
                 gradient={album.gradient}
                 to={`/album/${album.id}`}
                 photoUrl={album.coverUrl}
-                large
                 entityType="album"
                 entityId={album.id}
                 artworkFrame={album.artworkFrame}
