@@ -614,13 +614,21 @@ input[type="range"].seek-xl:active::-webkit-slider-thumb {
     transform: translateX(0);
   }
   85%, 100% {
-    transform: translateX(calc(-100% + var(--marquee-viewport, 100%)));
+    /* The exact pixel overflow (scrollWidth - containerWidth), set inline
+       per instance — a plain percentage can't express this since it means
+       something different on every element. */
+    transform: translateX(calc(-1 * var(--marquee-distance, 0px)));
   }
 }
 .marquee-text {
   display: inline-block;
   white-space: nowrap;
-  animation: marquee-scroll 8s ease-in-out infinite;
+  /* Duration is also set inline per instance, scaled to the text's own
+     overflow distance (see MarqueeText) so a longer line scrolls at the
+     same slow, readable pace instead of racing by in a fixed duration. */
+  animation-name: marquee-scroll;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
 }
 
 @keyframes bg-crossfade-in {

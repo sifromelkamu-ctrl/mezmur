@@ -56,29 +56,61 @@ const NOW_PLAYING_BACKGROUND = `linear-gradient(
   #050707 100%
 )`;
 
+// Slow, readable scroll speed for overflowing text — the animation's total
+// duration is derived from this plus the actual overflow distance (see
+// below), rather than a fixed duration, so a longer line always scrolls at
+// this same unhurried pace instead of racing by to fit a fixed time.
+const MARQUEE_PX_PER_SECOND = 24;
+// The keyframe (index.css) spends 70% of its duration actually scrolling —
+// 15% pause at the start, 15% held at the end — so the total duration has
+// to be inflated by that same fraction for the *scrolling* portion alone to
+// take scrollDistance / MARQUEE_PX_PER_SECOND seconds.
+const MARQUEE_SCROLL_FRACTION = 0.7;
+const MARQUEE_MIN_DURATION_S = 6;
+
 // Scrolls its text horizontally only when it doesn't fit in one line —
-// short titles just sit still, matching how Spotify/Apple Music do it.
-function MarqueeTitle({ text }: { text: string }) {
+// short text just sits still, matching how Spotify/Apple Music do it. Used
+// for the title, artist name, and album title, all of which can overflow
+// with a long enough name.
+function MarqueeText({
+  text,
+  className,
+  wrapperClassName = "",
+  style,
+}: {
+  text: string;
+  className: string;
+  wrapperClassName?: string;
+  style?: React.CSSProperties;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
-  const [overflowing, setOverflowing] = useState(false);
+  const [overflowPx, setOverflowPx] = useState(0);
 
   useLayoutEffect(() => {
-    setOverflowing(false);
+    setOverflowPx(0);
     const raf = requestAnimationFrame(() => {
       if (containerRef.current && textRef.current) {
-        setOverflowing(textRef.current.scrollWidth > containerRef.current.clientWidth);
+        setOverflowPx(Math.max(0, textRef.current.scrollWidth - containerRef.current.clientWidth));
       }
     });
     return () => cancelAnimationFrame(raf);
   }, [text]);
 
+  const overflowing = overflowPx > 0;
+  const durationS = Math.max(MARQUEE_MIN_DURATION_S, overflowPx / MARQUEE_PX_PER_SECOND / MARQUEE_SCROLL_FRACTION);
+
   return (
-    <div ref={containerRef} className="overflow-hidden whitespace-nowrap">
+    <div ref={containerRef} className={`overflow-hidden whitespace-nowrap ${wrapperClassName}`}>
       <span
         ref={textRef}
-        className={`text-2xl font-bold text-white ${overflowing ? "marquee-text" : "inline-block truncate max-w-full"}`}
-        style={{ textShadow: "0 2px 16px rgba(0,0,0,0.35)" }}
+        className={`${className} ${overflowing ? "marquee-text" : "inline-block truncate max-w-full"}`}
+        style={{
+          ...style,
+          ...(overflowing
+            ? ({ ["--marquee-distance" as string]: `${overflowPx}px`, animationDuration: `${durationS}s` } as React.CSSProperties)
+            : {}),
+        }}
       >
         {renderWithAmharicStyle(text)}
       </span>
@@ -411,14 +443,22 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
         <div className="w-full max-w-xs mx-auto shrink-0">
           <div className="mb-6 flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <MarqueeTitle text={currentTrack.title} />
-              <p className="text-base text-white/85 truncate mt-1">
-                {renderWithAmharicStyle(currentTrack.artistName ?? "")}
-              </p>
+              <MarqueeText
+                text={currentTrack.title}
+                className="text-2xl font-bold text-white"
+                style={{ textShadow: "0 2px 16px rgba(0,0,0,0.35)" }}
+              />
+              <MarqueeText
+                text={currentTrack.artistName ?? ""}
+                className="text-base text-white/85"
+                wrapperClassName="mt-1"
+              />
               {currentTrack.albumTitle && (
-                <p className="text-xs text-white/70 truncate mt-0.5">
-                  {renderWithAmharicStyle(currentTrack.albumTitle)}
-                </p>
+                <MarqueeText
+                  text={currentTrack.albumTitle}
+                  className="text-xs text-white/70"
+                  wrapperClassName="mt-0.5"
+                />
               )}
             </div>
             {canEditSingleMeta && (
