@@ -26,7 +26,8 @@ export default function Topbar() {
               <span className="text-white font-bold text-xs">M</span>
             </div>
             <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent">
-              <span className="font-abyssinica">መዝሙር</span> App
+              <span className="font-abyssinica">መዝሙር</span>{" "}
+              <span className="font-playfair italic">App</span>
             </span>
           </button>
         )}
