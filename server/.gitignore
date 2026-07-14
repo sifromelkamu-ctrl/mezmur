@@ -2,4 +2,8 @@ node_modules
 # Keep environment variables out of version control
 .env
 
+# A real YouTube account's cookies, in case one's dropped here directly
+# instead of via YTDLP_COOKIES_B64 (see ytdlp.ts) — never committed either way.
+cookies.txt
+
 /src/generated/prisma

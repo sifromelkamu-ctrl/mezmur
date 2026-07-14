@@ -55,4 +55,12 @@ EXPOSE 3001
 # best-effort sidecar on localhost:4416: if it fails to start or crashes,
 # yt-dlp's plugin just can't reach it and falls back to running without a
 # token (today's behavior), it never takes the main API process down with it.
-CMD ["sh", "-c", "node /opt/bgutil-provider/server/build/main.js & npx prisma migrate deploy && npm run start"]
+# `yt-dlp -U` self-updates the standalone binary in place at every container
+# start (every deploy), not just at image build time — the `curl .../latest`
+# line above only re-runs when Docker actually invalidates that layer, which
+# an unrelated code change further down the Dockerfile won't do, so without
+# this a long-lived image could otherwise keep shipping whatever yt-dlp
+# version it happened to bake in originally. Best-effort (|| true): a failed
+# self-update (offline runner, GitHub rate-limit) just leaves the
+# already-baked-in version running rather than blocking startup.
+CMD ["sh", "-c", "yt-dlp -U || true; node /opt/bgutil-provider/server/build/main.js & npx prisma migrate deploy && npm run start"]

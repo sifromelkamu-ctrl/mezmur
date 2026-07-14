@@ -18,25 +18,42 @@ import { GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
 // Absent entirely (the default) yt-dlp just runs cookie-less exactly as
 // before — existing behavior for anyone who hasn't set this yet.
 const COOKIES_PATH = path.join(os.tmpdir(), "yt-dlp-cookies.txt");
+// Fallback for a plain cookies.txt file dropped directly on disk (no env var
+// involved) — checked in both the Docker image's working directory and next
+// to this module, so a file committed/mounted at either location is picked
+// up automatically. YTDLP_COOKIES_B64 takes priority when both are present
+// since it's the documented, existing path or a per-deploy secret.
+const FILE_COOKIES_CANDIDATES = [
+  path.join(process.cwd(), "cookies.txt"),
+  path.join(path.dirname(new URL(import.meta.url).pathname), "cookies.txt"),
+];
 const cookiesArgs: string[] = (() => {
   const b64 = process.env.YTDLP_COOKIES_B64?.trim();
-  if (!b64) {
-    console.log("[yt-dlp] YTDLP_COOKIES_B64 not set — running without cookies (anonymous requests, likely to hit YouTube's bot-check on datacenter IPs).");
-    return [];
-  }
-  try {
-    writeFileSync(COOKIES_PATH, Buffer.from(b64, "base64"));
-    if (!existsSync(COOKIES_PATH)) {
-      console.error("[yt-dlp] YTDLP_COOKIES_B64 was set but the cookies file didn't end up on disk after writing — running without cookies.");
-      return [];
+  if (b64) {
+    try {
+      writeFileSync(COOKIES_PATH, Buffer.from(b64, "base64"));
+      if (!existsSync(COOKIES_PATH)) {
+        console.error("[yt-dlp] YTDLP_COOKIES_B64 was set but the cookies file didn't end up on disk after writing — running without cookies.");
+      } else {
+        const byteLength = Buffer.from(b64, "base64").byteLength;
+        console.log(`[yt-dlp] loaded cookies from YTDLP_COOKIES_B64 (${byteLength} bytes) -> ${COOKIES_PATH}`);
+        return ["--cookies", COOKIES_PATH];
+      }
+    } catch (err) {
+      console.error("[yt-dlp] failed to write cookies file from YTDLP_COOKIES_B64:", err);
     }
-    const byteLength = Buffer.from(b64, "base64").byteLength;
-    console.log(`[yt-dlp] loaded cookies from YTDLP_COOKIES_B64 (${byteLength} bytes) -> ${COOKIES_PATH}`);
-    return ["--cookies", COOKIES_PATH];
-  } catch (err) {
-    console.error("[yt-dlp] failed to write cookies file from YTDLP_COOKIES_B64:", err);
-    return [];
   }
+
+  const fileCookiePath = FILE_COOKIES_CANDIDATES.find((p) => existsSync(p));
+  if (fileCookiePath) {
+    console.log(`[yt-dlp] loaded cookies from ${fileCookiePath}`);
+    return ["--cookies", fileCookiePath];
+  }
+
+  console.log(
+    "[yt-dlp] no cookies found (YTDLP_COOKIES_B64 unset, no cookies.txt on disk) — running without cookies (anonymous requests, likely to hit YouTube's bot-check on datacenter IPs)."
+  );
+  return [];
 })();
 
 // YouTube's "Sign in to confirm you're not a bot" check increasingly
@@ -57,6 +74,21 @@ const cookiesArgs: string[] = (() => {
 // `-x --audio-format mp3` anyway, which extracts just the audio track
 // regardless of what the source container held.
 const CLIENT_ARGS = ["--extractor-args", "youtube:player_client=android,web"];
+
+// Public channels/playlists routinely fail with "[youtubetab] Playlists
+// that require authentication may not extract correctly without a
+// successful webpage download" whenever the initial webpage fetch itself
+// gets blocked (the same bot-check IP-reputation issue CLIENT_ARGS/cookies/
+// the proxy above all work around) — yt-dlp then can't tell whether the
+// list actually needs auth or not, and some versions treat that as fatal
+// even though the tab data itself came back fine via the API. This is
+// yt-dlp's own documented flag for exactly this case: it skips that
+// probe-and-guess step entirely rather than failing/guessing on it, so a
+// genuinely public channel/playlist/release list always extracts. --extractor-args
+// keys by extractor name, so this composes with CLIENT_ARGS's own
+// "youtube:" args rather than overriding them (verified: both flags reach
+// yt-dlp together and each extractor only reads its own key).
+const TAB_ARGS = ["--extractor-args", "youtubetab:skip=authcheck"];
 
 // The bgutil-ytdlp-pot-provider plugin (server/Dockerfile clones/builds it
 // into /opt/bgutil-provider) generates a real proof-of-origin token via its
@@ -100,6 +132,11 @@ const proxyArgs: string[] = (() => {
   console.log(`[yt-dlp] routing requests through proxy host ${host} (from YTDLP_PROXY_URL)`);
   return ["--proxy", url];
 })();
+
+// Shared prefix for every yt-dlp invocation in this file — one definition so
+// TAB_ARGS (or any future flag) only needs adding once instead of staying in
+// sync across every spawn() call site by hand.
+const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs, ...proxyArgs];
 
 export interface YoutubeMetadata {
   id: string;
@@ -156,7 +193,7 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 
 function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -262,7 +299,7 @@ const MAX_VIDEOS_PER_LIST = 200;
 function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
   return new Promise((resolve, reject) => {
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -345,7 +382,7 @@ export function searchChannelsByName(query: string, limit = 5): Promise<ChannelS
   return new Promise((resolve, reject) => {
     const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
     const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...cookiesArgs, ...CLIENT_ARGS, ...pluginArgs, ...proxyArgs, ...args], {
+    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
