@@ -119,6 +119,7 @@ export interface ApiArtist {
   spotifyArtistUrl?: string;
   spotifyLastSyncedAt?: string;
   spotifyLastSyncError?: string;
+  createdAt?: string;
 }
 
 export type ApiAlbumType = "album" | "ep" | "single" | "live" | "compilation";
