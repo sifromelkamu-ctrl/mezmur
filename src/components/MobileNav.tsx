@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center justify-center flex-1 py-2.5 transition-colors ${
+  `relative flex items-center justify-center flex-1 py-1.5 transition-colors ${
     isActive ? "text-fg" : "text-fg-subtle"
   }`;
 
@@ -17,13 +17,19 @@ function NavIcon({
   label: string;
 }) {
   return (
-    <span
-      className={`flex items-center justify-center w-11 h-11 rounded-full transition-all duration-300 ${
-        isActive ? "bg-brand/20 shadow-[0_0_16px_-2px_rgba(124,92,255,0.8)]" : ""
-      }`}
-    >
-      <Icon size={20} strokeWidth={isActive ? 2.4 : 2} className={isActive ? "text-brand-glow" : ""} />
-      <span className="sr-only">{label}</span>
+    <span className="flex flex-col items-center justify-center gap-0.5">
+      <span
+        className={`flex items-center justify-center w-11 h-9 rounded-full transition-all duration-300 ${
+          isActive ? "bg-brand/20 shadow-[0_0_16px_-2px_rgba(124,92,255,0.8)]" : ""
+        }`}
+      >
+        <Icon size={19} strokeWidth={isActive ? 2.4 : 2} className={isActive ? "text-brand-glow" : ""} />
+      </span>
+      <span
+        className={`font-sans text-[9.5px] font-medium leading-none tracking-wide ${isActive ? "text-brand-glow" : "text-fg-subtle"}`}
+      >
+        {label}
+      </span>
     </span>
   );
 }
