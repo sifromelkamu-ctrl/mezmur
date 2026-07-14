@@ -119,7 +119,12 @@ function MarqueeText({
 }
 
 const SWIPE_DISMISS_THRESHOLD = 90;
-const SWIPE_SKIP_THRESHOLD = 60;
+// Lower than it looks necessary in isolation — with touch-action now handing
+// horizontal movement to us immediately (see the artwork's touchAction:
+// "pan-y" below) rather than after the browser's own gesture-disambiguation
+// delay, a shorter distance reads as equally deliberate but noticeably
+// snappier to actually swipe.
+const SWIPE_SKIP_THRESHOLD = 45;
 const LONG_PRESS_MS = 550;
 const DOUBLE_TAP_MS = 300;
 
@@ -332,7 +337,17 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
         <div ref={artworkSlotRef} className="flex-1 min-h-0 w-full flex items-center justify-center mb-4">
           <div
             className="relative select-none"
-            style={{ width: artworkSize || undefined, height: artworkSize || undefined }}
+            style={{
+              width: artworkSize || undefined,
+              height: artworkSize || undefined,
+              // Without this, the browser spends the first several pixels of
+              // every touch move "deciding" whether it's a page pan or our
+              // own gesture (iOS Safari in particular), which is what made
+              // swipe-to-skip feel laggy/unresponsive — telling it up front
+              // that only vertical panning is its concern hands horizontal
+              // movement to our touch handlers immediately.
+              touchAction: "pan-y",
+            }}
             onTouchStart={handleArtworkTouchStart}
             onTouchMove={handleArtworkTouchMove}
             onTouchEnd={handleArtworkTouchEnd}
