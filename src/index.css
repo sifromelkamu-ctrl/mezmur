@@ -579,7 +579,8 @@ input[type="range"].seek-lg:active::-webkit-slider-thumb {
 }
 
 /* Premium Now Playing progress bar: thicker track, larger circular thumb
-   that's invisible until interaction, matching Spotify/Apple Music. */
+   that's invisible until interaction, matching Spotify/Apple Music. Active
+   portion is the brand accent color; the thumb stays bright white. */
 input[type="range"].seek-xl {
   -webkit-appearance: none;
   appearance: none;
@@ -587,8 +588,8 @@ input[type="range"].seek-xl {
   border-radius: 9999px;
   background: linear-gradient(
     to right,
-    #fff 0%,
-    #fff var(--progress, 0%),
+    var(--color-brand) 0%,
+    var(--color-brand) var(--progress, 0%),
     rgba(255, 255, 255, 0.25) var(--progress, 0%),
     rgba(255, 255, 255, 0.25) 100%
   );

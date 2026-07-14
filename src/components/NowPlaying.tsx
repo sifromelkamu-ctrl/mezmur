@@ -23,6 +23,7 @@ import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { usePlayer } from "../context/PlayerContext";
 import { useSleepTimer } from "../context/SleepTimerContext";
+import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { adminApi, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
 import { formatDuration } from "../utils/format";
@@ -37,6 +38,23 @@ import SleepTimerSheet from "./SleepTimerSheet";
 interface NowPlayingProps {
   onClose: () => void;
 }
+
+// Now Playing's own background is fixed to this one gradient for every
+// track — deliberately not derived from currentTrack.gradient (that's still
+// used for the artwork placeholder and its glow only, untouched below).
+// Picked to match the look of the "Bereket Tesfaye - መምህሩ Vol 3" Now Playing
+// screen: a premium teal -> emerald -> deep-black blend, multiple stops so
+// the transition reads as one continuous gradient rather than two flat bands.
+const NOW_PLAYING_BACKGROUND = `linear-gradient(
+  180deg,
+  #1cc4a3 0%,
+  #14b8a6 14%,
+  #0f8f7e 32%,
+  #134e4a 52%,
+  #0d2f2c 70%,
+  #0a1614 86%,
+  #050707 100%
+)`;
 
 // Scrolls its text horizontally only when it doesn't fit in one line —
 // short titles just sit still, matching how Spotify/Apple Music do it.
@@ -59,7 +77,8 @@ function MarqueeTitle({ text }: { text: string }) {
     <div ref={containerRef} className="overflow-hidden whitespace-nowrap">
       <span
         ref={textRef}
-        className={`text-2xl font-bold ${overflowing ? "marquee-text" : "inline-block truncate max-w-full"}`}
+        className={`text-2xl font-bold text-white ${overflowing ? "marquee-text" : "inline-block truncate max-w-full"}`}
+        style={{ textShadow: "0 2px 16px rgba(0,0,0,0.35)" }}
       >
         {renderWithAmharicStyle(text)}
       </span>
@@ -176,6 +195,12 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
     };
   }, []);
 
+  // The soft glow behind the artwork — unlike the screen's own fixed
+  // background above, this one *does* track the artwork's real dominant
+  // colors (sampled from the photo itself when one's loaded), same palette
+  // extraction Card.tsx's portrait artist cards already use.
+  const artworkPalette = useArtworkPalette(currentTrack?.coverUrl, currentTrack?.gradient ?? ["#134e4a", "#0b0b0d"]);
+
   if (!currentTrack) return null;
 
   const duration = currentTrack.duration;
@@ -251,19 +276,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
       onTouchStart={handleSheetTouchStart}
       onTouchEnd={handleSheetTouchEnd}
     >
-      <div
-        key={currentTrack.id}
-        className="absolute inset-0 -z-10 bg-crossfade"
-        style={{
-          backgroundImage: `linear-gradient(180deg, ${currentTrack.gradient[0]}e6 0%, ${currentTrack.gradient[1]}f2 45%, #0b0b0d 100%)`,
-        }}
-      />
-      <div
-        className="absolute inset-0 -z-10"
-        style={{
-          backgroundImage: `linear-gradient(180deg, ${currentTrack.gradient[0]}e6 0%, ${currentTrack.gradient[1]}f2 45%, #0b0b0d 100%)`,
-        }}
-      />
+      <div className="absolute inset-0 -z-10" style={{ backgroundImage: NOW_PLAYING_BACKGROUND }} />
 
       <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-2 shrink-0">
         <button
@@ -273,7 +286,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
         >
           <ChevronDown size={26} />
         </button>
-        <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Now Playing</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/75">Now Playing</p>
         <button
           onClick={() => (user ? setShowAddToPlaylist(true) : navigate("/auth"))}
           className="w-11 h-11 -mr-1 rounded-full flex items-center justify-center text-white/90 hover:bg-white/10 active:scale-90 transition-all"
@@ -297,6 +310,20 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
               setTimeout(() => setLikeBurst(false), 700);
             }}
           >
+            {/* Soft glow behind the artwork, sized larger than it and
+                blurred — colored from the artwork's own extracted palette
+                (see artworkPalette above), not the screen's fixed
+                background, so it actually reflects what's on the cover. */}
+            <div
+              aria-hidden
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 rounded-full pointer-events-none"
+              style={{
+                width: "135%",
+                height: "135%",
+                background: `radial-gradient(circle, ${artworkPalette.primary}80 0%, ${artworkPalette.secondary}40 45%, transparent 75%)`,
+                filter: "blur(48px)",
+              }}
+            />
             <CoverArt
               gradient={currentTrack.gradient}
               size="lg"
@@ -385,11 +412,11 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
           <div className="mb-6 flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <MarqueeTitle text={currentTrack.title} />
-              <p className="text-base text-white/70 truncate mt-1">
+              <p className="text-base text-white/85 truncate mt-1">
                 {renderWithAmharicStyle(currentTrack.artistName ?? "")}
               </p>
               {currentTrack.albumTitle && (
-                <p className="text-xs text-white/45 truncate mt-0.5">
+                <p className="text-xs text-white/70 truncate mt-0.5">
                   {renderWithAmharicStyle(currentTrack.albumTitle)}
                 </p>
               )}
@@ -441,7 +468,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
               onChange={(e) => seek(Number(e.target.value))}
               aria-label="Seek"
             />
-            <div className="flex items-center justify-between text-xs text-white/60 mt-2">
+            <div className="flex items-center justify-between text-xs text-white/80 mt-2">
               <span>{formatDuration(progress)}</span>
               <span>{formatDuration(duration)}</span>
             </div>
@@ -450,13 +477,13 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
           <div className="flex items-center justify-between gap-2 mb-6 px-1">
             <button
               onClick={toggleShuffle}
-              className={`${shuffle ? "text-brand" : "text-white/70 hover:text-white"} active:scale-90 transition-all`}
+              className={`${shuffle ? "text-brand" : "text-white/60 hover:text-white/90"} active:scale-90 transition-all`}
               aria-label="Shuffle"
             >
-              <Shuffle size={20} />
+              <Shuffle size={18} />
             </button>
             <button onClick={prev} className="text-white active:scale-90 transition-all" aria-label="Previous">
-              <SkipBack size={30} fill="currentColor" />
+              <SkipBack size={32} fill="currentColor" />
             </button>
             <button
               onClick={togglePlay}
@@ -468,14 +495,14 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
               {isPlaying ? <Pause size={32} fill="black" /> : <Play size={32} fill="black" className="ml-1.5" />}
             </button>
             <button onClick={next} className="text-white active:scale-90 transition-all" aria-label="Next">
-              <SkipForward size={30} fill="currentColor" />
+              <SkipForward size={32} fill="currentColor" />
             </button>
             <button
               onClick={toggleRepeat}
-              className={`${repeat ? "text-brand" : "text-white/70 hover:text-white"} active:scale-90 transition-all`}
+              className={`${repeat ? "text-brand" : "text-white/60 hover:text-white/90"} active:scale-90 transition-all`}
               aria-label="Repeat"
             >
-              {repeat ? <Repeat1 size={20} /> : <Repeat size={20} />}
+              {repeat ? <Repeat1 size={18} /> : <Repeat size={18} />}
             </button>
           </div>
         </div>
