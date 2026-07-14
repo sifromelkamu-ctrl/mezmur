@@ -29,7 +29,6 @@ function toArtistDTO(artist: {
   spotifyId?: string | null;
   spotifyLastSyncedAt?: Date | null;
   spotifyLastSyncError?: string | null;
-  createdAt?: Date;
 }) {
   return {
     id: artist.id,
@@ -45,9 +44,6 @@ function toArtistDTO(artist: {
     spotifyArtistUrl: artist.spotifyId ? `https://open.spotify.com/artist/${artist.spotifyId}` : undefined,
     spotifyLastSyncedAt: artist.spotifyLastSyncedAt ? artist.spotifyLastSyncedAt.toISOString() : undefined,
     spotifyLastSyncError: artist.spotifyLastSyncError ?? undefined,
-    // "Joined" display stat on the artist profile — this column already
-    // existed on Artist, just wasn't exposed via the DTO before.
-    createdAt: artist.createdAt ? artist.createdAt.toISOString() : undefined,
   };
 }
 

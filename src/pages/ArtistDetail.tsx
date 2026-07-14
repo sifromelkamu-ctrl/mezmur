@@ -1,5 +1,4 @@
 import {
-  Calendar,
   Check,
   Heart,
   Link2,
@@ -14,31 +13,20 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import Card from "../components/Card";
-import CoverArt from "../components/CoverArt";
 import SectionRow from "../components/SectionRow";
 import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
-import {
-  albumsApi,
-  artistsApi,
-  playlistsApi,
-  type ApiAlbum,
-  type ApiAlbumType,
-  type ApiArtistDetail,
-  type ApiPlaylist,
-} from "../lib/api";
+import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail } from "../lib/api";
 
 // The one accent this page's premium redesign is built around — not yet a
-// shared design-system token (see SectionRow's accent palette), so used
-// directly here rather than introducing a new global color for one page.
+// shared design-system token (see SectionRow's "teal" accent, added for
+// this page), so used directly here for anything SectionRow doesn't cover.
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#134e4a";
-
-const ALBUM_ROWS_COLLAPSED_COUNT = 5;
 
 // "live" (Concert Albums) is deliberately excluded — concerts are a
 // completely separate content type and must never appear in an artist's
@@ -69,58 +57,6 @@ function albumSubtitle(album: ApiAlbum): string {
   return parts.join(" · ");
 }
 
-// Full-width row for an artist's own discography — same onPlay/navigate
-// wiring AlbumDetail/Home already use for these albums, just laid out as a
-// row (thumbnail, title/artist/subtitle, play circle) instead of the
-// horizontal-scroll square Card grid used elsewhere.
-function AlbumRow({
-  album,
-  artistName,
-  to,
-  playing,
-  onPlay,
-}: {
-  album: ApiAlbum;
-  artistName: string;
-  to: string;
-  playing: boolean;
-  onPlay: () => void;
-}) {
-  const navigate = useNavigate();
-  return (
-    <div
-      onClick={() => navigate(to)}
-      className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-xl cursor-pointer hover:bg-white/5 transition-colors"
-    >
-      <CoverArt
-        gradient={album.gradient}
-        size="sm"
-        photoUrl={album.coverUrl}
-        entityType="album"
-        entityId={album.id}
-        artworkFrame={album.artworkFrame}
-        className="w-14 h-14 shrink-0 rounded-lg"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="font-bold text-white truncate">{album.title}</p>
-        <p className="text-sm text-white/60 truncate mt-0.5">{artistName}</p>
-        <p className="text-xs text-white/45 truncate mt-0.5">{albumSubtitle(album)}</p>
-      </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlay();
-        }}
-        className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-all"
-        style={{ backgroundColor: TEAL, color: "#000" }}
-        aria-label={`Play ${album.title}`}
-      >
-        {playing ? <Music2 size={16} /> : <Play size={16} fill="black" className="ml-0.5" />}
-      </button>
-    </div>
-  );
-}
-
 export default function ArtistDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -135,12 +71,7 @@ export default function ArtistDetail() {
   const [saving, setSaving] = useState(false);
   const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false);
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
-  const [playlists, setPlaylists] = useState<ApiPlaylist[]>([]);
   const [showAllSongs, setShowAllSongs] = useState(false);
-  // Same "show first N, View all/Show less" pattern as showAllSongs above,
-  // just per album type (Albums/EPs/Singles/Compilations can each overflow
-  // independently) instead of one flag for the whole page.
-  const [expandedAlbumTypes, setExpandedAlbumTypes] = useState<Set<ApiAlbumType>>(new Set());
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
@@ -155,7 +86,6 @@ export default function ArtistDetail() {
     setHeroPhotoLoaded(false);
     setHeroPhotoFailed(false);
     setShowAllSongs(false);
-    setExpandedAlbumTypes(new Set());
     artistsApi
       .get(id)
       .then(setArtist)
@@ -163,37 +93,18 @@ export default function ArtistDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Playlists here aren't specific to this artist (the catalog has no such
-  // relationship) — shown as a general "you might also like" row, same
-  // source Home/Library already use, just to round out the page the way the
-  // reference design does.
-  useEffect(() => {
-    playlistsApi.list().then(setPlaylists);
-  }, []);
-
   const albumsByType = useMemo(() => {
     const grouped: Record<ApiAlbumType, ApiAlbum[]> = { album: [], ep: [], single: [], live: [], compilation: [] };
     for (const album of artist?.albums ?? []) grouped[album.albumType].push(album);
     return grouped;
   }, [artist]);
 
-  // Stats card figures — Albums/Songs are derived from data already fetched
-  // (each album already carries its own trackCount), Joined from the
-  // Artist.createdAt column now exposed on the DTO.
+  // Stats card figures — derived from data already fetched (each album
+  // already carries its own trackCount).
   const totalSongCount = useMemo(
     () => (artist?.albums ?? []).reduce((sum, a) => sum + (a.trackCount ?? 0), 0),
     [artist]
   );
-  const joinedYear = artist?.createdAt ? new Date(artist.createdAt).getFullYear() : undefined;
-
-  const toggleAlbumTypeExpanded = (type: ApiAlbumType) => {
-    setExpandedAlbumTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  };
 
   if (loading) {
     return (
@@ -299,7 +210,7 @@ export default function ArtistDetail() {
         backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
       }}
     >
-      <div className="relative w-full overflow-hidden" style={{ height: "min(62vh, 520px)" }}>
+      <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
             <img
@@ -486,7 +397,7 @@ export default function ArtistDetail() {
           artist.bio && <p className="text-white/75 text-sm max-w-2xl mb-6">{artist.bio}</p>
         )}
 
-        <div className="grid grid-cols-3 gap-3 rounded-2xl border border-white/10 p-4 mb-8" style={{ backgroundColor: `${TEAL_DEEP}33` }}>
+        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/10 p-4 mb-8" style={{ backgroundColor: `${TEAL_DEEP}33` }}>
           <div className="flex flex-col items-center gap-1 text-center">
             <div className="flex items-center gap-1.5">
               <Music2 size={15} style={{ color: TEAL }} />
@@ -501,13 +412,6 @@ export default function ArtistDetail() {
             </div>
             <span className="text-xs text-white/60">Songs</span>
           </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Calendar size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-white">{joinedYear ?? "—"}</span>
-            </div>
-            <span className="text-xs text-white/60">Joined</span>
-          </div>
         </div>
 
         {artist.albums.length === 0 && (
@@ -517,40 +421,26 @@ export default function ArtistDetail() {
           </div>
         )}
 
-        {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => {
-          const albums = albumsByType[type];
-          const expanded = expandedAlbumTypes.has(type);
-          const visibleAlbums = expanded ? albums : albums.slice(0, ALBUM_ROWS_COLLAPSED_COUNT);
-          return (
-            <section key={type} className="mb-8">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
-                  <h2 className="text-xl font-bold tracking-tight text-white">{ALBUM_TYPE_SECTION_LABEL[type]}</h2>
-                </div>
-                {albums.length > ALBUM_ROWS_COLLAPSED_COUNT && (
-                  <button
-                    onClick={() => toggleAlbumTypeExpanded(type)}
-                    className="text-sm font-semibold transition-colors"
-                    style={{ color: TEAL }}
-                  >
-                    {expanded ? "Show less" : "View all"}
-                  </button>
-                )}
-              </div>
-              {visibleAlbums.map((album) => (
-                <AlbumRow
-                  key={album.id}
-                  album={album}
-                  artistName={artist.name}
-                  to={`/album/${album.id}`}
-                  playing={isPlaying && currentTrack?.albumId === album.id}
-                  onPlay={() => handlePlayAlbum(album.id)}
-                />
-              ))}
-            </section>
-          );
-        })}
+        {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
+          <SectionRow key={type} title={ALBUM_TYPE_SECTION_LABEL[type]} accent="teal" large scroll>
+            {albumsByType[type].map((album) => (
+              <Card
+                key={album.id}
+                title={album.title}
+                subtitle={albumSubtitle(album)}
+                gradient={album.gradient}
+                to={`/album/${album.id}`}
+                photoUrl={album.coverUrl}
+                large
+                entityType="album"
+                entityId={album.id}
+                artworkFrame={album.artworkFrame}
+                playing={isPlaying && currentTrack?.albumId === album.id}
+                onPlay={() => handlePlayAlbum(album.id)}
+              />
+            ))}
+          </SectionRow>
+        ))}
 
         {artist.topTracks.length > 0 && (
           <section className="mb-8">
@@ -580,25 +470,6 @@ export default function ArtistDetail() {
               />
             ))}
           </section>
-        )}
-
-        {playlists.length > 0 && (
-          <SectionRow title="Playlists" accent="violet" large scroll>
-            {playlists.map((pl) => (
-              <Card
-                key={pl.id}
-                title={pl.title}
-                subtitle={pl.description || "Playlist"}
-                gradient={pl.gradient}
-                to={`/playlist/${pl.id}`}
-                photoUrl={pl.coverUrl}
-                large
-                entityType="playlist"
-                entityId={pl.id}
-                artworkFrame={pl.artworkFrame}
-              />
-            ))}
-          </SectionRow>
         )}
       </div>
     </div>

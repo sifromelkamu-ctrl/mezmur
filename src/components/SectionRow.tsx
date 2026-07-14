@@ -1,7 +1,7 @@
 import { Children } from "react";
 import type { ReactNode } from "react";
 
-type SectionAccent = "brand" | "gold" | "green" | "violet" | "sky" | "red" | "cyan";
+type SectionAccent = "brand" | "gold" | "green" | "violet" | "sky" | "red" | "cyan" | "teal";
 
 const ACCENT_CLASSES: Record<SectionAccent, string> = {
   brand: "from-brand to-brand-dark",
@@ -11,6 +11,9 @@ const ACCENT_CLASSES: Record<SectionAccent, string> = {
   sky: "from-accent-sky to-blue-900",
   red: "from-accent-red to-rose-900",
   cyan: "from-accent-cyan to-blue-900",
+  // Not a shared design-system color yet — introduced for ArtistDetail's
+  // premium teal redesign, usable by any future section that wants it too.
+  teal: "from-[#14b8a6] to-[#134e4a]",
 };
 
 interface SectionRowProps {
