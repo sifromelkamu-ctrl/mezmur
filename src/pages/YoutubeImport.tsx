@@ -10,7 +10,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import SelectField from "../components/form/SelectField";
@@ -40,10 +40,16 @@ const DESTINATIONS: { id: Destination; label: string; icon: typeof Disc3 }[] = [
   { id: "live", label: "Concert", icon: Ticket },
 ];
 
-// The URL/destination form vs. the Single-only "Edit Metadata" review step —
-// distinct from Phase, which describes the background job's own lifecycle
-// once an import actually starts.
+// The URL/destination form vs. the Single/new-Concert "Edit Metadata" review
+// step — distinct from Phase, which describes the background job's own
+// lifecycle once an import actually starts.
 type Step = "form" | "metadata";
+
+// Concert destination only: attach this track to an already-existing concert
+// (the original, still-supported behavior — pick from the dropdown, no
+// metadata step), or create a brand-new one (shows the metadata step below,
+// same as Single, but with the extra concert-only fields).
+type ConcertMode = "existing" | "new";
 
 interface PreviewResult {
   title: string;
@@ -56,12 +62,14 @@ const POLL_INTERVAL_MS = 1000;
 
 export default function YoutubeImport() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [url, setUrl] = useState("");
   const [confirmRights, setConfirmRights] = useState(false);
   const [albums, setAlbums] = useState<ApiAlbum[]>([]);
   const [artists, setArtists] = useState<ApiArtist[]>([]);
   const [destination, setDestination] = useState<Destination>("single");
+  const [concertMode, setConcertMode] = useState<ConcertMode>("existing");
   const [albumId, setAlbumId] = useState("");
   const [genre, setGenre] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -70,10 +78,11 @@ export default function YoutubeImport() {
   const [submitting, setSubmitting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // "Edit Metadata" step (Single destination only) — pre-filled from a
-  // lightweight preview fetch (no download, nothing created yet), editable,
-  // and cached against the URL it was fetched for so navigating Back and
-  // forward again doesn't re-fetch unless the URL actually changed.
+  // "Edit Metadata" step (Single, and Concert's "Create new" mode) —
+  // pre-filled from a lightweight preview fetch (no download, nothing
+  // created yet), editable, and cached against the URL it was fetched for so
+  // navigating Back and forward again doesn't re-fetch unless the URL
+  // actually changed.
   const [step, setStep] = useState<Step>("form");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -82,6 +91,10 @@ export default function YoutubeImport() {
   const [metaArtistName, setMetaArtistName] = useState("");
   const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
+  // New-concert-only metadata — irrelevant to Single, never sent otherwise.
+  const [metaYear, setMetaYear] = useState("");
+  const [metaGenre, setMetaGenre] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
 
   useEffect(() => {
     albumsApi.list().then(setAlbums);
@@ -89,6 +102,21 @@ export default function YoutubeImport() {
     return () => {
       if (pollRef.current) clearTimeout(pollRef.current);
     };
+  }, []);
+
+  // Deep link from the Edit Concert modal's "Add Tracks" button
+  // (?destination=live&albumId=...) — preselects the Concert destination
+  // already pointed at that concert, "Add to existing" mode, ready to paste
+  // a URL and go.
+  useEffect(() => {
+    const paramDestination = searchParams.get("destination");
+    const paramAlbumId = searchParams.get("albumId");
+    if (paramDestination === "live") {
+      setDestination("live");
+      setConcertMode("existing");
+      if (paramAlbumId) setAlbumId(paramAlbumId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Regular Albums and Concert Albums are both just Album rows, distinguished
@@ -102,7 +130,10 @@ export default function YoutubeImport() {
   const selectDestination = (next: Destination) => {
     setDestination(next);
     setAlbumId("");
+    setConcertMode("existing");
   };
+
+  const isNewConcert = destination === "live" && concertMode === "new";
 
   const typedArtistName = metaArtistName.trim();
   const exactArtistMatch = artists.find((a) => a.name.toLowerCase() === typedArtistName.toLowerCase());
@@ -136,12 +167,13 @@ export default function YoutubeImport() {
     if (!url.trim()) return "Paste a YouTube URL first";
     if (!confirmRights) return "You must confirm you have permission to use this content";
     if (destination === "album" && !albumId) return "Select which album this track belongs to";
-    if (destination === "live" && !albumId) return "Select which concert this track belongs to";
+    if (destination === "live" && concertMode === "existing" && !albumId) return "Select which concert this track belongs to";
     return null;
   };
 
-  // "Next" (Single destination only) — fetches title/artist/thumbnail with
-  // no download and nothing created yet, then opens the Edit Metadata step.
+  // "Next" (Single destination, and Concert's "Create new" mode) — fetches
+  // title/artist/thumbnail with no download and nothing created yet, then
+  // opens the Edit Metadata step.
   const goToMetadataStep = async () => {
     setSubmitError(null);
     const error = validateForm();
@@ -162,6 +194,9 @@ export default function YoutubeImport() {
       setMetaTitle(result.title);
       setMetaArtistName(result.artistName);
       setSelectedArtistId(null);
+      setMetaYear("");
+      setMetaGenre("");
+      setMetaDescription("");
       setStep("metadata");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not fetch video info");
@@ -177,11 +212,11 @@ export default function YoutubeImport() {
       setSubmitError(error);
       return;
     }
-    if (destination === "single" && !metaTitle.trim()) {
-      setSubmitError("Song title can't be empty");
+    if ((destination === "single" || isNewConcert) && !metaTitle.trim()) {
+      setSubmitError(isNewConcert ? "Concert album name can't be empty" : "Song title can't be empty");
       return;
     }
-    if (destination === "single" && !typedArtistName) {
+    if ((destination === "single" || isNewConcert) && !typedArtistName) {
       setSubmitError("Enter or select an artist");
       return;
     }
@@ -190,8 +225,8 @@ export default function YoutubeImport() {
       const { jobId } = await adminApi.startYoutubeImport({
         url: url.trim(),
         confirmRights,
-        albumId: albumId || undefined,
-        genre: genre.trim() || undefined,
+        albumId: destination === "live" && concertMode === "existing" ? albumId || undefined : undefined,
+        genre: destination === "live" && concertMode === "new" ? undefined : genre.trim() || undefined,
         isSingle: destination === "single",
         ...(destination === "single"
           ? {
@@ -204,6 +239,23 @@ export default function YoutubeImport() {
               titleOverride: metaTitle.trim(),
               artistId: resolvedArtistId ?? undefined,
               artistName: resolvedArtistId ? undefined : typedArtistName,
+            }
+          : {}),
+        ...(isNewConcert
+          ? {
+              // Unlike Single, a Concert always resolves to a real Artist —
+              // Album.artistId is required at the schema level, so an
+              // unmatched name here isn't left unassigned: pipeline.ts's
+              // artist resolution auto-creates one (the same fallback
+              // catalog import already relies on) whenever isSingle is
+              // falsy, without needing an explicit createArtist opt-in.
+              newConcert: true,
+              titleOverride: metaTitle.trim(),
+              artistId: resolvedArtistId ?? undefined,
+              artistName: resolvedArtistId ? undefined : typedArtistName,
+              concertYear: metaYear.trim() ? Number(metaYear.trim()) : undefined,
+              concertGenre: metaGenre.trim() || undefined,
+              concertDescription: metaDescription.trim() || undefined,
             }
           : {}),
       });
@@ -224,6 +276,7 @@ export default function YoutubeImport() {
     setConfirmRights(false);
     setGenre("");
     setDestination("single");
+    setConcertMode("existing");
     setAlbumId("");
     setSubmitError(null);
     setStep("form");
@@ -232,6 +285,9 @@ export default function YoutubeImport() {
     setMetaTitle("");
     setMetaArtistName("");
     setSelectedArtistId(null);
+    setMetaYear("");
+    setMetaGenre("");
+    setMetaDescription("");
   };
 
   if (user?.role !== "admin") {
@@ -310,11 +366,39 @@ export default function YoutubeImport() {
             </div>
           </div>
 
+          {destination === "live" && (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setConcertMode("existing")}
+                className={`py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                  concertMode === "existing"
+                    ? "border-brand bg-brand/10 text-fg"
+                    : "border-transparent bg-panel text-fg-muted hover:text-fg"
+                }`}
+              >
+                Add to existing concert
+              </button>
+              <button
+                type="button"
+                onClick={() => setConcertMode("new")}
+                className={`py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                  concertMode === "new"
+                    ? "border-brand bg-brand/10 text-fg"
+                    : "border-transparent bg-panel text-fg-muted hover:text-fg"
+                }`}
+              >
+                Create new concert
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-3">
-            {destination === "single" ? (
+            {destination === "single" || isNewConcert ? (
               <p className="text-sm text-fg-muted bg-panel rounded-md px-3 py-2">
-                This track will be imported as a standalone single — no album. You'll review its title and artist
-                next.
+                {isNewConcert
+                  ? "A brand-new concert will be created — you'll review its name, artist, and other details next."
+                  : "This track will be imported as a standalone single — no album. You'll review its title and artist next."}
               </p>
             ) : (
               <SelectField
@@ -333,21 +417,23 @@ export default function YoutubeImport() {
                 ))}
               </SelectField>
             )}
-            {destination !== "single" && destinationAlbums.length === 0 && (
+            {destination !== "single" && !isNewConcert && destinationAlbums.length === 0 && (
               <p className="text-xs text-fg-subtle -mt-1">
                 {destination === "live"
-                  ? "No concerts yet — create one first from Bulk Upload Tracks."
+                  ? "No concerts yet — create one first, or switch to \"Create new concert\" above."
                   : "No albums yet — create one first from Bulk Upload Tracks."}
               </p>
             )}
-            <TextField
-              type="text"
-              value={genre}
-              onChange={(e) => setGenre(e.target.value)}
-              placeholder="Genre (optional)"
-              variant="panel"
-              className="px-3 py-2 text-base"
-            />
+            {!isNewConcert && (
+              <TextField
+                type="text"
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                placeholder="Genre (optional)"
+                variant="panel"
+                className="px-3 py-2 text-base"
+              />
+            )}
           </div>
 
           <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
@@ -374,7 +460,7 @@ export default function YoutubeImport() {
           )}
 
           <button
-            onClick={destination === "single" ? goToMetadataStep : startImport}
+            onClick={destination === "single" || isNewConcert ? goToMetadataStep : startImport}
             disabled={submitting || previewLoading}
             className="self-start flex items-center gap-2 bg-brand text-black text-sm font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
           >
@@ -383,7 +469,7 @@ export default function YoutubeImport() {
             ) : (
               <Clapperboard size={16} />
             )}
-            {phase === "error" ? "Try again" : destination === "single" ? "Next" : "Import from YouTube"}
+            {phase === "error" ? "Try again" : destination === "single" || isNewConcert ? "Next" : "Import from YouTube"}
           </button>
         </div>
       )}
@@ -407,12 +493,14 @@ export default function YoutubeImport() {
           </div>
 
           <label className="block">
-            <span className="text-xs font-semibold text-fg-muted">Song Title</span>
+            <span className="text-xs font-semibold text-fg-muted">
+              {isNewConcert ? "Concert Album Name" : "Song Title"}
+            </span>
             <TextField
               type="text"
               value={metaTitle}
               onChange={(e) => setMetaTitle(e.target.value)}
-              placeholder="Song title"
+              placeholder={isNewConcert ? "Concert album name" : "Song title"}
               variant="panel"
               className="w-full mt-1 px-3 py-2 text-base"
             />
@@ -463,12 +551,51 @@ export default function YoutubeImport() {
                     Will link to existing artist "
                     {artists.find((a) => a.id === resolvedArtistId)?.name ?? typedArtistName}"
                   </span>
+                ) : isNewConcert ? (
+                  <span>No matching artist — a new artist "{typedArtistName}" will be created</span>
                 ) : (
                   <span>No matching artist — this single will show as "{typedArtistName}" without an Artist page</span>
                 )}
               </p>
             )}
           </div>
+
+          {isNewConcert && (
+            <>
+              <label className="block">
+                <span className="text-xs font-semibold text-fg-muted">Release Year (optional)</span>
+                <TextField
+                  type="number"
+                  value={metaYear}
+                  onChange={(e) => setMetaYear(e.target.value)}
+                  placeholder="e.g. 2026"
+                  variant="panel"
+                  className="w-full mt-1 px-3 py-2 text-base"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-fg-muted">Genre (optional)</span>
+                <TextField
+                  type="text"
+                  value={metaGenre}
+                  onChange={(e) => setMetaGenre(e.target.value)}
+                  placeholder="e.g. Gospel, Worship"
+                  variant="panel"
+                  className="w-full mt-1 px-3 py-2 text-base"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-fg-muted">Description (optional)</span>
+                <textarea
+                  value={metaDescription}
+                  onChange={(e) => setMetaDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Optional concert description"
+                  className="w-full mt-1 bg-panel rounded-md px-3 py-2 text-sm placeholder:text-fg-subtle focus:outline-none focus:ring-2 focus:ring-border resize-none"
+                />
+              </label>
+            </>
+          )}
 
           {submitError && (
             <p className="flex items-center gap-2 text-sm text-accent-red">

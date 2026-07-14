@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
+import EditConcertModal from "../components/EditConcertModal";
 import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
@@ -40,14 +41,18 @@ export default function ConcertDetail() {
   const [concerts, setConcerts] = useState<ApiAlbum[]>([]);
   const [concert, setConcert] = useState<ApiAlbumDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => loadFavoriteConcertIds());
   const [copied, setCopied] = useState(false);
   const chipRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // The full concert list for the horizontal switcher — fetched once, not
   // re-fetched per concert, so switching between them never re-flashes it.
+  // Re-called after an edit (rename/delete) so the strip picks up the
+  // change immediately without a full page reload.
+  const refreshConcertList = () => concertsApi.list().then(setConcerts);
   useEffect(() => {
-    concertsApi.list().then(setConcerts);
+    refreshConcertList();
   }, []);
 
   useEffect(() => {
@@ -206,7 +211,7 @@ export default function ConcertDetail() {
             <p className="text-sm font-semibold uppercase tracking-wide">Concert</p>
             {isAdmin && (
               <button
-                onClick={() => navigate(`/album/${concert.id}`)}
+                onClick={() => setShowEditModal(true)}
                 className="text-fg-muted hover:text-fg transition-colors"
                 aria-label="Edit concert"
               >
@@ -289,6 +294,18 @@ export default function ConcertDetail() {
           ))}
         </div>
       </div>
+
+      {showEditModal && (
+        <EditConcertModal
+          concert={concert}
+          onClose={() => setShowEditModal(false)}
+          onSaved={(updated) => {
+            setConcert(updated);
+            refreshConcertList();
+          }}
+          onDeleted={() => navigate("/concerts")}
+        />
+      )}
     </div>
   );
 }

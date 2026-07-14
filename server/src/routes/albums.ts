@@ -81,10 +81,14 @@ const updateAlbumSchema = z.object({
   albumType: z.enum(["album", "ep", "single", "live", "compilation"]).optional(),
   releaseDate: z.string().trim().optional(),
   genre: z.string().trim().max(60).optional(),
+  year: z.number().int().min(1900).max(2100).nullable().optional(),
+  // Reassigns the whole album (Concert included) to a different existing
+  // catalog artist — the Edit Concert modal's "Change Artist" field.
+  artistId: z.string().min(1).optional(),
 });
 
 // PATCH /api/albums/:id - metadata editor: rename, description, type,
-// release date, and genre.
+// release date, year, genre, and artist.
 router.patch("/:id", requireAuth, async (req: AuthedRequest, res) => {
   const album = await prisma.album.findUnique({ where: { id: String(req.params.id) }, include: { artist: true } });
   if (!album) {
@@ -100,16 +104,30 @@ router.patch("/:id", requireAuth, async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const { releaseDate, ...rest } = parsed.data;
+  const { releaseDate, artistId, ...rest } = parsed.data;
   const parsedDate = releaseDate ? new Date(releaseDate) : undefined;
   if (releaseDate && parsedDate && Number.isNaN(parsedDate.getTime())) {
     res.status(400).json({ error: "Invalid release date" });
     return;
   }
-  const updated = await prisma.album.update({
-    where: { id: album.id },
-    data: { ...rest, ...(parsedDate ? { releaseDate: parsedDate } : {}) },
-  });
+  if (artistId) {
+    const newArtist = await prisma.artist.findUnique({ where: { id: artistId } });
+    if (!newArtist) {
+      res.status(404).json({ error: "Artist not found" });
+      return;
+    }
+  }
+  const albumUpdateData = { ...rest, ...(parsedDate ? { releaseDate: parsedDate } : {}), ...(artistId ? { artistId } : {}) };
+  // Changing the album's artist must cascade to every track in it — each
+  // Track also carries its own artistId (see toTrackDTO), so leaving the old
+  // one in place would show every song under the artist this concert no
+  // longer belongs to (same sync adminLibrary's moveTracks/mergeAlbums do).
+  const [updated] = await prisma.$transaction([
+    prisma.album.update({ where: { id: album.id }, data: albumUpdateData }),
+    ...(artistId && artistId !== album.artistId
+      ? [prisma.track.updateMany({ where: { albumId: album.id }, data: { artistId } })]
+      : []),
+  ]);
   res.json(toAlbumDTO(updated));
 });
 

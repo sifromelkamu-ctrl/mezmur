@@ -27,6 +27,11 @@ export interface StartImportParams {
   targetArtistId?: string;
   artistNameOverride?: string;
   createArtist?: boolean;
+  // "Concert" destination, "Create new concert" mode — see ImportVideoParams.
+  newConcert?: boolean;
+  concertYear?: number;
+  concertGenre?: string;
+  concertDescription?: string;
 }
 
 const jobs = new Map<string, ImportJob>();

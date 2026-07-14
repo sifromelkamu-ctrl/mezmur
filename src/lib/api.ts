@@ -290,6 +290,8 @@ export interface AlbumMetadataInput {
   albumType?: ApiAlbumType;
   releaseDate?: string;
   genre?: string;
+  year?: number | null;
+  artistId?: string;
 }
 
 export interface TrackMetadataInput {
@@ -534,6 +536,11 @@ export const adminApi = {
     artistId?: string;
     artistName?: string;
     createArtist?: boolean;
+    // "Concert" destination, "Create new concert" mode.
+    newConcert?: boolean;
+    concertYear?: number;
+    concertGenre?: string;
+    concertDescription?: string;
   }) => request<{ jobId: string }>("/admin/youtube-import", { method: "POST", body: JSON.stringify(input) }),
   getYoutubeImportStatus: (jobId: string) =>
     request<YoutubeImportJob>(`/admin/youtube-import/${jobId}`),

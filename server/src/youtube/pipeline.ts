@@ -107,6 +107,17 @@ export interface ImportVideoParams {
   // caller having to look up or pre-create the Album itself.
   albumTitle?: string;
   trackNumber?: number;
+  // "Concert" destination, "Create new concert" mode only (see
+  // YoutubeImport.tsx) — creates a brand-new Album row tagged
+  // albumType: "live" instead of reusing/finding one by title the way
+  // albumTitle/findOrCreateAlbum does. titleOverride (already used by the
+  // Single flow's Edit Metadata step) doubles as the concert's own title
+  // here. Mutually exclusive with albumTitle/albumId in practice — the
+  // client only ever sends one destination's fields.
+  newConcert?: boolean;
+  concertYear?: number;
+  concertGenre?: string;
+  concertDescription?: string;
   // Set by the catalog worker only: no artist photo, album cover, or track
   // cover is fetched/assigned for this import — catalog-imported content is
   // always art-less until an admin uses the manual Artwork Editor. The
@@ -301,6 +312,10 @@ export async function importYoutubeVideo({
   skipArtwork,
   allowDuplicates,
   batchId,
+  newConcert,
+  concertYear,
+  concertGenre,
+  concertDescription,
   onProgress,
 }: ImportVideoParams) {
   let tmpDir: string | undefined;
@@ -399,8 +414,26 @@ export async function importYoutubeVideo({
     onProgress?.("saving", 95, "Saving track…");
     // albumTitle is only ever set by catalog import, which always resolves a
     // real artist (never the isSingle/findExistingArtist path above) — the
-    // `artist &&` guard here is purely for the type checker.
-    const album = albumTitle && artist ? await findOrCreateAlbum(artist.id, albumTitle, { allowDuplicates, batchId }) : undefined;
+    // `artist &&` guard here is purely for the type checker. newConcert takes
+    // priority: it's an explicit "create a brand-new concert" action, never a
+    // find-or-reuse-by-title match the way albumTitle/findOrCreateAlbum is.
+    const album =
+      newConcert && artist
+        ? await prisma.album.create({
+            data: {
+              title: titleOverride ?? metadata.title,
+              artistId: artist.id,
+              albumType: "live",
+              year: concertYear,
+              genre: concertGenre,
+              description: concertDescription,
+              gradientFrom: artist.gradientFrom,
+              gradientTo: artist.gradientTo,
+            },
+          })
+        : albumTitle && artist
+          ? await findOrCreateAlbum(artist.id, albumTitle, { allowDuplicates, batchId })
+          : undefined;
 
     const track = await prisma.track.create({
       data: {

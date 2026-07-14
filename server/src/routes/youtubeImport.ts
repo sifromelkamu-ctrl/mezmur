@@ -102,6 +102,14 @@ const startImportSchema = z.object({
   // only when the typed name didn't match any existing artist and the admin
   // didn't pick one from the list either. Never guessed.
   createArtist: z.boolean().optional(),
+  // "Concert" destination, "Create new concert" mode: creates a brand-new
+  // Album (albumType "live") instead of requiring an existing one via
+  // albumId. titleOverride/artistId/artistName/createArtist above are
+  // reused as-is for the concert's own title/artist.
+  newConcert: z.boolean().optional(),
+  concertYear: z.number().int().min(1900).max(2100).optional(),
+  concertGenre: z.string().trim().max(60).optional(),
+  concertDescription: z.string().trim().max(4000).optional(),
 });
 
 // POST /api/admin/youtube-import — validates the URL and permission
@@ -137,6 +145,10 @@ router.post("/", async (req: AuthedRequest, res) => {
     targetArtistId: parsed.data.artistId,
     artistNameOverride: parsed.data.artistName,
     createArtist: parsed.data.createArtist,
+    newConcert: parsed.data.newConcert,
+    concertYear: parsed.data.concertYear,
+    concertGenre: parsed.data.concertGenre,
+    concertDescription: parsed.data.concertDescription,
   });
 
   res.status(202).json({ jobId });
