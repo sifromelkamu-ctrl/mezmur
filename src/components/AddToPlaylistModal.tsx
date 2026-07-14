@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import TextField from "./form/TextField";
 import { useAuth } from "../context/useAuth";
 import { playlistsApi, type ApiPlaylist, type ApiTrack } from "../lib/api";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 
 interface AddToPlaylistModalProps {
   track: ApiTrack;
@@ -87,7 +86,7 @@ export default function AddToPlaylistModal({ track, onClose }: AddToPlaylistModa
         >
           <ListMusic size={16} className="text-white/80" />
         </span>
-        <span className="flex-1 min-w-0 truncate text-sm font-medium">{renderWithAmharicStyle(pl.title)}</span>
+        <span className="flex-1 min-w-0 truncate text-sm font-medium">{pl.title}</span>
         <span
           className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border transition-colors ${
             added ? "bg-brand border-brand text-black" : "border-border text-transparent"
@@ -118,7 +117,7 @@ export default function AddToPlaylistModal({ track, onClose }: AddToPlaylistModa
             <X size={18} />
           </button>
         </div>
-        <p className="text-sm text-fg-muted truncate mb-4">{renderWithAmharicStyle(track.title)}</p>
+        <p className="text-sm text-fg-muted truncate mb-4">{track.title}</p>
 
         <form onSubmit={createAndAdd} className="mb-3 shrink-0">
           <div className="flex items-center gap-2">

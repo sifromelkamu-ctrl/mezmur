@@ -1,6 +1,5 @@
 import { ListMusic, X } from "lucide-react";
 import type { ApiTrack } from "../lib/api";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 import CoverArt from "./CoverArt";
 
 interface QueuePanelProps {
@@ -42,8 +41,8 @@ export default function QueuePanel({ currentTrack, queue, onSelect, onClose }: Q
             artworkFrame={currentTrack.artworkFrame}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white truncate">{renderWithAmharicStyle(currentTrack.title)}</p>
-            <p className="text-xs text-white/60 truncate">{renderWithAmharicStyle(currentTrack.artistName ?? "")}</p>
+            <p className="text-sm font-semibold text-white truncate">{currentTrack.title}</p>
+            <p className="text-xs text-white/60 truncate">{currentTrack.artistName}</p>
           </div>
         </div>
 
@@ -66,8 +65,8 @@ export default function QueuePanel({ currentTrack, queue, onSelect, onClose }: Q
                     artworkFrame={track.artworkFrame}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{renderWithAmharicStyle(track.title)}</p>
-                    <p className="text-xs text-white/60 truncate">{renderWithAmharicStyle(track.artistName ?? "")}</p>
+                    <p className="text-sm font-medium text-white truncate">{track.title}</p>
+                    <p className="text-xs text-white/60 truncate">{track.artistName}</p>
                   </div>
                 </button>
               ))}

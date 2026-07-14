@@ -9,7 +9,6 @@ import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { adminApi, albumsApi, type ApiAlbumDetail, type ApiAlbumType } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 
 function formatDuration(totalSeconds: number): string {
   const totalMinutes = Math.round(totalSeconds / 60);
@@ -297,15 +296,13 @@ export default function AlbumDetail() {
                   </button>
                 )}
               </div>
-              <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">
-                {renderWithAmharicStyle(album.title)}
-              </h1>
+              <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">{album.title}</h1>
               <p className="text-sm text-fg-muted">
                 <span
                   className="font-semibold text-fg hover:underline cursor-pointer"
                   onClick={() => navigate(`/artist/${album.artistId}`)}
                 >
-                  {renderWithAmharicStyle(album.artistName ?? "")}
+                  {album.artistName}
                 </span>{" "}
                 {album.year ? `· ${album.year} ` : ""}· {orderedTracks.length} songs, {formatDuration(totalDuration)}
                 {album.genre ? ` · ${album.genre}` : ""}

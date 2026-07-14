@@ -2,7 +2,6 @@ import { Heart, Pause, Play, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFavorites } from "../context/FavoritesContext";
 import { usePlayer } from "../context/PlayerContext";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
 import NowPlaying from "./NowPlaying";
@@ -51,8 +50,8 @@ export default function PlayerBar() {
             className={isPlaying ? "ring-2 ring-brand/60 shadow-[0_0_14px_rgba(124,92,255,0.55)]" : ""}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold truncate">{renderWithAmharicStyle(currentTrack.title)}</p>
-            <p className="text-xs text-fg-muted truncate">{renderWithAmharicStyle(currentTrack.artistName ?? "")}</p>
+            <p className="text-sm font-semibold truncate">{currentTrack.title}</p>
+            <p className="text-xs text-fg-muted truncate">{currentTrack.artistName}</p>
           </div>
           {isPlaying && (
             <span className="shrink-0 flex items-center justify-center text-brand">

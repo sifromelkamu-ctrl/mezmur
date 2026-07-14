@@ -4,7 +4,6 @@ import { usePlayer } from "../context/PlayerContext";
 import { useFavorites } from "../context/FavoritesContext";
 import type { ApiTrack } from "../lib/api";
 import { formatDuration } from "../utils/format";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 import AddToPlaylistModal from "./AddToPlaylistModal";
 import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
@@ -96,10 +95,8 @@ export default function TrackRow({
           artworkFrame={track.artworkFrame}
         />
         <div className="min-w-0">
-          <p className={`text-sm font-medium truncate ${isCurrent ? "text-brand" : "text-fg"}`}>
-            {renderWithAmharicStyle(track.title)}
-          </p>
-          {subtitle && <p className="text-xs text-fg-muted truncate">{renderWithAmharicStyle(subtitle)}</p>}
+          <p className={`text-sm font-medium truncate ${isCurrent ? "text-brand" : "text-fg"}`}>{track.title}</p>
+          {subtitle && <p className="text-xs text-fg-muted truncate">{subtitle}</p>}
         </div>
       </div>
 

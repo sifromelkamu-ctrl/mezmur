@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { Play } from "lucide-react";
-import { renderWithAmharicStyle } from "../../utils/scriptText";
 
 interface ForYouCardProps {
   title: string;
@@ -37,8 +36,8 @@ export default function ForYouCard({ title, subtitle, gradient, to, photoUrl, on
       <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-3xl" />
 
       <div className="relative h-full flex flex-col justify-end p-4">
-        <p className="text-[15px] font-bold text-white leading-tight truncate">{renderWithAmharicStyle(title)}</p>
-        <p className="text-xs text-white/60 truncate mt-0.5">{renderWithAmharicStyle(subtitle)}</p>
+        <p className="text-[15px] font-bold text-white leading-tight truncate">{title}</p>
+        <p className="text-xs text-white/60 truncate mt-0.5">{subtitle}</p>
       </div>
 
       <button

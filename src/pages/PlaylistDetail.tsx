@@ -8,7 +8,6 @@ import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { playlistsApi, searchApi, type ApiPlaylist, type ApiTrack } from "../lib/api";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 
 export default function PlaylistDetail() {
   const { id } = useParams();
@@ -108,9 +107,7 @@ export default function PlaylistDetail() {
         />
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-wide">{isOwner ? "Your Playlist" : "Playlist"}</p>
-          <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">
-            {renderWithAmharicStyle(playlist.title)}
-          </h1>
+          <h1 className="text-3xl font-black tracking-tight mt-2 mb-4 break-words">{playlist.title}</h1>
           {playlist.description && <p className="text-fg-muted text-sm mb-2">{playlist.description}</p>}
           <p className="text-sm text-fg-muted">
             <span className="font-semibold text-fg">Mezmur</span> · {playlistTracks.length} songs, about{" "}
@@ -180,8 +177,8 @@ export default function PlaylistDetail() {
                       artworkFrame={track.artworkFrame}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{renderWithAmharicStyle(track.title)}</p>
-                      <p className="text-xs text-fg-muted truncate">{renderWithAmharicStyle(track.artistName ?? "")}</p>
+                      <p className="text-sm font-medium truncate">{track.title}</p>
+                      <p className="text-xs text-fg-muted truncate">{track.artistName}</p>
                     </div>
                     <button
                       onClick={() => !alreadyAdded && addTrack(track.id)}

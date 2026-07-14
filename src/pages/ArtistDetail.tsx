@@ -29,7 +29,6 @@ import {
   type ApiArtistDetail,
   type ApiPlaylist,
 } from "../lib/api";
-import { renderWithAmharicStyle } from "../utils/scriptText";
 
 // "live" (Concert Albums) is deliberately excluded — concerts are a
 // completely separate content type and must never appear in an artist's
@@ -312,7 +311,7 @@ export default function ArtistDetail() {
             </span>
             <span className="text-xs font-bold uppercase tracking-wide text-brand">Artist</span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight break-words">{renderWithAmharicStyle(artist.name)}</h1>
+          <h1 className="text-4xl font-black tracking-tight break-words">{artist.name}</h1>
           <p className="text-sm text-fg-muted mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
       </div>
