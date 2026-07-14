@@ -4,11 +4,17 @@ import { normalizeForMatch } from "../artwork/matching.js";
 import { toSafeErrorMessage } from "./safeError.js";
 import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 
-// A single global FIFO of item ids, processed one at a time. yt-dlp/ffmpeg
-// are heavy (CPU + bandwidth), so we deliberately don't run items in
-// parallel — a catalog import is a background chore, not a race.
+// A single global FIFO of item ids. Each item spends almost all of its time
+// waiting on network I/O (yt-dlp fetching through the configured proxy —
+// see ytdlp.ts's YTDLP_PROXY_URL — not on CPU), so running a few at once is
+// safe even on a modest instance and directly cuts total batch wall-clock
+// time: a free-tier proxy's throughput was observed in production to vary
+// a lot (a healthy download: ~10s; a congested one: several minutes before
+// yt-dlp's own retries gave up), and previously every item queued fully
+// behind whichever one it happened to land on.
+const CONCURRENCY = 3;
 const queue: string[] = [];
-let processing = false;
+let activeWorkers = 0;
 
 // Ids currently being worked on by processItem() in *this* process — as
 // opposed to items merely marked "downloading"/etc. in the database, which
@@ -137,20 +143,30 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function kick() {
-  if (processing) return;
-  processing = true;
-  try {
-    while (queue.length > 0) {
-      const itemId = queue.shift()!;
-      await processItem(itemId);
-      // A short pause between items so a long run of back-to-back storage
-      // API calls doesn't land in the same tight window that's been
-      // observed to trip transient failures under sustained load.
-      if (queue.length > 0) await sleep(3000);
-    }
-  } finally {
-    processing = false;
+// Each worker greedily pulls the next id off the shared queue until it's
+// empty — queue.shift() is synchronous, so concurrent workers can never
+// grab the same item. The pause between an individual worker's own items
+// is shorter than the old single-worker version's (1.5s vs 3s) since
+// CONCURRENCY workers already naturally space out storage API calls
+// against each other; it's not trying to throttle the batch as a whole.
+async function worker() {
+  let itemId: string | undefined;
+  while ((itemId = queue.shift()) !== undefined) {
+    await processItem(itemId);
+    if (queue.length > 0) await sleep(1500);
+  }
+}
+
+// Tops the worker pool back up to CONCURRENCY whenever new items are
+// enqueued or a worker finishes — synchronous on purpose (no internal
+// await before activeWorkers++), so a burst of enqueue() calls in a tight
+// loop (e.g. "select all" then "start") can never over-spawn workers.
+function kick() {
+  while (activeWorkers < CONCURRENCY && queue.length > 0) {
+    activeWorkers++;
+    worker().finally(() => {
+      activeWorkers--;
+    });
   }
 }
 

@@ -187,7 +187,7 @@ function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "st
 // that a URL containing a `list=` param only ever resolves to the single
 // video, never an entire playlist.
 export async function fetchYoutubeMetadata(url: string): Promise<YoutubeMetadata> {
-  const stdout = await runYtDlp(["--dump-json", "--no-playlist", "--no-warnings", url]);
+  const stdout = await runYtDlp(["--dump-json", "--no-playlist", "--no-warnings", "--retries", "3", "--socket-timeout", "15", url]);
   const lastLine = stdout.trim().split("\n").pop();
   if (!lastLine) throw new YtDlpError("yt-dlp returned no metadata");
 
@@ -396,6 +396,19 @@ export async function downloadYoutubeAudio(
       // audio. 160kbps is still solid streaming quality.
       "--audio-quality",
       "160K",
+      // yt-dlp's defaults (10 retries, no socket timeout) are tuned for an
+      // interactive user waiting on one download — against a free-tier
+      // proxy under load, that let a single stalled connection eat 7-8
+      // minutes before giving up (confirmed in production). A flaky
+      // attempt now fails in well under a minute instead of stalling the
+      // whole sequential queue behind it; a healthy connection is
+      // unaffected either way.
+      "--retries",
+      "3",
+      "--fragment-retries",
+      "3",
+      "--socket-timeout",
+      "15",
       "--no-playlist",
       "--no-warnings",
       "--newline",
