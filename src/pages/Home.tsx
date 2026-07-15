@@ -216,7 +216,16 @@ export default function Home() {
       {/* Compact header: greeting + devotional line, notification, profile */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <h1 className="text-xl font-black tracking-tight text-fg leading-tight">{t(greetingKey())}</h1>
+          {/* Same premium language as the buttons beside it — a soft
+              brand-colored ambient glow, here behind a gently faded
+              gradient fill instead of a bevel (which only reads on a
+              round tile, not a line of text). */}
+          <h1
+            className="text-xl font-black tracking-tight leading-tight bg-gradient-to-r from-fg to-fg/65 bg-clip-text text-transparent"
+            style={{ filter: "drop-shadow(0 2px 14px color-mix(in oklab, var(--color-brand) 45%, transparent))" }}
+          >
+            {t(greetingKey())}
+          </h1>
           <p className="text-xs text-fg-muted italic mt-0.5">{devotionalLine}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
