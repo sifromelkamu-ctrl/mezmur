@@ -40,15 +40,19 @@ export default function ForYouCard({ title, subtitle, gradient, to, photoUrl, on
         <p className="text-xs text-white/60 truncate mt-0.5">{subtitle}</p>
       </div>
 
+      {/* Sized/styled to match the artist cards' play button (Card.tsx's
+          portrait variant) — this one used to be noticeably larger and a
+          solid brand color, which read as inconsistent sitting right below
+          the Artists row on Home. */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onPlay();
         }}
-        className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-brand text-black flex items-center justify-center shadow-[0_8px_20px_-4px_rgba(124,92,255,0.8)] active:scale-90 transition-transform"
+        className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center shadow-lg active:scale-90 hover:scale-105 transition-transform"
         aria-label={`Play ${title}`}
       >
-        <Play size={15} fill="black" className="ml-0.5" />
+        <Play size={14} fill="white" className="text-white ml-0.5" />
       </button>
     </div>
   );
