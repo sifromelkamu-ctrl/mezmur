@@ -18,6 +18,7 @@ import {
   YtDlpError,
 } from "./ytdlp.js";
 import { generateWaveform } from "./waveform.js";
+import type { AlbumType } from "../generated/prisma/enums.js";
 
 // Not every channel exposes a "Videos" tab — YouTube Music-style Official
 // Artist Channels in particular often only have Releases/Playlists — so a
@@ -106,6 +107,13 @@ export interface ImportVideoParams {
   // into real Album rows by the album/release title alone, without the
   // caller having to look up or pre-create the Album itself.
   albumTitle?: string;
+  // The catalog batch's "Regular Album" vs "Concert Album" destination
+  // choice (see routes/youtubeCatalogImport.ts) — only meaningful alongside
+  // albumTitle, and only actually applied when findOrCreateAlbum ends up
+  // creating a brand-new album rather than matching an existing one (see
+  // findOrCreateAlbum below for why). The single-video quick-import job
+  // never sets this.
+  albumType?: AlbumType;
   trackNumber?: number;
   // "Concert" destination, "Create new concert" mode only (see
   // YoutubeImport.tsx) — creates a brand-new Album row tagged
@@ -253,7 +261,7 @@ async function findExistingArtist(name: string) {
 async function findOrCreateAlbum(
   artistId: string,
   title: string,
-  options?: { allowDuplicates?: boolean; batchId?: string }
+  options?: { allowDuplicates?: boolean; batchId?: string; albumType?: AlbumType }
 ) {
   const artist = await prisma.artist.findUniqueOrThrow({ where: { id: artistId } });
 
@@ -270,7 +278,13 @@ async function findOrCreateAlbum(
       return prisma.album.findUniqueOrThrow({ where: { id: map[normalized] } });
     }
     const created = await prisma.album.create({
-      data: { title, artistId, gradientFrom: artist.gradientFrom, gradientTo: artist.gradientTo },
+      data: {
+        title,
+        artistId,
+        gradientFrom: artist.gradientFrom,
+        gradientTo: artist.gradientTo,
+        albumType: options.albumType,
+      },
     });
     await prisma.youtubeImportBatch.update({
       where: { id: options.batchId },
@@ -291,11 +305,20 @@ async function findOrCreateAlbum(
     .map((c) => ({ id: c.id, score: similarity(c.title, title) }))
     .sort((a, b) => b.score - a.score)[0];
   if (best && best.score >= IDENTITY_MIN) {
+    // A match against an existing album keeps whatever type it already
+    // had — choosing "Concert Album" for this batch can never silently
+    // retag a regular album that just happens to share this title.
     return prisma.album.findUniqueOrThrow({ where: { id: best.id } });
   }
 
   return prisma.album.create({
-    data: { title, artistId, gradientFrom: artist.gradientFrom, gradientTo: artist.gradientTo },
+    data: {
+      title,
+      artistId,
+      gradientFrom: artist.gradientFrom,
+      gradientTo: artist.gradientTo,
+      albumType: options?.albumType,
+    },
   });
 }
 
@@ -315,6 +338,7 @@ export async function importYoutubeVideo({
   createArtist,
   targetArtistId,
   albumTitle,
+  albumType,
   trackNumber,
   skipArtwork,
   allowDuplicates,
@@ -440,7 +464,7 @@ export async function importYoutubeVideo({
             },
           })
         : albumTitle && artist
-          ? await findOrCreateAlbum(artist.id, albumTitle, { allowDuplicates, batchId })
+          ? await findOrCreateAlbum(artist.id, albumTitle, { allowDuplicates, batchId, albumType })
           : undefined;
 
     const track = await prisma.track.create({

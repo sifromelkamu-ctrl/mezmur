@@ -323,6 +323,14 @@ model YoutubeImportBatch {
   // time, globally, across every batch.
   duplicateAlbumMap Json?
 
+  // The admin's explicit "Regular Album" vs "Concert Album" destination
+  // choice for this whole batch (see routes/youtubeCatalogImport.ts) —
+  // applied only to albums *newly created* while processing this batch
+  // (catalogWorker.ts/pipeline.ts's findOrCreateAlbum); an album this batch
+  // merely matches by title keeps whatever type it already had, so choosing
+  // "Concert Album" here can never silently retag an existing regular album.
+  albumType AlbumType @default(album)
+
   @@index([createdBy])
 }
 

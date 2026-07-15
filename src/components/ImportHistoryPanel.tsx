@@ -190,6 +190,7 @@ export default function ImportHistoryPanel({
                   <p className="text-sm font-semibold truncate">{b.label ?? b.channelName ?? b.sourceUrl}</p>
                 )}
                 <p className="text-xs text-fg-muted">
+                  {b.albumType === "live" && <span className="text-brand font-semibold">Concert · </span>}
                   {b.itemCount} songs found · {STATUS_LABEL[b.status] ?? b.status} · {historyDuration(b)} ·{" "}
                   {new Date(b.createdAt).toLocaleString()}
                 </p>

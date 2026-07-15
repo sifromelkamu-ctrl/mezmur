@@ -76,6 +76,25 @@ export function buildRecommendations(input: BuildRecommendationsInput, limit = 2
 
   const hasEnoughSignal = artistWeight.size + genreWeight.size >= MIN_TASTE_ANCHORS;
 
+  // Shared across both branches below — greedily picks from a pre-sorted
+  // candidate list while skipping any track whose artist is already
+  // represented, so "For You" never shows the same artist twice on one
+  // page (a personalized listener's top-scored tracks otherwise cluster
+  // heavily around whichever one artist dominates their taste signal).
+  // Tracks with no artistId (unmatched Singles) are never constrained by
+  // this — there's no artist identity for them to collide on.
+  const usedArtistIds = new Set<string>();
+  const pickDiverse = (candidates: ApiTrack[], count: number): ApiTrack[] => {
+    const picked: ApiTrack[] = [];
+    for (const t of candidates) {
+      if (picked.length >= count) break;
+      if (t.artistId && usedArtistIds.has(t.artistId)) continue;
+      picked.push(t);
+      if (t.artistId) usedArtistIds.add(t.artistId);
+    }
+    return picked;
+  };
+
   let items: RecommendationItem[] = [];
 
   if (hasEnoughSignal) {
@@ -84,22 +103,22 @@ export function buildRecommendations(input: BuildRecommendationsInput, limit = 2
       (t.genre ? (genreWeight.get(t.genre) ?? 0) * 2 : 0) +
       Math.min(t.playCount ?? 0, 50) * 0.02;
 
-    items = tracks
+    const scored = tracks
       .filter((t) => !seenTrackIds.has(t.id))
-      .map((t) => ({ item: trackToItem(t), score: scoreTrack(t) }))
+      .map((t) => ({ track: t, score: scoreTrack(t) }))
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((x) => x.item);
+      .map((x) => x.track);
+
+    items = pickDiverse(scored, limit).map(trackToItem);
   }
 
   if (items.length < limit) {
     const existingIds = new Set(items.map((i) => i.id));
-    const trending = [...tracks]
+    const trendingCandidates = [...tracks]
       .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
-      .filter((t) => !existingIds.has(t.id))
-      .slice(0, limit - items.length)
-      .map(trackToItem);
+      .filter((t) => !existingIds.has(t.id));
+    const trending = pickDiverse(trendingCandidates, limit - items.length).map(trackToItem);
     items = [...items, ...trending];
   }
 

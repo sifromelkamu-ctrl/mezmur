@@ -11,7 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import ImportHistoryPanel from "../components/ImportHistoryPanel";
@@ -63,6 +63,7 @@ function statusIcon(status: YoutubeCatalogItem["status"]) {
 export default function YoutubeCatalogImport() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [url, setUrl] = useState("");
   const [confirmRights, setConfirmRights] = useState(false);
@@ -71,6 +72,14 @@ export default function YoutubeCatalogImport() {
   // batch imports as a brand-new library item instead of being matched or
   // skipped against existing content.
   const [allowDuplicates, setAllowDuplicates] = useState(false);
+  // "Regular Album" (default) vs "Concert Album" — whichever Album row(s)
+  // this batch creates get tagged accordingly (see
+  // routes/youtubeCatalogImport.ts). Deep-linkable from Home's Concerts
+  // section (?destination=concert), same pattern as the single-video
+  // import screen's own ?destination=live.
+  const [destinationType, setDestinationType] = useState<"album" | "concert">(
+    () => (searchParams.get("destination") === "concert" ? "concert" : "album")
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -249,6 +258,7 @@ export default function YoutubeCatalogImport() {
         artistId: artistMode === "existing" ? selectedArtistId : undefined,
         artistName: artistMode === "new" ? newArtistName.trim() : undefined,
         allowDuplicates,
+        destinationType,
       });
       setUrl("");
       setConfirmRights(false);
@@ -573,6 +583,34 @@ export default function YoutubeCatalogImport() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+
+          <div className="bg-elevated rounded-lg p-4 flex flex-col gap-3 mb-4">
+            <p className="text-xs font-bold text-fg-muted uppercase tracking-wide">Import as</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDestinationType("album")}
+                className={`flex-1 text-sm font-semibold px-3 py-2 rounded-full transition-colors ${
+                  destinationType === "album" ? "bg-brand text-black" : "bg-panel text-fg-muted hover:text-fg"
+                }`}
+              >
+                Regular Album
+              </button>
+              <button
+                onClick={() => setDestinationType("concert")}
+                className={`flex-1 text-sm font-semibold px-3 py-2 rounded-full transition-colors ${
+                  destinationType === "concert" ? "bg-brand text-black" : "bg-panel text-fg-muted hover:text-fg"
+                }`}
+              >
+                Concert Album
+              </button>
+            </div>
+            {destinationType === "concert" && (
+              <p className="text-xs text-fg-muted -mt-1">
+                Every album this batch creates shows up in Home → Concerts instead of the regular Albums section —
+                ideal for a single playlist that's one whole concert recording.
+              </p>
             )}
           </div>
 

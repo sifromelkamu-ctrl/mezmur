@@ -89,6 +89,11 @@ async function processItem(itemId: string) {
       targetArtistId: item.batch.targetArtistId ?? undefined,
       artistNameOverride: item.batch.targetArtistId ? undefined : (item.batch.channelName ?? undefined),
       albumTitle: item.albumTitle ?? undefined,
+      // The admin's "Regular Album" vs "Concert Album" destination choice
+      // for this whole batch (see routes/youtubeCatalogImport.ts) — only
+      // matters when albumTitle is set, and only actually applied to an
+      // album findOrCreateAlbum ends up creating fresh (see pipeline.ts).
+      albumType: item.batch.albumType,
       trackNumber: item.albumTitle ? item.position + 1 : undefined,
       skipArtwork: true,
       allowDuplicates: item.batch.allowDuplicates,

@@ -463,6 +463,10 @@ export interface YoutubeCatalogBatch {
   createdAt: string;
   targetArtistId: string | null;
   allowDuplicates: boolean;
+  // Whichever real Album row(s) this batch creates get this type — see
+  // routes/youtubeCatalogImport.ts's destinationType. "live" means the
+  // admin chose "Concert Album" as this batch's destination.
+  albumType: ApiAlbumType;
   items: YoutubeCatalogItem[];
 }
 
@@ -474,6 +478,7 @@ export interface YoutubeCatalogBatchSummary {
   status: YoutubeCatalogBatchStatus;
   error: string | null;
   itemCount: number;
+  albumType: ApiAlbumType;
   createdAt: string;
   updatedAt: string;
 }
@@ -585,6 +590,10 @@ export const adminApi = {
     // already exists). When true, every album/single/track in this batch
     // imports as a brand-new row instead of being matched/skipped.
     allowDuplicates?: boolean;
+    // "Regular Album" (default) vs "Concert Album" — whichever Album row(s)
+    // this batch creates get tagged accordingly (see
+    // routes/youtubeCatalogImport.ts).
+    destinationType?: "album" | "concert";
   }) => request<{ batchId: string }>("/admin/youtube-import/catalog", { method: "POST", body: JSON.stringify(input) }),
   listYoutubeCatalogBatches: (params?: { q?: string; status?: string; page?: number; pageSize?: number }) => {
     const qs = new URLSearchParams();

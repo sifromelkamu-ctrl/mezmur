@@ -14,10 +14,15 @@ async function canEditOwned(userId: string, ownerId: string | null): Promise<boo
   return profile?.role === "admin";
 }
 
-// GET /api/albums - catalog albums (belonging to non-user-owned artists)
+// GET /api/albums - catalog albums (belonging to non-user-owned artists).
+// Concert Albums are a completely separate content type — browsed only via
+// Home's Concerts section (see routes/concerts.ts) — so they're excluded
+// here at the source rather than relying on every consumer (Library's
+// Albums tab, search, Home's own client-side filter, ...) to remember to
+// filter albumType itself.
 router.get("/", async (_req, res) => {
   const albums = await prisma.album.findMany({
-    where: { artist: { ownerId: null } },
+    where: { artist: { ownerId: null }, albumType: { not: "live" } },
     include: { artist: true },
     orderBy: { createdAt: "asc" },
   });

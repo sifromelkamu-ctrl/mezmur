@@ -252,7 +252,6 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
           {albumsForArtist.map((al) => (
             <option key={al.id} value={al.id}>
               {al.title}
-              {al.albumType === "live" ? " (Concert Album)" : ""}
             </option>
           ))}
         </SelectField>

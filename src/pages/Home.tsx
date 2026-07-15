@@ -1,4 +1,4 @@
-import { Bell, Flame, Heart, Music, Shuffle, Sparkles, User } from "lucide-react";
+import { Bell, Flame, Heart, Music, Plus, Shuffle, Sparkles, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
@@ -111,7 +111,21 @@ export default function Home() {
   );
   const continueListening = useMemo(() => {
     const ids = getRecentlyPlayedIds();
-    return ids.map((id) => tracks.find((tr) => tr.id === id)).filter((tr): tr is ApiTrack => Boolean(tr));
+    // Keeps recency order but only the most-recent track per artist — the
+    // raw play log otherwise repeats the same artist's tiles whenever the
+    // listener replayed a few of their songs back to back.
+    const seenArtists = new Set<string>();
+    const result: ApiTrack[] = [];
+    for (const id of ids) {
+      const tr = tracks.find((t) => t.id === id);
+      if (!tr) continue;
+      if (tr.artistId) {
+        if (seenArtists.has(tr.artistId)) continue;
+        seenArtists.add(tr.artistId);
+      }
+      result.push(tr);
+    }
+    return result;
   }, [tracks]);
   const recommended = useMemo(
     () =>
@@ -427,12 +441,24 @@ export default function Home() {
             <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-violet to-indigo-900" />
             <h2 className="font-bold tracking-tight text-2xl">{t("concerts")}</h2>
           </div>
-          <button
-            onClick={() => navigate("/concerts")}
-            className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors shrink-0"
-          >
-            Show all
-          </button>
+          <div className="flex items-center gap-4 shrink-0">
+            {user?.role === "admin" && (
+              <button
+                onClick={() => navigate("/admin/youtube-catalog-import?destination=concert")}
+                className="flex items-center gap-1 text-sm font-semibold text-fg-muted hover:text-brand transition-colors"
+                aria-label="Import a concert album"
+              >
+                <Plus size={15} />
+                Import
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/concerts")}
+              className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors"
+            >
+              Show all
+            </button>
+          </div>
         </div>
         {concerts.length > 0 ? (
           <div

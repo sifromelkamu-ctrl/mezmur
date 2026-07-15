@@ -31,6 +31,13 @@ const startEnumerationSchema = z
     // track in this batch imports as a brand-new row, never matched or
     // skipped against existing content.
     allowDuplicates: z.boolean().optional().default(false),
+    // "Regular Album" (default) vs "Concert Album" — whichever real Album
+    // row(s) this batch ends up *creating* (grouped by playlist/release
+    // title, see catalogEnumerate.ts) get tagged accordingly. Matters most
+    // for the single-playlist import mode (one whole concert recording as
+    // one playlist -> one Concert Album), but applies just as well to a
+    // channel import that's entirely concert footage.
+    destinationType: z.enum(["album", "concert"]).optional().default("album"),
   })
   .refine((v) => (v.artistMode === "existing" ? Boolean(v.artistId) : Boolean(v.artistName)), {
     message: "Choose an existing artist, or provide a name for the new artist",
@@ -86,7 +93,7 @@ router.post("/", async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const { url, urls, artistMode, artistId, artistName, allowDuplicates } = parsed.data;
+  const { url, urls, artistMode, artistId, artistName, allowDuplicates, destinationType } = parsed.data;
 
   const targetArtist = await resolveTargetArtist(res, { artistMode, artistId, artistName });
   if (!targetArtist) return; // response already sent (404 or 409)
@@ -129,6 +136,7 @@ router.post("/", async (req: AuthedRequest, res) => {
       targetArtistId: targetArtist.id,
       existingAlbumTitlesSnapshot,
       allowDuplicates,
+      albumType: destinationType === "concert" ? "live" : "album",
     },
   });
 
@@ -249,6 +257,7 @@ router.get("/", async (req: AuthedRequest, res) => {
       status: b.status,
       error: b.error,
       itemCount: b._count.items,
+      albumType: b.albumType,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
     })),
