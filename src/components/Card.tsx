@@ -123,8 +123,19 @@ export default function Card({
         )}
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-3 pr-12">
-          <p className={`font-semibold text-sm text-white truncate ${titleClassName}`}>{title}</p>
-          {shouldShowSubtitle && <p className="text-xs text-gold truncate mt-0.5">{subtitle}</p>}
+          {/* Long artist names were getting clipped mid-word at text-sm on
+              one line — smaller size + a second wrap line (instead of
+              truncating) keeps the whole name readable; the text-shadow
+              is a premium touch that keeps it legible over bright photos
+              regardless of what's directly behind it. */}
+          <p
+            className={`font-bold text-[12.5px] leading-tight tracking-tight text-white line-clamp-2 [text-shadow:0_1px_4px_rgba(0,0,0,0.65)] ${titleClassName}`}
+          >
+            {title}
+          </p>
+          {shouldShowSubtitle && (
+            <p className="text-[11px] font-medium text-gold truncate mt-1 tracking-wide">{subtitle}</p>
+          )}
         </div>
         {onPlay && (
           <button

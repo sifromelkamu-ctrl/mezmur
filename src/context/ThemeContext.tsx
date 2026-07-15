@@ -13,6 +13,14 @@ export const ACCENT_THEMES: AccentTheme[] = [
   { id: "cyan", name: "Electric Cyan", brand: "#31d7ff", brandDark: "#0ea5c7", brandGlow: "#7ee8ff" },
   { id: "gold", name: "Soft Gold", brand: "#f3c969", brandDark: "#c9a34a", brandGlow: "#ffe3a3" },
   { id: "crimson", name: "Crimson", brand: "#e0483c", brandDark: "#b91c1c", brandGlow: "#f87171" },
+  // Jewel-tone additions — deeper/richer mid-tones than the originals above
+  // (rather than pastel), both so they read as more "premium" and so they
+  // still hold up as plain text (nav labels, filter pills) on a light
+  // background, not just as icon-on-color fills.
+  { id: "emerald", name: "Deep Emerald", brand: "#059669", brandDark: "#047857", brandGlow: "#34d399" },
+  { id: "sapphire", name: "Sapphire Blue", brand: "#2563eb", brandDark: "#1d4ed8", brandGlow: "#60a5fa" },
+  { id: "rose", name: "Rose Quartz", brand: "#db2777", brandDark: "#9d174d", brandGlow: "#f9a8d4" },
+  { id: "copper", name: "Burnt Copper", brand: "#c2410c", brandDark: "#7c2d12", brandGlow: "#fb923c" },
 ];
 
 const STORAGE_KEY = "mezmur:accent-theme";
