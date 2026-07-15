@@ -1,5 +1,5 @@
 import { Bell, Flame, Heart, Music, Shuffle, Sparkles, User } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
 import Card from "../components/Card";
@@ -222,14 +222,28 @@ export default function Home() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             aria-label={t("notifications")}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-elevated ring-1 ring-white/10 text-fg-muted hover:text-fg active:scale-90 transition-all"
+            className="tile-glow w-10 h-10 rounded-full flex items-center justify-center ring-1 ring-white/15 text-fg-muted hover:text-fg active:scale-90 transition-all"
+            style={
+              {
+                "--tile-glow": "color-mix(in oklab, var(--color-fg-subtle) 35%, transparent)",
+                background:
+                  "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-fg) 10%, var(--color-elevated)) 0%, var(--color-elevated) 100%)",
+              } as CSSProperties
+            }
           >
             <Bell size={17} />
           </button>
           <button
             onClick={() => (user ? navigate("/settings") : navigate("/auth"))}
             aria-label={user ? t("settings") : t("logIn")}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-brand to-accent-cyan text-white font-bold text-sm shadow-[0_0_16px_-2px_rgba(124,92,255,0.6)] active:scale-90 transition-all"
+            className="tile-glow w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ring-1 ring-white/30 active:scale-90 transition-all"
+            style={
+              {
+                "--tile-glow": "color-mix(in oklab, var(--color-brand) 65%, transparent)",
+                background:
+                  "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-brand) 40%, white) 0%, var(--color-brand) 55%, color-mix(in oklab, var(--color-accent-cyan) 70%, black) 100%)",
+              } as CSSProperties
+            }
           >
             {user ? initial : <User size={15} />}
           </button>
