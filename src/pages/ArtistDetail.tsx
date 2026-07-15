@@ -361,11 +361,15 @@ export default function ArtistDetail() {
   const visibleTopTracks = showAllSongs ? artist.topTracks : artist.topTracks.slice(0, 5);
 
   return (
-    <div
-      style={{
-        backgroundImage: `linear-gradient(180deg, ${TEAL} 0%, #0f8f7e 10%, ${TEAL_DEEP} 22%, #0d2f2c 34%, #0a1614 46%, #050707 58%, #050707 100%)`,
-      }}
-    >
+    // Flat, not a gradient — the teal→black transition now lives entirely
+    // on the hero below, scoped to its own fixed height (see comment
+    // there). Keeping a second, page-length-based gradient here was the
+    // bug: its color stops are percentages of the *whole page*, so on a
+    // shorter page (short bio, few albums) the hero's fixed-height bottom
+    // edge landed mid-transition — still greenish, not yet black — right
+    // where the photo's own overlay above it was already solid black,
+    // producing a visible hard seam. A flat fill always matches exactly.
+    <div style={{ backgroundColor: "#050707" }}>
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
@@ -383,7 +387,18 @@ export default function ArtistDetail() {
             />
           )}
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050707] via-[#0d2f2c]/50 to-transparent" />
+        {/* Teal→black wash, its stops sized to *this* container's own
+            height (not the page's), so it's always fully resolved to solid
+            #050707 by its own bottom edge — flush with the flat page
+            background right below it, no matter how tall the full page
+            ends up being. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(180deg, ${TEAL}00 0%, ${TEAL}66 18%, ${TEAL_DEEP}b3 40%, #0d2f2ce6 62%, #0a1614f2 80%, #050707 100%)`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050707] via-[#050707]/55 to-transparent" />
 
         <BackButton />
         <div className="absolute top-4 right-4">
