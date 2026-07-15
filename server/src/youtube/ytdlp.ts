@@ -136,7 +136,18 @@ const proxyArgs: string[] = (() => {
 // Shared prefix for every yt-dlp invocation in this file — one definition so
 // TAB_ARGS (or any future flag) only needs adding once instead of staying in
 // sync across every spawn() call site by hand.
-const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs, ...proxyArgs];
+const BASE_ARGS_NO_PROXY = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs];
+const BASE_ARGS = [...BASE_ARGS_NO_PROXY, ...proxyArgs];
+
+// A misconfigured or (as observed in production) unfunded/expired proxy
+// account fails at the connection layer, before yt-dlp ever reaches
+// YouTube — every single request hard-fails identically regardless of URL,
+// which is strictly worse than not using a proxy at all. Matches yt-dlp's
+// own wording for these ("Unable to connect to proxy", the ProxyError
+// class name, an explicit tunnel failure) rather than YouTube-side content
+// errors, so a real "this video is private" etc. is never misclassified
+// as a proxy problem.
+const PROXY_FAILURE_RE = /unable to connect to proxy|proxyerror|tunnel connection failed/i;
 
 export interface YoutubeMetadata {
   id: string;
@@ -191,11 +202,17 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
   return new YtDlpError(GENERIC_IMPORT_ERROR);
 }
 
-function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
+// Logs the exact argv, exit code, and complete stdout/stderr for every
+// attempt (never the cookie file's own contents — only its path ever
+// appears in argv, via --cookies). One low-level spawn, used by every
+// call site below; success (code 0) resolves, everything else follows
+// toYtDlpError/ytDlpSpawnError's existing classification.
+function spawnOnce(
+  fullArgs: string[],
+  onLine?: (line: string, stream: "stdout" | "stderr") => void
+): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve, reject) => {
-    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn("yt-dlp", fullArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
 
@@ -208,16 +225,54 @@ function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "st
       onLine?.(line, "stderr");
     });
 
-    child.on("error", (err) => reject(ytDlpSpawnError(err, "runYtDlp")));
-
+    child.on("error", (err) => reject(err));
     child.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(toYtDlpError(stderr, stdout, code, "runYtDlp", args));
-      }
+      console.log(`[yt-dlp] yt-dlp ${fullArgs.join(" ")} -> exit ${code}`);
+      resolve({ stdout, stderr, code });
     });
   });
+}
+
+// Shared entry point for every yt-dlp invocation in this file. Retries
+// exactly once, without the proxy, if a proxy is configured and the
+// failure is specifically a proxy connection failure (see PROXY_FAILURE_RE)
+// — a dead/unfunded proxy account fails identically on every request, so
+// falling back to a direct connection (still carrying cookies/player-client/
+// PO-token) is strictly better than hard-failing every single import until
+// someone notices and fixes the proxy account.
+async function execYtDlp(
+  args: string[],
+  context: string,
+  onLine?: (line: string, stream: "stdout" | "stderr") => void
+): Promise<string> {
+  let attempt: { stdout: string; stderr: string; code: number | null };
+  try {
+    attempt = await spawnOnce([...BASE_ARGS, ...args], onLine);
+  } catch (err) {
+    throw ytDlpSpawnError(err as NodeJS.ErrnoException, context);
+  }
+
+  if (attempt.code === 0) return attempt.stdout;
+
+  if (proxyArgs.length > 0 && PROXY_FAILURE_RE.test(attempt.stderr)) {
+    console.error(
+      `[yt-dlp:${context}] proxy connection failed (YTDLP_PROXY_URL looks misconfigured, expired, or out of funds) — retrying once without it.`
+    );
+    try {
+      const retry = await spawnOnce([...BASE_ARGS_NO_PROXY, ...args], onLine);
+      if (retry.code === 0) return retry.stdout;
+      throw toYtDlpError(retry.stderr, retry.stdout, retry.code, context, args);
+    } catch (err) {
+      if (err instanceof YtDlpError) throw err;
+      throw ytDlpSpawnError(err as NodeJS.ErrnoException, context);
+    }
+  }
+
+  throw toYtDlpError(attempt.stderr, attempt.stdout, attempt.code, context, args);
+}
+
+function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
+  return execYtDlp(args, "runYtDlp", onLine);
 }
 
 // Fetches video metadata without downloading anything. --no-playlist ensures
@@ -296,46 +351,31 @@ function rankedThumbnailUrls(thumbnails: unknown): string[] {
 export const MAX_PLAYLISTS = 25;
 const MAX_VIDEOS_PER_LIST = 200;
 
-function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
-  return new Promise((resolve, reject) => {
-    const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on("error", (err) => reject(ytDlpSpawnError(err, "runFlatPlaylistDump")));
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(toYtDlpError(stderr, stdout, code, "runFlatPlaylistDump", args));
-        return;
-      }
-      try {
-        const raw = JSON.parse(stdout);
-        const entries: FlatEntry[] = Array.isArray(raw.entries)
-          ? raw.entries
-              .filter((e: Record<string, unknown>) => typeof e.id === "string")
-              .map((e: Record<string, unknown>) => ({
-                videoId: String(e.id),
-                title: typeof e.title === "string" ? e.title : "Untitled",
-                duration: typeof e.duration === "number" ? Math.round(e.duration) : null,
-              }))
-          : [];
-        const thumbnailCandidates = rankedThumbnailUrls(raw.thumbnails);
-        resolve({
-          title: typeof raw.title === "string" ? raw.title : null,
-          channel: typeof raw.channel === "string" ? raw.channel : typeof raw.uploader === "string" ? raw.uploader : null,
-          thumbnailUrl: thumbnailCandidates[0] ?? null,
-          thumbnailCandidates,
-          entries,
-        });
-      } catch {
-        reject(new YtDlpError("Could not parse playlist listing"));
-      }
-    });
-  });
+async function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
+  const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
+  const stdout = await execYtDlp(args, "runFlatPlaylistDump");
+  try {
+    const raw = JSON.parse(stdout);
+    const entries: FlatEntry[] = Array.isArray(raw.entries)
+      ? raw.entries
+          .filter((e: Record<string, unknown>) => typeof e.id === "string")
+          .map((e: Record<string, unknown>) => ({
+            videoId: String(e.id),
+            title: typeof e.title === "string" ? e.title : "Untitled",
+            duration: typeof e.duration === "number" ? Math.round(e.duration) : null,
+          }))
+      : [];
+    const thumbnailCandidates = rankedThumbnailUrls(raw.thumbnails);
+    return {
+      title: typeof raw.title === "string" ? raw.title : null,
+      channel: typeof raw.channel === "string" ? raw.channel : typeof raw.uploader === "string" ? raw.uploader : null,
+      thumbnailUrl: thumbnailCandidates[0] ?? null,
+      thumbnailCandidates,
+      entries,
+    };
+  } catch {
+    throw new YtDlpError("Could not parse playlist listing");
+  }
 }
 
 // Lists the videos in a channel's "Videos" tab (flat — no per-video
@@ -378,35 +418,19 @@ export interface ChannelSearchResult {
 // auto-generated "Topic" channel instead of the real uploader channel.
 // Results are heuristic (name matching, not a guaranteed identity), so
 // callers should still verify a candidate actually works before trusting it.
-export function searchChannelsByName(query: string, limit = 5): Promise<ChannelSearchResult[]> {
-  return new Promise((resolve, reject) => {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
-    const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
-    const child = spawn("yt-dlp", [...BASE_ARGS, ...args], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on("error", (err) => reject(ytDlpSpawnError(err, "searchChannelsByName")));
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(toYtDlpError(stderr, stdout, code, "searchChannelsByName", args));
-        return;
-      }
-      try {
-        const raw = JSON.parse(stdout);
-        const entries = Array.isArray(raw.entries) ? raw.entries : [];
-        const results: ChannelSearchResult[] = entries
-          .filter((e: Record<string, unknown>) => typeof e.url === "string" && typeof e.title === "string")
-          .map((e: Record<string, unknown>) => ({ title: String(e.title), channelUrl: String(e.url) }));
-        resolve(results);
-      } catch {
-        reject(new YtDlpError("Could not parse channel search results"));
-      }
-    });
-  });
+export async function searchChannelsByName(query: string, limit = 5): Promise<ChannelSearchResult[]> {
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`;
+  const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
+  const stdout = await execYtDlp(args, "searchChannelsByName");
+  try {
+    const raw = JSON.parse(stdout);
+    const entries = Array.isArray(raw.entries) ? raw.entries : [];
+    return entries
+      .filter((e: Record<string, unknown>) => typeof e.url === "string" && typeof e.title === "string")
+      .map((e: Record<string, unknown>) => ({ title: String(e.title), channelUrl: String(e.url) }));
+  } catch {
+    throw new YtDlpError("Could not parse channel search results");
+  }
 }
 
 // Downloads the best available audio-only stream and extracts it to MP3
