@@ -122,10 +122,22 @@ export default function Card({
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-3">
+        <div className="absolute inset-x-0 bottom-0 p-3 pr-12">
           <p className={`font-semibold text-sm text-white truncate ${titleClassName}`}>{title}</p>
-          {shouldShowSubtitle && <p className="text-xs text-white/70 truncate mt-0.5">{subtitle}</p>}
+          {shouldShowSubtitle && <p className="text-xs text-gold truncate mt-0.5">{subtitle}</p>}
         </div>
+        {onPlay && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+            }}
+            className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center shadow-lg active:scale-90 hover:scale-105 transition-transform"
+            aria-label={`Play ${title}`}
+          >
+            <Play size={14} fill="white" className="text-white ml-0.5" />
+          </button>
+        )}
         {playing && (
           <span className="absolute top-2 left-2 bg-black/70 rounded-full p-1.5 flex items-center justify-center">
             <EqualizerBars />

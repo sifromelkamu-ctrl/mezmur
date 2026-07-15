@@ -273,7 +273,7 @@ export default function Library() {
         <Sparkles size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand pointer-events-none" />
       </div>
 
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="flex items-center gap-1 mb-6 flex-nowrap overflow-x-auto no-scrollbar">
         {(["artists", "albums", "playlists", "favorites"] as Filter[]).map((f) => {
           const Icon = filterIcons[f];
           const active = filter === f;
@@ -281,13 +281,13 @@ export default function Library() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors border ${
+              className={`flex items-center gap-1 px-2.5 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-colors border shrink-0 ${
                 active
                   ? "bg-elevated text-brand border-brand shadow-[0_0_16px_-6px_var(--color-brand)]"
                   : "bg-transparent text-fg border-border hover:bg-hover"
               }`}
             >
-              <Icon size={15} />
+              <Icon size={13} />
               {filterLabels[f]}
             </button>
           );
