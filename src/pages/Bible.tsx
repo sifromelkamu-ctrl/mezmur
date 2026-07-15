@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BIBLE_BOOKS } from "../data/bibleBooks";
+import { useTheme } from "../context/ThemeContext";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
@@ -51,6 +52,8 @@ const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
 
 export default function Bible() {
+  const { mode } = useTheme();
+  const isLight = mode === "light";
   const [bookSlug, setBookSlug] = useState<string | null>(null);
   const [chapter, setChapter] = useState<number | null>(null);
   const [bookText, setBookText] = useState<BookText | null>(null);
@@ -722,7 +725,15 @@ export default function Bible() {
     <div className="bible-scope bg-base min-h-full px-6 py-6 max-w-2xl">
       <div
         className="relative flex items-center gap-5 rounded-3xl px-8 py-10 mb-8 overflow-hidden border border-gold/25 shadow-2xl"
-        style={{ backgroundImage: "linear-gradient(135deg, #3b0764 0%, #1e1b4b 50%, #05060f 100%)" }}
+        style={{
+          // Light mode isn't just the dark hero's colors inverted — it's a
+          // warm parchment/vellum palette (fits a "Holy Bible" card much
+          // better than a pale version of the night-sky purple) built from
+          // the same cream family as the app's own light theme base.
+          backgroundImage: isLight
+            ? "linear-gradient(135deg, #fdf6e6 0%, #f6e7c4 55%, #ecd8a6 100%)"
+            : "linear-gradient(135deg, #3b0764 0%, #1e1b4b 50%, #05060f 100%)",
+        }}
       >
         {/* floating ambient glow orbs */}
         <div
@@ -735,13 +746,16 @@ export default function Bible() {
         />
 
         {/* large watermark cross */}
-        <Cross size={190} className="absolute -right-4 top-1/2 -translate-y-1/2 text-white/[0.05] rotate-6 pointer-events-none" />
+        <Cross
+          size={190}
+          className={`absolute -right-4 top-1/2 -translate-y-1/2 rotate-6 pointer-events-none ${isLight ? "text-black/[0.06]" : "text-white/[0.05]"}`}
+        />
 
         {/* fine dot texture */}
         <div
           className="absolute inset-0 opacity-[0.05] pointer-events-none"
           style={{
-            backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
+            backgroundImage: `radial-gradient(circle, ${isLight ? "#3a2a12" : "#fff"} 1px, transparent 1px)`,
             backgroundSize: "16px 16px",
           }}
         />
@@ -762,11 +776,11 @@ export default function Bible() {
             መጽሐፍ ቅዱስ
           </h1>
           <div className="flex items-center gap-3 mt-3 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-white/60 font-semibold">
+            <div className="flex items-center gap-1.5 text-xs text-fg-muted font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-gold" /> 39 ብሉይ ኪዳን
             </div>
-            <div className="w-px h-3 bg-white/20" />
-            <div className="flex items-center gap-1.5 text-xs text-white/60 font-semibold">
+            <div className="w-px h-3 bg-border" />
+            <div className="flex items-center gap-1.5 text-xs text-fg-muted font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-accent-green" /> 27 አዲስ ኪዳን
             </div>
           </div>
@@ -780,7 +794,9 @@ export default function Bible() {
         <div
           className="relative overflow-hidden rounded-xl p-6 mt-2"
           style={{
-            backgroundImage: "linear-gradient(135deg, #1e1b4b, #0f172a)",
+            backgroundImage: isLight
+              ? "linear-gradient(135deg, #fdf6e6, #f3e6c8)"
+              : "linear-gradient(135deg, #1e1b4b, #0f172a)",
             animation: "verse-fade-in 0.6s ease-out",
           }}
         >
@@ -794,7 +810,7 @@ export default function Bible() {
             <Sunrise size={16} className="text-gold" />
             <h3 className={`text-sm font-black uppercase tracking-widest ${WORD_ART_TITLE}`}>የዕለቱ መና</h3>
           </div>
-          <p className="relative font-menbere italic text-base text-white/90 leading-relaxed">“{dailyVerse.text}”</p>
+          <p className="relative font-menbere italic text-base text-fg/90 leading-relaxed">“{dailyVerse.text}”</p>
           <p className="relative text-xs text-gold/80 font-semibold mt-3 text-right">{dailyVerse.ref}</p>
         </div>
       )}
