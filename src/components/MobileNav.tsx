@@ -24,7 +24,7 @@ function NavIcon({
   return (
     <span className="flex flex-col items-center justify-center gap-0.5">
       <span
-        className={`tile-glow flex items-center justify-center w-11 h-9 rounded-full transition-all duration-300 ${
+        className={`tile-glow flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
           isActive ? "ring-1 ring-white/25" : ""
         }`}
         style={
