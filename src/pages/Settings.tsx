@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Disc3,
+  Droplet,
   GalleryHorizontal,
   Globe2,
   Info,
@@ -25,10 +26,10 @@ import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
 import { useLyricsSetting } from "../context/LyricsContext";
-import { ACCENT_THEMES, useTheme } from "../context/ThemeContext";
+import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, useTheme } from "../context/ThemeContext";
 import { LANGUAGES } from "../i18n/translations";
 
-type Section = "account" | "subscription" | "appearance" | "accent" | "language" | "lyrics" | "about";
+type Section = "account" | "subscription" | "appearance" | "accent" | "avatar" | "language" | "lyrics" | "about";
 
 function SettingsRow({
   icon,
@@ -72,7 +73,7 @@ function SectionHeader({ title, onBack }: { title: string; onBack: () => void })
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, updateName } = useAuth();
-  const { themeId, setThemeId, mode, setMode } = useTheme();
+  const { themeId, setThemeId, mode, setMode, avatarColorId, setAvatarColorId } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { lyricsEnabled, setLyricsEnabled } = useLyricsSetting();
   const [section, setSection] = useState<Section | null>(null);
@@ -80,6 +81,7 @@ export default function Settings() {
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
   const currentAccent = ACCENT_THEMES.find((th) => th.id === themeId)?.name ?? "Emerald";
+  const currentAvatarColor = AVATAR_COLOR_OPTIONS.find((o) => o.id === avatarColorId)?.name ?? "White";
   const currentLanguage = LANGUAGES.find((l) => l.id === language)?.nativeName ?? "English";
 
   const startEditName = () => {
@@ -250,6 +252,37 @@ export default function Settings() {
         </div>
       </div>
     );
+  } else if (section === "avatar") {
+    content = (
+      <div className="px-6 py-6 max-w-2xl">
+        <SectionHeader title="Avatar color" onBack={() => setSection(null)} />
+        <div className="bg-elevated rounded-lg p-4">
+          <p className="text-sm text-fg-muted mb-4">
+            Pick a color for the "M" mark in the header — independent of your accent color, defaults to white.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {AVATAR_COLOR_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setAvatarColorId(opt.id)}
+                className="flex flex-col items-center gap-2 group"
+                aria-label={`Use ${opt.name} avatar color`}
+              >
+                <span
+                  className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-1 ring-border group-hover:ring-2 group-hover:ring-fg-subtle transition-all"
+                  style={{ backgroundColor: opt.color }}
+                >
+                  {avatarColorId === opt.id && (
+                    <Check size={18} className={opt.id === "white" ? "text-black" : "text-white"} strokeWidth={3} />
+                  )}
+                </span>
+                <span className="text-xs text-fg-muted">{opt.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   } else if (section === "language") {
     content = (
       <div className="px-6 py-6 max-w-2xl">
@@ -351,6 +384,12 @@ export default function Settings() {
             label="Accent color"
             value={currentAccent}
             onClick={() => setSection("accent")}
+          />
+          <SettingsRow
+            icon={<Droplet size={20} />}
+            label="Avatar color"
+            value={currentAvatarColor}
+            onClick={() => setSection("avatar")}
           />
           <SettingsRow
             icon={<Globe2 size={20} />}

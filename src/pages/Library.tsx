@@ -22,6 +22,7 @@ import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
+import { getAvatarColor, useTheme } from "../context/ThemeContext";
 import { albumsApi, artistsApi, playlistsApi, type ApiAlbum, type ApiArtist, type ApiPlaylist } from "../lib/api";
 
 type Filter = "artists" | "albums" | "playlists" | "favorites";
@@ -137,6 +138,8 @@ export default function Library() {
   const { user } = useAuth();
   const { playTrack } = usePlayer();
   const { favorites } = useFavorites();
+  const { avatarColorId } = useTheme();
+  const avatarColor = getAvatarColor(avatarColorId);
   const [searchParams] = useSearchParams();
   const initialFilter = searchParams.get("filter");
   const [filter, setFilter] = useState<Filter>(
@@ -221,9 +224,12 @@ export default function Library() {
         <button
           onClick={() => navigate("/")}
           aria-label={t("home")}
-          className="justify-self-start w-9 h-9 rounded-full bg-gradient-to-br from-brand to-accent-cyan flex items-center justify-center shrink-0"
+          className="justify-self-start w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+          style={{ backgroundColor: avatarColor.background }}
         >
-          <span className="text-white font-bold text-sm">M</span>
+          <span className="font-bold text-sm" style={{ color: avatarColor.text }}>
+            M
+          </span>
         </button>
         {/* text-lg (1.125rem) + 9% = 1.226rem — kept identical to Topbar's wordmark size */}
         <span className="justify-self-center font-abyssinica font-bold text-[1.226rem] tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent whitespace-nowrap">
