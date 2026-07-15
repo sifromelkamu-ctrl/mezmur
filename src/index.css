@@ -485,15 +485,24 @@ body::before {
   }
 }
 
-/* Slow breathing glow for solid-color icon tiles (Home's quick actions,
-   MobileNav's active tab) — color comes from the --tile-glow custom
-   property set inline per instance, so one animation serves every hue. */
+/* Breathing glow + glass bevel for solid-color icon tiles (Home's quick
+   actions, MobileNav's active tab) — color comes from the --tile-glow
+   custom property set inline per instance, so one animation serves every
+   hue. The inset shadows give the orb a glossy, domed "premium" read (a
+   soft highlight top-left, a soft shade bottom-right) on top of the
+   ambient color glow that pulses. */
 @keyframes tile-glow-pulse {
   0%, 100% {
-    box-shadow: 0 6px 16px -8px var(--tile-glow, transparent);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.6),
+      inset 0 -5px 9px rgba(0, 0, 0, 0.3),
+      0 6px 16px -8px var(--tile-glow, transparent);
   }
   50% {
-    box-shadow: 0 10px 26px -6px var(--tile-glow, transparent);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.6),
+      inset 0 -5px 9px rgba(0, 0, 0, 0.3),
+      0 11px 28px -6px var(--tile-glow, transparent);
   }
 }
 .tile-glow {

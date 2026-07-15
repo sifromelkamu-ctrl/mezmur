@@ -54,9 +54,10 @@ export default function MobileNav() {
   const { t } = useLanguage();
 
   return (
-    <nav
-      className="w-full flex items-center rounded-full bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.55)] px-1 py-1"
-    >
+    <nav className="relative overflow-hidden w-full flex items-center rounded-full bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.55)] px-1 py-1">
+      {/* Same specular highlight as the quick-action card, for a matching
+          glass-premium finish across Home's chrome. */}
+      <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
       <NavLink to="/" end className={itemClass}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Home} label={t("home")} />}
       </NavLink>
