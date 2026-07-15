@@ -1,4 +1,5 @@
 import { BookOpen, Home, Library, Search } from "lucide-react";
+import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -16,18 +17,33 @@ function NavIcon({
   Icon: typeof Home;
   label: string;
 }) {
+  // Active state used to be a translucent brand-tinted circle with a
+  // brand-colored icon on top — same hue on both layers, so the icon
+  // nearly disappeared into its own background (worst in light mode).
+  // A solid orb with a white icon keeps it legible in any theme/accent.
   return (
     <span className="flex flex-col items-center justify-center gap-0.5">
       <span
-        className={`flex items-center justify-center w-11 h-9 rounded-full transition-all duration-300 ${
-          isActive ? "bg-brand/20 shadow-[0_0_16px_-2px_rgba(124,92,255,0.8)]" : ""
+        className={`tile-glow flex items-center justify-center w-11 h-9 rounded-full transition-all duration-300 ${
+          isActive ? "ring-1 ring-white/25" : ""
         }`}
+        style={
+          isActive
+            ? ({
+                "--tile-glow": "color-mix(in oklab, var(--color-brand) 70%, transparent)",
+                background:
+                  "radial-gradient(120% 130% at 35% 25%, color-mix(in oklab, var(--color-brand) 45%, white) 0%, var(--color-brand) 55%, color-mix(in oklab, var(--color-brand) 80%, black) 100%)",
+              } as CSSProperties)
+            : undefined
+        }
       >
-        <Icon size={19} strokeWidth={isActive ? 2.4 : 2} className={isActive ? "text-brand-glow" : ""} />
+        <Icon
+          size={19}
+          strokeWidth={isActive ? 2.4 : 2}
+          className={isActive ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" : ""}
+        />
       </span>
-      <span
-        className={`font-sans text-[9.5px] font-medium leading-none tracking-wide ${isActive ? "text-brand-glow" : "text-fg-subtle"}`}
-      >
+      <span className={`font-sans text-[9.5px] font-medium leading-none tracking-wide ${isActive ? "text-brand" : "text-fg-subtle"}`}>
         {label}
       </span>
     </span>

@@ -485,6 +485,26 @@ body::before {
   }
 }
 
+/* Slow breathing glow for solid-color icon tiles (Home's quick actions,
+   MobileNav's active tab) — color comes from the --tile-glow custom
+   property set inline per instance, so one animation serves every hue. */
+@keyframes tile-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 6px 16px -8px var(--tile-glow, transparent);
+  }
+  50% {
+    box-shadow: 0 10px 26px -6px var(--tile-glow, transparent);
+  }
+}
+.tile-glow {
+  animation: tile-glow-pulse 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-glow {
+    animation: none;
+  }
+}
+
 .card-hover {
   transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.15s ease;
 }
