@@ -23,8 +23,34 @@ export const ACCENT_THEMES: AccentTheme[] = [
   { id: "copper", name: "Burnt Copper", brand: "#c2410c", brandDark: "#7c2d12", brandGlow: "#fb923c" },
 ];
 
+export interface AvatarColorOption {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// The "M" logo circle's own color, independent of the app's accent theme —
+// a user might run a Crimson accent but still want their own avatar mark to
+// stay a plain white. White is the default; the rest reuse the accent
+// palette's hues so the two pickers feel like one coherent color system.
+export const AVATAR_COLOR_OPTIONS: AvatarColorOption[] = [
+  { id: "white", name: "White", color: "#ffffff" },
+  ...ACCENT_THEMES.map((t) => ({ id: t.id, name: t.name, color: t.brand })),
+];
+
+// Resolves an avatarColorId to a background + a legible mark color on top
+// of it — every option here is either white or a saturated brand hue, so a
+// simple "white bg gets dark text, everything else gets white text" rule
+// covers all of them without needing real contrast math.
+export function getAvatarColor(id: string): { background: string; text: string } {
+  const option = AVATAR_COLOR_OPTIONS.find((o) => o.id === id) ?? AVATAR_COLOR_OPTIONS[0];
+  return { background: option.color, text: option.id === "white" ? "#1f1a17" : "#ffffff" };
+}
+
 const STORAGE_KEY = "mezmur:accent-theme";
 const MODE_STORAGE_KEY = "mezmur:mode";
+const AVATAR_COLOR_STORAGE_KEY = "mezmur:avatar-color";
+const DEFAULT_AVATAR_COLOR_ID = "white";
 const DEFAULT_THEME_ID = "purple";
 // The app shipped with "green" (Emerald) as its hardcoded default for a long
 // time, so most existing installs have it saved even though the user never
@@ -51,6 +77,8 @@ interface ThemeContextValue {
   setThemeId: (id: string) => void;
   mode: ThemeMode;
   setMode: (mode: ThemeMode) => void;
+  avatarColorId: string;
+  setAvatarColorId: (id: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -63,6 +91,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
   const [mode, setModeState] = useState<ThemeMode>(
     () => (localStorage.getItem(MODE_STORAGE_KEY) as ThemeMode | null) ?? "dark"
+  );
+  const [avatarColorId, setAvatarColorIdState] = useState<string>(
+    () => localStorage.getItem(AVATAR_COLOR_STORAGE_KEY) ?? DEFAULT_AVATAR_COLOR_ID
   );
 
   useEffect(() => {
@@ -84,8 +115,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setModeState(next);
   };
 
+  const setAvatarColorId = (id: string) => {
+    localStorage.setItem(AVATAR_COLOR_STORAGE_KEY, id);
+    setAvatarColorIdState(id);
+  };
+
   return (
-    <ThemeContext.Provider value={{ themeId, setThemeId, mode, setMode }}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={{ themeId, setThemeId, mode, setMode, avatarColorId, setAvatarColorId }}>
+      {children}
+    </ThemeContext.Provider>
   );
 }
 

@@ -1,32 +1,39 @@
 import {
+  Bookmark,
   BookOpen,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Copy,
   Cross,
   Flame,
+  Heart,
   Loader2,
   Pause,
   ScrollText,
   Search,
   Settings2,
-  Sparkles,
+  Share2,
   StickyNote,
   Sunrise,
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BIBLE_BOOKS } from "../data/bibleBooks";
 import { useTheme } from "../context/ThemeContext";
+import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
 import {
+  getAllAnnotations,
   HIGHLIGHT_COLORS,
   loadChapterAnnotations,
+  parseVerseKey,
+  setFavorite,
   setHighlight,
   setNote,
   verseKey,
@@ -43,6 +50,7 @@ import {
   type FontSize,
   type ReadingPrefs,
 } from "../utils/bibleReadingPrefs";
+import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../utils/bibleReadingHistory";
 
 const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -50,6 +58,24 @@ type BookText = Record<string, string[]>; // chapter number -> verses
 
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
+
+// Highlights specific keywords inline within a verse — used by the Bible
+// home screen's hero banner (Psalm 119:105, "lamp"/"light" picked out in
+// gold), matching the reference design's emphasized key words.
+function renderHighlightedVerse(text: string, keywords: string[]) {
+  if (keywords.length === 0) return text;
+  const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(${escaped.join("|")})`, "g");
+  return text.split(pattern).map((part, i) =>
+    keywords.includes(part) ? (
+      <span key={i} className="text-gold-glow">
+        {part}
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 export default function Bible() {
   const { mode } = useTheme();
@@ -69,13 +95,19 @@ export default function Bible() {
   const [justCopied, setJustCopied] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
-  const [dailyVerse, setDailyVerse] = useState<{ ref: string; text: string } | null>(null);
+  const [dailyVerse, setDailyVerse] = useState<
+    { ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
+  >(null);
+  const [heroVerse, setHeroVerse] = useState<{ ref: string; text: string } | null>(null);
+  const [activeModal, setActiveModal] = useState<"bookmarks" | "notes" | "favorites" | "history" | null>(null);
+  const [dailyVerseShared, setDailyVerseShared] = useState(false);
 
   const [showBookSearch, setShowBookSearch] = useState(false);
   const [bookSearchQuery, setBookSearchQuery] = useState("");
   const [searchScope, setSearchScope] = useState<"chapter" | "book">("book");
   const [jumpToVerse, setJumpToVerse] = useState<number | null>(null);
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
+  const booksSectionRef = useRef<HTMLDivElement>(null);
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
@@ -149,6 +181,11 @@ export default function Bible() {
     setSelectedVerses(new Set());
     setEditingNoteVerse(null);
     setAnnotations(bookSlug && chapter ? loadChapterAnnotations(bookSlug, chapter) : {});
+    // Powers the Old/New Testament progress bars and the Recently Read row
+    // on the Bible home screen — recorded the moment a chapter is opened,
+    // not on some "finished reading" heuristic (there's no reliable signal
+    // for that with plain scrolling text).
+    if (bookSlug && chapter) recordChapterRead(bookSlug, chapter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter]);
 
@@ -167,7 +204,21 @@ export default function Bible() {
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data: BookText) => {
         const text = data[String(pick.chapter)]?.[pick.verseIndex];
-        if (text) setDailyVerse({ ref: pick.refAm, text });
+        if (text) setDailyVerse({ ref: pick.refAm, text, slug: pick.slug, chapter: pick.chapter, verseIndex: pick.verseIndex });
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fixed "brand anchor" verse for the home screen's big hero banner (Psalm
+  // 119:105, "Your word is a lamp to my feet") — fetched from the real data
+  // file rather than typed inline so the Amharic text is guaranteed exact,
+  // not retyped from a reference image.
+  useEffect(() => {
+    fetch("/bible/psalms.json")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data: BookText) => {
+        const text = data["119"]?.[104];
+        if (text) setHeroVerse({ ref: "መዝሙረ ዳዊት 119:105", text });
       })
       .catch(() => {});
   }, []);
@@ -211,6 +262,22 @@ export default function Bible() {
       applyAnnotationUpdate(key, updated);
     });
     setSelectedVerses(new Set());
+  };
+
+  // Feeds the Bible home screen's "Favorites" quick-access list. Mirrors
+  // handleApplyHighlight's toggle rule: a lone already-favorited verse
+  // un-favorites, everything else (including multi-select) favorites.
+  const handleToggleFavorite = () => {
+    if (!bookSlug || !chapter) return;
+    const ids = [...selectedVerses];
+    const soleVerse = ids.length === 1 ? ids[0] : null;
+    const soleKey = soleVerse !== null ? verseKey(bookSlug, chapter, soleVerse) : null;
+    const turningOn = soleKey ? !annotations[soleKey]?.favorite : true;
+    ids.forEach((i) => {
+      const key = verseKey(bookSlug, chapter, i);
+      const updated = setFavorite(key, turningOn);
+      applyAnnotationUpdate(key, updated);
+    });
   };
 
   const handleCopySelected = async () => {
@@ -575,6 +642,20 @@ export default function Bible() {
                   </button>
                 );
               })()}
+            {(() => {
+              const soleVerse = selectedVerses.size === 1 ? [...selectedVerses][0] : null;
+              const soleKey = soleVerse !== null && bookSlug && chapter ? verseKey(bookSlug, chapter, soleVerse) : "";
+              const isFavorited = Boolean(annotations[soleKey]?.favorite);
+              return (
+                <button
+                  onClick={handleToggleFavorite}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
+                >
+                  <Heart size={14} className={isFavorited ? "text-red-400" : ""} fill={isFavorited ? "currentColor" : "none"} />
+                  {isFavorited ? "Favorited" : "Favorite"}
+                </button>
+              );
+            })()}
             <button
               onClick={() => setSelectedVerses(new Set())}
               className="ml-auto text-xs font-semibold text-fg-subtle hover:text-fg px-2 py-1.5"
@@ -621,6 +702,7 @@ export default function Bible() {
   // Book index
   const oldTestament = BIBLE_BOOKS.filter((b) => b.testament === "old");
   const newTestament = BIBLE_BOOKS.filter((b) => b.testament === "new");
+  const bookFromSlug = (slug: string) => BIBLE_BOOKS.find((b) => b.slug === slug);
 
   const TESTAMENT_THEME = {
     old: {
@@ -631,6 +713,7 @@ export default function Bible() {
       glow: "shadow-[0_0_18px_rgba(242,183,5,0.25)]",
       iconBg: "bg-gradient-to-br from-gold/25 to-transparent",
       badgeBg: "bg-gold/15 text-gold",
+      label: "ብሉይ ኪዳን",
     },
     new: {
       icon: Flame,
@@ -640,8 +723,131 @@ export default function Bible() {
       glow: "shadow-[0_0_18px_rgba(20,184,102,0.25)]",
       iconBg: "bg-gradient-to-br from-accent-green/25 to-transparent",
       badgeBg: "bg-accent-green/15 text-accent-green",
+      label: "አዲስ ኪዳን",
     },
   } as const;
+
+  // Old/New Testament reading progress — distinct chapters ever opened,
+  // divided by each testament's true chapter total (BIBLE_BOOKS.chapterCount
+  // sums), not capped by the recency log below.
+  const readChapterKeys = getReadChapterKeys();
+  const oldSlugs = new Set(oldTestament.map((b) => b.slug));
+  const newSlugs = new Set(newTestament.map((b) => b.slug));
+  let oldReadCount = 0;
+  let newReadCount = 0;
+  readChapterKeys.forEach((k) => {
+    const slug = k.split(":")[0];
+    if (oldSlugs.has(slug)) oldReadCount++;
+    else if (newSlugs.has(slug)) newReadCount++;
+  });
+  const oldTotalChapters = oldTestament.reduce((s, b) => s + b.chapterCount, 0);
+  const newTotalChapters = newTestament.reduce((s, b) => s + b.chapterCount, 0);
+  const oldPercent = oldTotalChapters ? Math.round((oldReadCount / oldTotalChapters) * 100) : 0;
+  const newPercent = newTotalChapters ? Math.round((newReadCount / newTotalChapters) * 100) : 0;
+  const readPercent = { old: oldPercent, new: newPercent } as const;
+
+  const recentHistory = getRecentHistory(8);
+
+  const openVerse = (slug: string, chapterNum: number, verseIndex: number | null = null) => {
+    setActiveModal(null);
+    setBookSlug(slug);
+    setChapter(chapterNum);
+    setJumpToVerse(verseIndex);
+  };
+
+  const startReading = () => {
+    const recent = getRecentHistory(1)[0];
+    if (recent) openVerse(recent.bookSlug, recent.chapter);
+    else openVerse("genesis", 1);
+  };
+
+  const handleShareDailyVerse = async () => {
+    if (!dailyVerse) return;
+    const text = `“${dailyVerse.text}” — ${dailyVerse.ref}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {
+        // user cancelled or share failed, fall through to clipboard copy
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setDailyVerseShared(true);
+      setTimeout(() => setDailyVerseShared(false), 1800);
+    } catch {
+      // clipboard unavailable — silently ignore
+    }
+  };
+
+  // Bookmarks/Notes/Favorites/History quick-access lists — small whole-
+  // library scans (see getAllAnnotations' own comment) mapped into the
+  // shared BibleListModal row shape.
+  const allAnnotations = getAllAnnotations();
+  const bookmarkRows: BibleListModalRow[] = allAnnotations
+    .filter(({ annotation }) => annotation.color)
+    .map(({ key, annotation }) => {
+      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
+      const b = bookFromSlug(s);
+      const swatch = HIGHLIGHT_COLORS.find((h) => h.id === annotation.color);
+      return {
+        key,
+        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
+        subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
+        badge: <span className={`w-3 h-3 rounded-full shrink-0 ${swatch?.swatch ?? "bg-gold"}`} />,
+        onClick: () => openVerse(s, c, v),
+      };
+    });
+  const noteRows: BibleListModalRow[] = allAnnotations
+    .filter(({ annotation }) => annotation.note)
+    .map(({ key, annotation }) => {
+      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
+      const b = bookFromSlug(s);
+      return {
+        key,
+        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
+        subtitle: annotation.note,
+        badge: <StickyNote size={16} className="text-gold shrink-0" />,
+        onClick: () => openVerse(s, c, v),
+      };
+    });
+  const favoriteRows: BibleListModalRow[] = allAnnotations
+    .filter(({ annotation }) => annotation.favorite)
+    .map(({ key }) => {
+      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
+      const b = bookFromSlug(s);
+      return {
+        key,
+        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
+        subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
+        badge: <Heart size={16} className="text-red-400 shrink-0" fill="currentColor" />,
+        onClick: () => openVerse(s, c, v),
+      };
+    });
+  const historyRows: BibleListModalRow[] = getRecentHistory(30).map((entry) => {
+    const b = bookFromSlug(entry.bookSlug);
+    return {
+      key: `${entry.bookSlug}-${entry.chapter}`,
+      title: `${b?.nameAm ?? entry.bookSlug} ${entry.chapter}`,
+      subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
+      badge: <Clock size={16} className="text-fg-subtle shrink-0" />,
+      onClick: () => openVerse(entry.bookSlug, entry.chapter),
+    };
+  });
+
+  const QUICK_ACCESS = [
+    {
+      id: "bible",
+      label: "ቅዱስ መጽሐፍ",
+      icon: BookOpen,
+      onClick: () => booksSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    },
+    { id: "bookmarks", label: "የመጽሐፍ ምልክት", icon: Bookmark, onClick: () => setActiveModal("bookmarks") },
+    { id: "notes", label: "ማስታወሻዎች", icon: StickyNote, onClick: () => setActiveModal("notes") },
+    { id: "history", label: "ታሪክ", icon: Clock, onClick: () => setActiveModal("history") },
+    { id: "favorites", label: "የሚወደዱ", icon: Heart, onClick: () => setActiveModal("favorites") },
+  ] as const;
 
   const BookList = ({
     books,
@@ -675,144 +881,298 @@ export default function Bible() {
     </div>
   );
 
-  const TestamentSection = ({
+  // Testament stat card — icon, book count, and a real reading-progress bar
+  // (replaces the old plain expand row); still toggles the book list below
+  // it open/closed on click, same interaction as before.
+  const TestamentProgressCard = ({
     id,
-    titleAm,
     books,
   }: {
     id: "old" | "new";
-    titleAm: string;
     books: typeof BIBLE_BOOKS;
   }) => {
     const isOpen = expanded[id];
     const theme = TESTAMENT_THEME[id];
     const Icon = theme.icon;
+    const percent = readPercent[id];
     return (
-      <div className="mb-4">
-        <button
-          onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-          className={`w-full flex items-center gap-4 bg-elevated hover:bg-elevated-hover rounded-xl px-4 py-4 transition-all ${
-            isOpen ? `ring-1 ${theme.ring}` : ""
-          }`}
-        >
-          <div className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center ${theme.iconBg} ring-1 ${theme.ring} ${theme.glow}`}>
-            <Icon size={20} className={theme.accent} />
-          </div>
-          <div className="text-left flex-1 min-w-0">
-            <h2 className="font-abyssinica text-2xl font-bold tracking-wide text-gold drop-shadow-[0_1px_10px_rgba(242,183,5,0.3)]">
-              {titleAm}
-            </h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${theme.dot}`} />
-              <p className="text-xs text-fg-muted">{books.length} መጻሕፍት</p>
-            </div>
+      <button
+        onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
+        className={`text-left bg-elevated hover:bg-elevated-hover rounded-2xl p-4 transition-all ${
+          isOpen ? `ring-1 ${theme.ring}` : ""
+        }`}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme.iconBg} ring-1 ${theme.ring} ${theme.glow}`}>
+            <Icon size={17} className={theme.accent} />
           </div>
           <ChevronDown
-            size={20}
+            size={16}
             className={`shrink-0 transition-transform ${isOpen ? `rotate-180 ${theme.accent}` : "text-fg-subtle"}`}
           />
-        </button>
-        {isOpen && (
-          <div className="mt-2">
-            <BookList books={books} theme={theme} />
-          </div>
-        )}
-      </div>
+        </div>
+        <p className="font-abyssinica text-base font-bold text-fg truncate">
+          {id === "old" ? "የብሉይ ኪዳን" : "የአዲስ ኪዳን"}
+        </p>
+        <p className="text-[11px] text-fg-muted mb-2.5">{books.length} መጻሕፍት</p>
+        <div className="h-1.5 rounded-full bg-border overflow-hidden mb-1.5">
+          <div className={`h-full rounded-full ${theme.dot}`} style={{ width: `${percent}%` }} />
+        </div>
+        <p className="text-[10px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
+      </button>
     );
   };
 
   return (
     <div className="bible-scope bg-base min-h-full px-6 py-6 max-w-2xl">
+      {/* Hero — a featured verse (Psalm 119:105, fetched from the real book
+          data) instead of a plain title card, with two keywords picked out
+          in gold and a CTA straight into reading. Warm amber/candlelight
+          tones stand in for the reference photo (an open Bible + candle) —
+          no stock photography is sourced into the app, so the same mood is
+          built from gradients + a soft glow instead. */}
       <div
-        className="relative flex items-center gap-5 rounded-3xl px-8 py-10 mb-8 overflow-hidden border border-gold/25 shadow-2xl"
+        className="relative rounded-3xl overflow-hidden mb-6 border border-gold/20 shadow-2xl"
         style={{
-          // Light mode isn't just the dark hero's colors inverted — it's a
-          // warm parchment/vellum palette (fits a "Holy Bible" card much
-          // better than a pale version of the night-sky purple) built from
-          // the same cream family as the app's own light theme base.
           backgroundImage: isLight
-            ? "linear-gradient(135deg, #fdf6e6 0%, #f6e7c4 55%, #ecd8a6 100%)"
-            : "linear-gradient(135deg, #3b0764 0%, #1e1b4b 50%, #05060f 100%)",
+            ? "linear-gradient(135deg, #fff3dd 0%, #fbe4b8 45%, #edc888 100%)"
+            : "linear-gradient(135deg, #2b1608 0%, #1a0f05 55%, #0b0603 100%)",
         }}
       >
-        {/* floating ambient glow orbs */}
         <div
-          className="absolute -left-10 -top-10 w-56 h-56 rounded-full bg-gold/25 blur-3xl pointer-events-none"
-          style={{ animation: "orb-float 7s ease-in-out infinite" }}
+          className="absolute -right-12 top-1/2 -translate-y-1/2 w-72 h-72 rounded-full blur-3xl pointer-events-none"
+          style={{
+            background: isLight ? "rgba(243,201,105,0.5)" : "rgba(243,201,105,0.22)",
+            animation: "orb-float 6s ease-in-out infinite",
+          }}
         />
-        <div
-          className="absolute -right-16 -bottom-16 w-64 h-64 rounded-full bg-accent-green/20 blur-3xl pointer-events-none"
-          style={{ animation: "orb-float 9s ease-in-out infinite reverse" }}
-        />
-
-        {/* large watermark cross */}
         <Cross
-          size={190}
-          className={`absolute -right-4 top-1/2 -translate-y-1/2 rotate-6 pointer-events-none ${isLight ? "text-black/[0.06]" : "text-white/[0.05]"}`}
+          size={170}
+          className={`absolute -right-6 -bottom-10 rotate-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
         />
-
-        {/* fine dot texture */}
         <div
-          className="absolute inset-0 opacity-[0.05] pointer-events-none"
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(circle, ${isLight ? "#3a2a12" : "#fff"} 1px, transparent 1px)`,
             backgroundSize: "16px 16px",
           }}
         />
 
-        <div
-          className="relative w-14 h-14 shrink-0 rounded-full flex items-center justify-center bg-gradient-to-br from-gold/30 to-transparent ring-2 ring-gold/50"
-          style={{ animation: "icon-ring-pulse 4s ease-in-out infinite" }}
-        >
-          <BookOpen size={23} className="text-gold" />
-        </div>
-
-        <div className="relative min-w-0">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Sparkles size={13} className="text-gold-glow" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-gold/70">ቅዱስ ቃለ እግዚአብሔር</span>
-          </div>
-          <h1 className="text-shimmer-gold font-ethiopic text-4xl font-black tracking-wide leading-tight whitespace-nowrap">
-            መጽሐፍ ቅዱስ
-          </h1>
-          <div className="flex items-center gap-3 mt-3 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-fg-muted font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-gold" /> 39 ብሉይ ኪዳን
-            </div>
-            <div className="w-px h-3 bg-border" />
-            <div className="flex items-center gap-1.5 text-xs text-fg-muted font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-green" /> 27 አዲስ ኪዳን
-            </div>
-          </div>
+        <div className="relative px-6 py-8">
+          {heroVerse ? (
+            <>
+              <p className="font-agbalumo text-2xl leading-snug text-fg mb-3">
+                {renderHighlightedVerse(heroVerse.text, ["መብራት", "ብርሃን"])}
+              </p>
+              <p className="text-xs font-semibold text-gold/80 mb-5">{heroVerse.ref}</p>
+            </>
+          ) : (
+            <div className="h-24" />
+          )}
+          <button
+            onClick={startReading}
+            className="flex items-center gap-2 bg-gold text-black font-bold text-sm px-5 py-3 rounded-full hover:scale-105 transition-transform shadow-lg"
+          >
+            <BookOpen size={16} />
+            ቅዱስ መጽሐፍ ይንብቡ
+            <ChevronRight size={15} />
+          </button>
         </div>
       </div>
 
-      <TestamentSection id="old" titleAm="ብሉይ ኪዳን" books={oldTestament} />
-      <TestamentSection id="new" titleAm="አዲስ ኪዳን" books={newTestament} />
+      {/* Quick Access */}
+      <div className="mb-7">
+        <h2 className="text-sm font-bold text-fg-muted mb-3">ቁልፍ መደረሻ</h2>
+        <div className="grid grid-cols-5 gap-2">
+          {QUICK_ACCESS.map((item) => (
+            <button key={item.id} onClick={item.onClick} className="flex flex-col items-center gap-2 min-w-0">
+              <span
+                className="tile-glow w-12 h-12 rounded-full flex items-center justify-center ring-1 ring-white/25"
+                style={
+                  {
+                    "--tile-glow": "color-mix(in oklab, var(--color-gold) 60%, transparent)",
+                    background:
+                      "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-gold) 45%, white) 0%, var(--color-gold) 55%, color-mix(in oklab, var(--color-gold) 80%, black) 100%)",
+                  } as CSSProperties
+                }
+              >
+                <item.icon size={17} className="text-[#3a2410]" />
+              </span>
+              <span className="text-[9.5px] font-semibold text-fg-muted text-center leading-tight w-full line-clamp-2">
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {/* Daily verse — a different verse from the hero, rotates once per
+          local calendar day (see the fetch effect above). Same rule as the
+          hero above: the reference design's photo (a sunrise over
+          mountains) isn't sourced as a real image — a warm sunrise-toned
+          gradient (gold glow at top-right fading down into dusk) stands in
+          for it instead, matching this card's own "የሃራ ቀል"/Sunrise-icon
+          theme far more than the previous flat indigo did. */}
       {dailyVerse && (
         <div
-          className="relative overflow-hidden rounded-xl p-6 mt-2"
+          className="relative overflow-hidden rounded-xl p-6 mb-7"
           style={{
             backgroundImage: isLight
-              ? "linear-gradient(135deg, #fdf6e6, #f3e6c8)"
-              : "linear-gradient(135deg, #1e1b4b, #0f172a)",
+              ? "radial-gradient(130% 110% at 88% -15%, #fff6df 0%, #fbe4b0 20%, #f0c988 42%, #dba668 62%, #c98f5c 100%)"
+              : "radial-gradient(130% 110% at 88% -15%, #f3c969 0%, #d98f3c 20%, #7a4a24 45%, #2e1c10 72%, #120b06 100%)",
             animation: "verse-fade-in 0.6s ease-out",
           }}
         >
           <div
             className="absolute -right-6 -top-6"
-            style={{ animation: "verse-glow-pulse 4s ease-in-out infinite" }}
+            style={{ animation: "verse-glow-pulse 4s ease-in-out infinite", color: isLight ? "#6b3a12" : undefined }}
           >
-            <Sunrise size={120} className="text-gold" />
+            <Sunrise size={120} className={isLight ? "" : "text-gold"} />
           </div>
-          <div className="relative flex items-center gap-2 mb-3">
-            <Sunrise size={16} className="text-gold" />
-            <h3 className={`text-sm font-black uppercase tracking-widest ${WORD_ART_TITLE}`}>የዕለቱ መና</h3>
+          <button
+            onClick={handleShareDailyVerse}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center bg-black/15 hover:bg-black/25 transition-colors"
+            aria-label="Share verse"
+          >
+            {dailyVerseShared ? (
+              <Check size={15} style={{ color: isLight ? "#6b3a12" : undefined }} className={isLight ? "" : "text-gold"} />
+            ) : (
+              <Share2 size={15} className="text-fg/70" />
+            )}
+          </button>
+          {/* This card's own accent — the shared gold token is tuned for a
+              neutral background, and reads as near-invisible gold-on-gold
+              against the warm sunrise gradient above in light mode, so it
+              gets its own deep amber/brown here instead (dark mode's
+              background stays dark enough that the shared gold is still
+              plenty legible, unchanged). */}
+          <div className="relative flex items-center gap-2 mb-3" style={{ color: isLight ? "#6b3a12" : undefined }}>
+            <Sunrise size={16} className={isLight ? "" : "text-gold"} />
+            <h3
+              className={`text-sm font-black uppercase tracking-widest ${isLight ? "" : WORD_ART_TITLE}`}
+              style={isLight ? { color: "#5c3410" } : undefined}
+            >
+              የዕለቱ መና
+            </h3>
           </div>
           <p className="relative font-menbere italic text-base text-fg/90 leading-relaxed">“{dailyVerse.text}”</p>
-          <p className="relative text-xs text-gold/80 font-semibold mt-3 text-right">{dailyVerse.ref}</p>
+          <p
+            className={`relative text-xs font-semibold mt-3 text-right ${isLight ? "" : "text-gold/80"}`}
+            style={isLight ? { color: "#6b3a12" } : undefined}
+          >
+            {dailyVerse.ref}
+          </p>
+          <button
+            onClick={() => openVerse(dailyVerse.slug, dailyVerse.chapter, dailyVerse.verseIndex)}
+            className={`relative flex items-center gap-1 text-xs font-bold transition-colors mt-4 ${
+              isLight ? "hover:opacity-75" : "text-gold hover:text-gold-glow"
+            }`}
+            style={isLight ? { color: "#6b3a12" } : undefined}
+          >
+            መሱ ቃል ይንብቡ
+            <ChevronRight size={14} />
+          </button>
         </div>
+      )}
+
+      {/* Books — progress cards replace the old plain expand rows; still
+          toggle the same book list open/closed beneath them. */}
+      <div ref={booksSectionRef} className="mb-7">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-fg-muted">መጻሕፍት</h2>
+          <button
+            onClick={() => setExpanded({ old: true, new: true })}
+            className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
+          >
+            ሁሉንም ይመልከቱ
+            <ChevronRight size={12} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <TestamentProgressCard id="old" books={oldTestament} />
+          <TestamentProgressCard id="new" books={newTestament} />
+        </div>
+        {expanded.old && (
+          <div className="mt-3">
+            <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
+          </div>
+        )}
+        {expanded.new && (
+          <div className="mt-3">
+            <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
+          </div>
+        )}
+      </div>
+
+      {/* Recently Read */}
+      {recentHistory.length > 0 && (
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-fg-muted">በቅርብ የተነበቡ</h2>
+            <button
+              onClick={() => setActiveModal("history")}
+              className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
+            >
+              ሁሉንም ይመልከቱ
+              <ChevronRight size={12} />
+            </button>
+          </div>
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+            {recentHistory.map((entry) => {
+              const b = bookFromSlug(entry.bookSlug);
+              if (!b) return null;
+              const theme = TESTAMENT_THEME[b.testament];
+              return (
+                <button
+                  key={`${entry.bookSlug}-${entry.chapter}`}
+                  onClick={() => openVerse(entry.bookSlug, entry.chapter)}
+                  className="shrink-0 w-32 bg-elevated hover:bg-elevated-hover rounded-xl p-3 text-left transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[9.5px] font-bold uppercase ${theme.accent}`}>{theme.label}</span>
+                    <Bookmark size={13} className="text-fg-subtle shrink-0" />
+                  </div>
+                  <p className="font-abyssinica text-sm font-bold text-fg truncate">
+                    {b.nameAm} {entry.chapter}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {activeModal === "bookmarks" && (
+        <BibleListModal
+          title="የመጽሐፍ ምልክት"
+          emptyLabel="እስካሁን ምንም ምልክት አልተደረገም።"
+          rows={bookmarkRows}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+      {activeModal === "notes" && (
+        <BibleListModal
+          title="ማስታወሻዎች"
+          emptyLabel="እስካሁን ምንም ማስታወሻ የለም።"
+          rows={noteRows}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+      {activeModal === "favorites" && (
+        <BibleListModal
+          title="የሚወደዱ"
+          emptyLabel="እስካሁን ምንም የተወደደ ጥቅስ የለም።"
+          rows={favoriteRows}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+      {activeModal === "history" && (
+        <BibleListModal
+          title="ታሪክ"
+          emptyLabel="እስካሁን ምንም አልተነበበም።"
+          rows={historyRows}
+          onClose={() => setActiveModal(null)}
+        />
       )}
     </div>
   );

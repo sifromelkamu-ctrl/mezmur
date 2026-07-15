@@ -2,6 +2,7 @@ import { Search, Settings } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
+import { getAvatarColor, useTheme } from "../context/ThemeContext";
 import TextField from "./form/TextField";
 
 export default function Topbar() {
@@ -15,6 +16,8 @@ export default function Topbar() {
   const isLibrary = location.pathname === "/library";
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { avatarColorId } = useTheme();
+  const avatarColor = getAvatarColor(avatarColorId);
 
   if (isLibrary) return null;
 
@@ -28,8 +31,13 @@ export default function Topbar() {
               className="flex items-center gap-1 shrink-0 py-2.5 -my-2.5"
               aria-label={t("home")}
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand to-accent-cyan flex items-center justify-center">
-                <span className="text-white font-bold text-xs">M</span>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                style={{ backgroundColor: avatarColor.background }}
+              >
+                <span className="font-bold text-xs" style={{ color: avatarColor.text }}>
+                  M
+                </span>
               </div>
               {/* text-lg (1.125rem) + 9% = 1.226rem */}
               <span className="font-abyssinica font-bold text-[1.226rem] tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent">
