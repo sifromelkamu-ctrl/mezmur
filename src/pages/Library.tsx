@@ -1,4 +1,17 @@
-import { Check, Heart, Mic2, MoreVertical, Play, Plus, Search as SearchIcon } from "lucide-react";
+import {
+  ArrowDownWideNarrow,
+  Check,
+  Disc3,
+  Heart,
+  ListMusic,
+  Mic2,
+  Play,
+  Plus,
+  Search as SearchIcon,
+  Settings,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/Card";
@@ -154,6 +167,12 @@ export default function Library() {
     playlists: t("playlists"),
     favorites: "Favorites",
   };
+  const filterIcons: Record<Filter, typeof UserRound> = {
+    artists: UserRound,
+    albums: Disc3,
+    playlists: ListMusic,
+    favorites: Heart,
+  };
 
   useEffect(() => {
     Promise.all([playlistsApi.list(), artistsApi.list(), albumsApi.list()])
@@ -198,9 +217,39 @@ export default function Library() {
 
   return (
     <div className="px-6 py-6">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <h1 className="text-2xl font-bold">{t("yourLibrary")}</h1>
-        {filter === "playlists" && (
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-6">
+        <button
+          onClick={() => navigate("/")}
+          aria-label={t("home")}
+          className="justify-self-start w-9 h-9 rounded-full bg-gradient-to-br from-brand to-accent-cyan flex items-center justify-center shrink-0"
+        >
+          <span className="text-white font-bold text-sm">M</span>
+        </button>
+        {/* text-lg (1.125rem) + 9% = 1.226rem — kept identical to Topbar's wordmark size */}
+        <span className="justify-self-center font-abyssinica font-bold text-[1.226rem] tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent whitespace-nowrap">
+          መዝሙር
+        </span>
+        <div className="justify-self-end flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate("/settings")}
+            aria-label={t("settings")}
+            className="w-9 h-9 rounded-full flex items-center justify-center ring-1 ring-border text-gold hover:bg-hover transition-colors"
+          >
+            <Settings size={17} />
+          </button>
+          {!user && (
+            <button
+              onClick={() => navigate("/auth")}
+              className="bg-white text-black text-xs font-bold rounded-full px-3.5 py-2 hover:scale-105 transition-transform shrink-0"
+            >
+              {t("logIn")}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {filter === "playlists" && (
+        <div className="flex justify-end mb-4">
           <button
             onClick={() => (user ? setShowCreatePlaylist(true) : navigate("/auth"))}
             className="flex items-center gap-2 bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform"
@@ -208,33 +257,41 @@ export default function Library() {
             <Plus size={16} />
             {t("createPlaylist")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="relative max-w-sm mb-6">
-        <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+      <div className="relative mb-6">
+        <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gold" />
         <TextField
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("searchYourLibrary")}
           pill
-          className="pl-9 pr-4 py-2 text-base w-full"
+          className="pl-9 pr-10 py-2 text-base w-full"
         />
+        <Sparkles size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand pointer-events-none" />
       </div>
 
       <div className="flex items-center gap-2 mb-6 flex-wrap">
-        {(["artists", "albums", "playlists", "favorites"] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
-              filter === f ? "bg-white text-black" : "bg-elevated text-fg-muted hover:bg-elevated-hover"
-            }`}
-          >
-            {filterLabels[f]}
-          </button>
-        ))}
+        {(["artists", "albums", "playlists", "favorites"] as Filter[]).map((f) => {
+          const Icon = filterIcons[f];
+          const active = filter === f;
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors border ${
+                active
+                  ? "bg-elevated text-brand border-brand shadow-[0_0_16px_-6px_var(--color-brand)]"
+                  : "bg-transparent text-fg border-border hover:bg-hover"
+              }`}
+            >
+              <Icon size={15} />
+              {filterLabels[f]}
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -248,7 +305,7 @@ export default function Library() {
                   onClick={() => setShowArtistSort((v) => !v)}
                   className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2.5 rounded-md hover:bg-hover transition-colors"
                 >
-                  <MoreVertical size={14} />
+                  <ArrowDownWideNarrow size={14} />
                   Sort
                 </button>
                 {showArtistSort && (

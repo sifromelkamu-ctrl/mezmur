@@ -10,8 +10,13 @@ export default function Topbar() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isSearchPage = location.pathname === "/search";
   const isHome = location.pathname === "/";
+  // Library renders its own bespoke header (avatar / centered wordmark /
+  // gear) to match its dedicated design, same pattern as Home below.
+  const isLibrary = location.pathname === "/library";
   const { user } = useAuth();
   const { t } = useLanguage();
+
+  if (isLibrary) return null;
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-base/80 backdrop-blur-md gap-3">
