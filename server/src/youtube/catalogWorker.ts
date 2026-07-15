@@ -4,15 +4,17 @@ import { normalizeForMatch } from "../artwork/matching.js";
 import { toSafeErrorMessage } from "./safeError.js";
 import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 
-// A single global FIFO of item ids. Each item spends almost all of its time
-// waiting on network I/O (yt-dlp fetching through the configured proxy —
-// see ytdlp.ts's YTDLP_PROXY_URL — not on CPU), so running a few at once is
-// safe even on a modest instance and directly cuts total batch wall-clock
-// time: a free-tier proxy's throughput was observed in production to vary
-// a lot (a healthy download: ~10s; a congested one: several minutes before
-// yt-dlp's own retries gave up), and previously every item queued fully
-// behind whichever one it happened to land on.
-const CONCURRENCY = 3;
+// A single global FIFO of item ids. Serial on purpose (one item at a time,
+// with a real pause between each — see worker() below): without a working
+// proxy to spread requests across IPs, 3 concurrent fetches plus only a
+// 1.5s gap made a batch look exactly like a scraping burst to YouTube and
+// got every single item bot-check-blocked in production, even though a
+// lone one-off import from the same box succeeded moments earlier. This
+// used to run CONCURRENCY=3 back when a (paid, IP-rotating) proxy was
+// configured and doing the actual request-spreading — safe to revisit if
+// this app's proxy situation changes again, but serial+spaced-out is the
+// only thing that's actually reliable against a bare IP.
+const CONCURRENCY = 1;
 const queue: string[] = [];
 let activeWorkers = 0;
 
@@ -143,17 +145,17 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Each worker greedily pulls the next id off the shared queue until it's
-// empty — queue.shift() is synchronous, so concurrent workers can never
-// grab the same item. The pause between an individual worker's own items
-// is shorter than the old single-worker version's (1.5s vs 3s) since
-// CONCURRENCY workers already naturally space out storage API calls
-// against each other; it's not trying to throttle the batch as a whole.
+// Pulls the next id off the shared queue until it's empty, pausing between
+// every item — long enough that a multi-item batch reads as ordinary,
+// spaced-out usage rather than a scraping burst (see CONCURRENCY above for
+// why this matters without a proxy in front of it).
+const ITEM_DELAY_MS = 6000;
+
 async function worker() {
   let itemId: string | undefined;
   while ((itemId = queue.shift()) !== undefined) {
     await processItem(itemId);
-    if (queue.length > 0) await sleep(1500);
+    if (queue.length > 0) await sleep(ITEM_DELAY_MS);
   }
 }
 
