@@ -32,6 +32,8 @@ interface AdminTrackRow {
   artistId: string | null;
   artistNameOverride?: string | null;
   albumId: string | null;
+  isSingle: boolean;
+  isConcertSong: boolean;
   publishedAt: Date | null;
   lyrics: string | null;
   artist: { name: string; gradientFrom: string; gradientTo: string } | null;
@@ -69,6 +71,11 @@ function toAdminTrackDTO(track: AdminTrackRow) {
     artistName: track.artist?.name ?? track.artistNameOverride ?? undefined,
     albumId: track.albumId,
     albumTitle: track.album?.title,
+    // Only meaningful while the track has no album (see Track.isSingle/
+    // isConcertSong in schema.prisma) — the "Category" selector in the Edit
+    // Song form reads these to show the track's current standalone kind.
+    isSingle: track.isSingle,
+    isConcertSong: track.isConcertSong,
     releaseYear: track.publishedAt ? track.publishedAt.getUTCFullYear() : undefined,
     lyrics: track.lyrics ?? undefined,
     gradient,
@@ -101,6 +108,12 @@ const editTrackSchema = z.object({
   language: z.string().trim().max(60).optional(),
   releaseYear: z.number().int().min(1900).max(2100).nullable().optional(),
   lyrics: z.string().trim().max(20000).nullable().optional(),
+  // The Edit Song form's "Category" selector, shown only while the track has
+  // no album — mutually exclusive (see Track.isConcertSong in
+  // schema.prisma); setting either one always clears the other and detaches
+  // any album, since both only ever mean "standalone."
+  isSingle: z.boolean().optional(),
+  isConcertSong: z.boolean().optional(),
 });
 
 // PATCH /api/admin/library/tracks/:id - the full "Edit Song" form: title,
@@ -149,6 +162,15 @@ router.patch("/tracks/:id", async (req: AuthedRequest, res) => {
     }
   }
 
+  // Marking a track Single or Concert Song only ever means "standalone" —
+  // both force it off any album regardless of what else was sent, and each
+  // one clears the other (see Track.isConcertSong in schema.prisma).
+  if (data.isConcertSong === true) {
+    albumIdUpdate = null;
+  } else if (data.isSingle === true) {
+    albumIdUpdate = null;
+  }
+
   const updateData: Prisma.TrackUpdateInput = {};
   if (data.title !== undefined) updateData.title = data.title;
   if (data.artistId !== undefined) updateData.artist = { connect: { id: data.artistId } };
@@ -163,6 +185,16 @@ router.patch("/tracks/:id", async (req: AuthedRequest, res) => {
     updateData.publishedAt = data.releaseYear === null ? null : new Date(Date.UTC(data.releaseYear, 0, 1));
   }
   if (data.lyrics !== undefined) updateData.lyrics = data.lyrics;
+  if (data.isConcertSong === true) {
+    updateData.isConcertSong = true;
+    updateData.isSingle = false;
+  } else if (data.isSingle === true) {
+    updateData.isSingle = true;
+    updateData.isConcertSong = false;
+  } else {
+    if (data.isConcertSong !== undefined) updateData.isConcertSong = data.isConcertSong;
+    if (data.isSingle !== undefined) updateData.isSingle = data.isSingle;
+  }
 
   const updated = await prisma.track.update({
     where: { id: track.id },

@@ -32,6 +32,9 @@ export interface StartImportParams {
   concertYear?: number;
   concertGenre?: string;
   concertDescription?: string;
+  // "Concert" destination, "Add as standalone Concert Song" mode — see
+  // ImportVideoParams.
+  standaloneConcertSong?: boolean;
 }
 
 const jobs = new Map<string, ImportJob>();

@@ -174,6 +174,15 @@ model Track {
   // tagged rather than auto-detected.
   isSingle Boolean @default(false)
 
+  // True only when this track was imported/converted as a standalone
+  // "Concert Song" — a Concert destination import of a single YouTube video
+  // that isn't attached to any Concert Album (see routes/youtubeImport.ts,
+  // routes/concerts.ts). Mutually exclusive with isSingle in practice (never
+  // both true at once — see adminLibrary.ts's track-conversion endpoint),
+  // and — like isSingle — deliberately a tag, never inferred from albumId
+  // being null, so an old orphaned track never accidentally shows up here.
+  isConcertSong Boolean @default(false)
+
   // Admin-only artwork framing — see Artist.artworkFrame for the contract.
   // "Album Artwork Is Master Artwork": for a track with an albumId, this
   // column (and coverUrl above) is never read — toTrackDTO always resolves

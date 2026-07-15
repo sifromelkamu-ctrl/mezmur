@@ -110,6 +110,11 @@ const startImportSchema = z.object({
   concertYear: z.number().int().min(1900).max(2100).optional(),
   concertGenre: z.string().trim().max(60).optional(),
   concertDescription: z.string().trim().max(4000).optional(),
+  // "Concert" destination, "Add as standalone Concert Song" mode: no album
+  // at all — the track surfaces directly in Home's Concerts section as its
+  // own tile (Track.isConcertSong). titleOverride/artistId/artistName/
+  // createArtist above are reused as-is, same as newConcert.
+  standaloneConcertSong: z.boolean().optional(),
 });
 
 // POST /api/admin/youtube-import — validates the URL and permission
@@ -149,6 +154,7 @@ router.post("/", async (req: AuthedRequest, res) => {
     concertYear: parsed.data.concertYear,
     concertGenre: parsed.data.concertGenre,
     concertDescription: parsed.data.concertDescription,
+    standaloneConcertSong: parsed.data.standaloneConcertSong,
   });
 
   res.status(202).json({ jobId });

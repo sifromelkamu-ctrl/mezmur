@@ -8,6 +8,7 @@ import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { albumsApi, concertsApi, type ApiAlbum, type ApiAlbumDetail } from "../lib/api";
+import { isConcertAlbumItem } from "../lib/concerts";
 import { renderWithAmharicStyle } from "../utils/scriptText";
 
 function formatDuration(totalSeconds: number): string {
@@ -50,7 +51,10 @@ export default function ConcertDetail() {
   // re-fetched per concert, so switching between them never re-flashes it.
   // Re-called after an edit (rename/delete) so the strip picks up the
   // change immediately without a full page reload.
-  const refreshConcertList = () => concertsApi.list().then(setConcerts);
+  // Standalone Concert Songs also come back in this feed (see
+  // server/src/routes/concerts.ts) but never have a detail page of their
+  // own — this switcher only ever links between real Concert Albums.
+  const refreshConcertList = () => concertsApi.list().then((items) => setConcerts(items.filter(isConcertAlbumItem)));
   useEffect(() => {
     refreshConcertList();
   }, []);
@@ -304,6 +308,7 @@ export default function ConcertDetail() {
             refreshConcertList();
           }}
           onDeleted={() => navigate("/concerts")}
+          onConvertedToAlbum={(albumId) => navigate(`/album/${albumId}`, { replace: true })}
         />
       )}
     </div>

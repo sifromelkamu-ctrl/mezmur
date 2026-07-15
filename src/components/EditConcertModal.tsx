@@ -1,4 +1,4 @@
-import { Check, GripVertical, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, Disc3, GripVertical, Pencil, Plus, Ticket, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -25,9 +25,13 @@ interface EditConcertModalProps {
   // Called after "Delete Concert" actually succeeds — the caller navigates
   // away, since this concert no longer exists.
   onDeleted: () => void;
+  // Called after "Convert to Regular Album" succeeds — this row is no
+  // longer a concert at all, so the caller navigates to its new home
+  // (/album/:id) instead of re-rendering ConcertDetail for it.
+  onConvertedToAlbum: (albumId: string) => void;
 }
 
-export default function EditConcertModal({ concert, onClose, onSaved, onDeleted }: EditConcertModalProps) {
+export default function EditConcertModal({ concert, onClose, onSaved, onDeleted, onConvertedToAlbum }: EditConcertModalProps) {
   const navigate = useNavigate();
   const [artists, setArtists] = useState<ApiArtist[]>([]);
   const [form, setForm] = useState({
@@ -47,6 +51,8 @@ export default function EditConcertModal({ concert, onClose, onSaved, onDeleted 
   const [coverUrl, setCoverUrl] = useState(concert.coverUrl);
   const [artworkFrame, setArtworkFrame] = useState(concert.artworkFrame);
   const [error, setError] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
+  const [detachingTrackId, setDetachingTrackId] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -123,8 +129,37 @@ export default function EditConcertModal({ concert, onClose, onSaved, onDeleted 
     await refresh();
   };
 
+  // Detaches a track from this concert album without deleting it — it
+  // becomes its own standalone Concert Song, showing up as its own tile in
+  // Home's Concerts section instead of inside this tracklist.
+  const handleDetachTrack = async (trackId: string) => {
+    setDetachingTrackId(trackId);
+    try {
+      await adminLibraryApi.updateTrack(trackId, { isConcertSong: true });
+      await refresh();
+    } finally {
+      setDetachingTrackId(null);
+    }
+  };
+
   const handleAddTracks = () => {
     navigate(`/admin/youtube-import?destination=live&albumId=${concert.id}`);
+  };
+
+  // Converts this row from a Concert Album to a regular Album — same Album
+  // row, just albumType flipped back (see routes/albums.ts's albumType
+  // field). It's no longer a concert at all once this succeeds, so the
+  // caller navigates to its new home instead of re-rendering this modal.
+  const handleConvertToAlbum = async () => {
+    setConverting(true);
+    setError(null);
+    try {
+      await albumsApi.update(concert.id, { albumType: "album" });
+      onConvertedToAlbum(concert.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not convert to a regular album");
+      setConverting(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -324,15 +359,36 @@ export default function EditConcertModal({ concert, onClose, onSaved, onDeleted 
                   <GripVertical size={14} className="text-fg-subtle shrink-0" />
                   <span className="flex-1 min-w-0 truncate text-sm">{track.title}</span>
                   <button
+                    onClick={() => handleDetachTrack(track.id)}
+                    disabled={detachingTrackId === track.id}
+                    className="text-fg-subtle hover:text-brand transition-colors shrink-0 disabled:opacity-50"
+                    aria-label={`Remove ${track.title} from this concert — keep it as a standalone Concert Song`}
+                    title="Remove from concert (keep as standalone Concert Song)"
+                  >
+                    <Ticket size={14} />
+                  </button>
+                  <button
                     onClick={() => handleRemoveTrack(track.id)}
                     className="text-fg-subtle hover:text-accent-red transition-colors shrink-0"
-                    aria-label={`Remove ${track.title}`}
+                    aria-label={`Delete ${track.title}`}
+                    title="Delete permanently"
                   >
                     <X size={14} />
                   </button>
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <button
+              onClick={handleConvertToAlbum}
+              disabled={converting}
+              className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg transition-colors disabled:opacity-60"
+            >
+              <Disc3 size={14} />
+              {converting ? "Converting…" : "Convert to Regular Album"}
+            </button>
           </div>
 
           <div className="border-t border-border pt-4">

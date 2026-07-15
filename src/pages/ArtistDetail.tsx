@@ -387,18 +387,18 @@ export default function ArtistDetail() {
             />
           )}
         </div>
-        {/* Teal→black wash, its stops sized to *this* container's own
-            height (not the page's), so it's always fully resolved to solid
-            #050707 by its own bottom edge — flush with the flat page
-            background right below it, no matter how tall the full page
-            ends up being. */}
+        {/* Teal→black wash — stays fully transparent for the top half of the
+            photo (previous version started darkening at 18% and stacked a
+            second black overlay on top, washing out most of the picture)
+            and only darkens the bottom third, still fully resolving to
+            solid #050707 by its own bottom edge so it stays flush with the
+            flat page background right below it regardless of page length. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, ${TEAL}00 0%, ${TEAL}66 18%, ${TEAL_DEEP}b3 40%, #0d2f2ce6 62%, #0a1614f2 80%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${TEAL_DEEP}4d 62%, #0d2f2c99 75%, #0a1614dd 90%, #050707 100%)`,
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050707] via-[#050707]/55 to-transparent" />
 
         <BackButton />
         <div className="absolute top-4 right-4">

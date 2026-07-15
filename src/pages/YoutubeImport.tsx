@@ -47,9 +47,12 @@ type Step = "form" | "metadata";
 
 // Concert destination only: attach this track to an already-existing concert
 // (the original, still-supported behavior — pick from the dropdown, no
-// metadata step), or create a brand-new one (shows the metadata step below,
-// same as Single, but with the extra concert-only fields).
-type ConcertMode = "existing" | "new";
+// metadata step), create a brand-new concert album (shows the metadata step
+// below, same as Single, but with the extra concert-only fields), or add it
+// directly as its own standalone Concert Song — no album at all, same
+// metadata step as Single (title/artist only, no concert-only fields) — see
+// Home's Concerts section, which renders it as its own smaller tile.
+type ConcertMode = "existing" | "new" | "standalone";
 
 interface PreviewResult {
   title: string;
@@ -134,6 +137,11 @@ export default function YoutubeImport() {
   };
 
   const isNewConcert = destination === "live" && concertMode === "new";
+  const isStandaloneConcertSong = destination === "live" && concertMode === "standalone";
+  // Single, Concert's "Create new" mode, and Concert's "standalone song"
+  // mode all need the same title/artist review step before anything is
+  // actually imported.
+  const needsMetadataStep = destination === "single" || isNewConcert || isStandaloneConcertSong;
 
   const typedArtistName = metaArtistName.trim();
   const exactArtistMatch = artists.find((a) => a.name.toLowerCase() === typedArtistName.toLowerCase());
@@ -171,9 +179,9 @@ export default function YoutubeImport() {
     return null;
   };
 
-  // "Next" (Single destination, and Concert's "Create new" mode) — fetches
-  // title/artist/thumbnail with no download and nothing created yet, then
-  // opens the Edit Metadata step.
+  // "Next" (Single destination, and Concert's "Create new"/"Standalone song"
+  // modes) — fetches title/artist/thumbnail with no download and nothing
+  // created yet, then opens the Edit Metadata step.
   const goToMetadataStep = async () => {
     setSubmitError(null);
     const error = validateForm();
@@ -212,11 +220,11 @@ export default function YoutubeImport() {
       setSubmitError(error);
       return;
     }
-    if ((destination === "single" || isNewConcert) && !metaTitle.trim()) {
+    if (needsMetadataStep && !metaTitle.trim()) {
       setSubmitError(isNewConcert ? "Concert album name can't be empty" : "Song title can't be empty");
       return;
     }
-    if ((destination === "single" || isNewConcert) && !typedArtistName) {
+    if (needsMetadataStep && !typedArtistName) {
       setSubmitError("Enter or select an artist");
       return;
     }
@@ -256,6 +264,16 @@ export default function YoutubeImport() {
               concertYear: metaYear.trim() ? Number(metaYear.trim()) : undefined,
               concertGenre: metaGenre.trim() || undefined,
               concertDescription: metaDescription.trim() || undefined,
+            }
+          : {}),
+        ...(isStandaloneConcertSong
+          ? {
+              // Same "always resolves a real Artist" behavior as newConcert
+              // above — a standalone Concert Song is never left unassigned.
+              standaloneConcertSong: true,
+              titleOverride: metaTitle.trim(),
+              artistId: resolvedArtistId ?? undefined,
+              artistName: resolvedArtistId ? undefined : typedArtistName,
             }
           : {}),
       });
@@ -367,7 +385,7 @@ export default function YoutubeImport() {
           </div>
 
           {destination === "live" && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setConcertMode("existing")}
@@ -390,15 +408,28 @@ export default function YoutubeImport() {
               >
                 Create new concert
               </button>
+              <button
+                type="button"
+                onClick={() => setConcertMode("standalone")}
+                className={`py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                  concertMode === "standalone"
+                    ? "border-brand bg-brand/10 text-fg"
+                    : "border-transparent bg-panel text-fg-muted hover:text-fg"
+                }`}
+              >
+                Standalone song
+              </button>
             </div>
           )}
 
           <div className="grid grid-cols-1 gap-3">
-            {destination === "single" || isNewConcert ? (
+            {needsMetadataStep ? (
               <p className="text-sm text-fg-muted bg-panel rounded-md px-3 py-2">
                 {isNewConcert
                   ? "A brand-new concert will be created — you'll review its name, artist, and other details next."
-                  : "This track will be imported as a standalone single — no album. You'll review its title and artist next."}
+                  : isStandaloneConcertSong
+                    ? "This song will be added directly to Home → Concerts as its own standalone Concert Song — no album. You'll review its title and artist next."
+                    : "This track will be imported as a standalone single — no album. You'll review its title and artist next."}
               </p>
             ) : (
               <SelectField
@@ -417,7 +448,7 @@ export default function YoutubeImport() {
                 ))}
               </SelectField>
             )}
-            {destination !== "single" && !isNewConcert && destinationAlbums.length === 0 && (
+            {destination !== "single" && !isNewConcert && !isStandaloneConcertSong && destinationAlbums.length === 0 && (
               <p className="text-xs text-fg-subtle -mt-1">
                 {destination === "live"
                   ? "No concerts yet — create one first, or switch to \"Create new concert\" above."
@@ -460,7 +491,7 @@ export default function YoutubeImport() {
           )}
 
           <button
-            onClick={destination === "single" || isNewConcert ? goToMetadataStep : startImport}
+            onClick={needsMetadataStep ? goToMetadataStep : startImport}
             disabled={submitting || previewLoading}
             className="self-start flex items-center gap-2 bg-brand text-black text-sm font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
           >
@@ -469,7 +500,7 @@ export default function YoutubeImport() {
             ) : (
               <Clapperboard size={16} />
             )}
-            {phase === "error" ? "Try again" : destination === "single" || isNewConcert ? "Next" : "Import from YouTube"}
+            {phase === "error" ? "Try again" : needsMetadataStep ? "Next" : "Import from YouTube"}
           </button>
         </div>
       )}
@@ -551,7 +582,7 @@ export default function YoutubeImport() {
                     Will link to existing artist "
                     {artists.find((a) => a.id === resolvedArtistId)?.name ?? typedArtistName}"
                   </span>
-                ) : isNewConcert ? (
+                ) : isNewConcert || isStandaloneConcertSong ? (
                   <span>No matching artist — a new artist "{typedArtistName}" will be created</span>
                 ) : (
                   <span>No matching artist — this single will show as "{typedArtistName}" without an Artist page</span>

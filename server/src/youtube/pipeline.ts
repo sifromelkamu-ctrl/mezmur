@@ -118,6 +118,13 @@ export interface ImportVideoParams {
   concertYear?: number;
   concertGenre?: string;
   concertDescription?: string;
+  // "Concert" destination, "Add as standalone Concert Song" mode (see
+  // YoutubeImport.tsx) — the track is saved with no album at all
+  // (Track.isConcertSong instead), so it surfaces directly in Home's
+  // Concerts section as its own tile rather than opening a tracklist.
+  // Mutually exclusive with newConcert/albumId/albumTitle in practice — the
+  // client only ever sends one destination's fields.
+  standaloneConcertSong?: boolean;
   // Set by the catalog worker only: no artist photo, album cover, or track
   // cover is fetched/assigned for this import — catalog-imported content is
   // always art-less until an admin uses the manual Artwork Editor. The
@@ -316,6 +323,7 @@ export async function importYoutubeVideo({
   concertYear,
   concertGenre,
   concertDescription,
+  standaloneConcertSong,
   onProgress,
 }: ImportVideoParams) {
   let tmpDir: string | undefined;
@@ -446,6 +454,7 @@ export async function importYoutubeVideo({
         artistNameOverride: artist ? undefined : resolvedArtistName,
         albumId: album?.id ?? albumId,
         isSingle: Boolean(isSingle),
+        isConcertSong: Boolean(standaloneConcertSong),
         trackNumber,
         audioUrl: audioUrlData.publicUrl,
         coverUrl: coverUrl ?? album?.coverUrl ?? undefined,

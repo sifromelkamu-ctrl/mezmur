@@ -371,13 +371,24 @@ export const podcastsApi = {
   get: (id: string) => request<ApiPodcast>(`/podcasts/${id}`),
 };
 
-// A dedicated, admin-curated category — never regular albums, never
+// A dedicated, admin-curated category — never regular albums/singles, never
 // auto-derived from "newest"/"recently imported" (see server/src/routes/
-// concerts.ts). Reuses albumsApi.get() for a single concert's detail view
-// since a concert is still an Album row server-side, just filtered out of
-// every other album-facing endpoint.
+// concerts.ts). A Concert Album is still an Album row server-side (just
+// filtered out of every other album-facing endpoint) and a standalone
+// Concert Song is still a Track row (Track.isConcertSong) — this feed
+// merges both into one ordered list, tagged by `kind` so Home can render
+// each with its own tile. Reuses albumsApi.get() for a single concert
+// album's detail view.
+export interface ApiConcertAlbumItem extends ApiAlbum {
+  kind: "album";
+}
+export interface ApiConcertSongItem extends ApiTrack {
+  kind: "song";
+}
+export type ApiConcertItem = ApiConcertAlbumItem | ApiConcertSongItem;
+
 export const concertsApi = {
-  list: () => request<ApiAlbum[]>("/concerts"),
+  list: () => request<ApiConcertItem[]>("/concerts"),
 };
 
 // A dedicated category too: a track with no album at all — never a regular
@@ -541,6 +552,8 @@ export const adminApi = {
     concertYear?: number;
     concertGenre?: string;
     concertDescription?: string;
+    // "Concert" destination, "Add as standalone Concert Song" mode.
+    standaloneConcertSong?: boolean;
   }) => request<{ jobId: string }>("/admin/youtube-import", { method: "POST", body: JSON.stringify(input) }),
   getYoutubeImportStatus: (jobId: string) =>
     request<YoutubeImportJob>(`/admin/youtube-import/${jobId}`),
@@ -620,11 +633,15 @@ export const adminApi = {
     request<{ resumed: number }>(`/admin/youtube-import/catalog/${batchId}/resume`, { method: "POST" }),
 };
 
-// Extends ApiTrack with the two extra fields the admin "Edit Song" form
-// needs (lyrics, releaseYear) that no other screen reads.
+// Extends ApiTrack with the extra fields the admin "Edit Song" form needs
+// (lyrics, releaseYear) plus the standalone-category flags (only meaningful
+// while the track has no album — see Track.isSingle/isConcertSong in
+// schema.prisma) that no other screen reads.
 export interface ApiAdminTrack extends ApiTrack {
   lyrics?: string;
   releaseYear?: number;
+  isSingle?: boolean;
+  isConcertSong?: boolean;
 }
 
 export interface AdminTrackEditInput {
@@ -637,6 +654,8 @@ export interface AdminTrackEditInput {
   language?: string;
   releaseYear?: number | null;
   lyrics?: string | null;
+  isSingle?: boolean;
+  isConcertSong?: boolean;
 }
 
 // Admin-only "Library Management" tools: reassigning a song's album/artist,

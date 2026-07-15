@@ -33,10 +33,13 @@ router.get("/", async (req, res) => {
       OR: [{ artist: { ownerId: null } }, { artistId: null }],
       // Concerts are a completely separate content type from every other
       // track-based surface (Continue Listening, Recommended, Random Play,
-      // trending/mood/era browsing, ...) — a track belonging to a
-      // "live"-tagged album never leaks into any of them. `album` being
-      // null (an unassigned single) always passes this check untouched.
+      // trending/mood/era browsing, ...) — neither a concert album's own
+      // track (album.albumType) nor a standalone Concert Song
+      // (isConcertSong, no album at all) ever leaks into any of them.
+      // `album` being null (an unassigned single) always passes the first
+      // check untouched.
       NOT: { album: { albumType: "live" } },
+      isConcertSong: false,
       ...(mood ? { moods: { has: mood } } : {}),
       ...(language ? { language: { equals: language, mode: "insensitive" } } : {}),
       ...(era === "classic" ? { album: { year: { lt: ERA_CUTOFF_YEAR } } } : {}),
@@ -55,6 +58,7 @@ router.get("/trending", async (req, res) => {
     where: {
       OR: [{ artist: { ownerId: null } }, { artistId: null }],
       NOT: { album: { albumType: "live" } },
+      isConcertSong: false,
     },
     include: { artist: true, album: true },
     orderBy: { playCount: "desc" },

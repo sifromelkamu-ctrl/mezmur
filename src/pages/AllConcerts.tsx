@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import Card from "../components/Card";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
-import { albumsApi, concertsApi, type ApiAlbum } from "../lib/api";
+import { albumsApi, concertsApi, type ApiConcertItem } from "../lib/api";
+import { isConcertSongItem } from "../lib/concerts";
 
 type SortMode = "name" | "year";
 
@@ -19,7 +20,7 @@ export default function AllConcerts() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { currentTrack, isPlaying, playTrack } = usePlayer();
-  const [concerts, setConcerts] = useState<ApiAlbum[] | null>(null);
+  const [concerts, setConcerts] = useState<ApiConcertItem[] | null>(null);
   const [error, setError] = useState(false);
   const [sort, setSort] = useState<SortMode>("name");
   const [showSort, setShowSort] = useState(false);
@@ -47,7 +48,10 @@ export default function AllConcerts() {
       case "name":
         return copy.sort((a, b) => a.title.localeCompare(b.title));
       case "year":
-        return copy.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+        // Standalone Concert Songs carry no year of their own — sorted as
+        // if unset (0), same as an Album with no year, rather than crashing
+        // on a field that only Concert Albums actually have.
+        return copy.sort((a, b) => ((b.kind === "album" ? b.year : undefined) ?? 0) - ((a.kind === "album" ? a.year : undefined) ?? 0));
     }
   }, [concerts, sort]);
 
@@ -60,6 +64,8 @@ export default function AllConcerts() {
     const full = await albumsApi.get(id);
     if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
   };
+
+  const concertsQueue = concerts?.filter(isConcertSongItem) ?? [];
 
   return (
     <div className="px-6 py-6">
@@ -121,22 +127,42 @@ export default function AllConcerts() {
         <div className="text-fg-muted text-sm bg-elevated/50 rounded-lg p-4 max-w-md">No concerts yet.</div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-          {sortedConcerts.map((album) => (
-            <Card
-              key={album.id}
-              title={album.title}
-              subtitle={album.year ? `${album.year} · Concert` : "Concert"}
-              gradient={album.gradient}
-              to={`/concert/${album.id}`}
-              photoUrl={album.coverUrl}
-              large
-              entityType="album"
-              entityId={album.id}
-              artworkFrame={album.artworkFrame}
-              playing={isPlaying && currentTrack?.albumId === album.id}
-              onPlay={() => playAlbum(album.id)}
-            />
-          ))}
+          {sortedConcerts.map((item) =>
+            item.kind === "album" ? (
+              <Card
+                key={item.id}
+                title={item.title}
+                subtitle={item.year ? `${item.year} · Concert` : "Concert"}
+                gradient={item.gradient}
+                to={`/concert/${item.id}`}
+                photoUrl={item.coverUrl}
+                large
+                entityType="album"
+                entityId={item.id}
+                artworkFrame={item.artworkFrame}
+                playing={isPlaying && currentTrack?.albumId === item.id}
+                onPlay={() => playAlbum(item.id)}
+              />
+            ) : (
+              // A standalone Concert Song has no tracklist/detail page —
+              // tapping it plays immediately instead of navigating.
+              <Card
+                key={item.id}
+                title={item.title}
+                subtitle={item.artistName ? `${item.artistName} · Concert Song` : "Concert Song"}
+                gradient={item.gradient}
+                to=""
+                photoUrl={item.coverUrl}
+                large
+                entityType="track"
+                entityId={item.id}
+                artworkFrame={item.artworkFrame}
+                playing={isPlaying && currentTrack?.id === item.id}
+                onCardClick={() => playTrack(item, concertsQueue)}
+                onPlay={() => playTrack(item, concertsQueue)}
+              />
+            )
+          )}
         </div>
       )}
     </div>

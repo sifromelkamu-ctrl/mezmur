@@ -7,6 +7,7 @@ import {
   Pencil,
   Plus,
   Search as SearchIcon,
+  Ticket,
   Trash2,
   X,
 } from "lucide-react";
@@ -131,6 +132,11 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
   const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Only meaningful while there's no album (see Track.isSingle/isConcertSong
+  // in schema.prisma) — "Add to Concert Album" is just picking a concert
+  // from the album dropdown below, since a Concert Album is still a regular
+  // Album row.
+  const [category, setCategory] = useState<"none" | "single" | "concert_song">("none");
 
   useEffect(() => {
     adminLibraryApi.getTrack(trackId).then((t) => {
@@ -144,6 +150,7 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
       setGenre(t.genre ?? "");
       setLanguage(t.language ?? "");
       setLyrics(t.lyrics ?? "");
+      setCategory(t.isConcertSong ? "concert_song" : t.isSingle ? "single" : "none");
     });
   }, [trackId]);
 
@@ -167,6 +174,10 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
         genre: genre.trim(),
         language: language.trim(),
         lyrics: lyrics.trim() === "" ? null : lyrics.trim(),
+        // Only sent while standalone — an album assignment above already
+        // wins (adminLibrary.ts's PATCH forces these off any album
+        // regardless, so this only actually matters when albumId is empty).
+        ...(!albumId ? { isSingle: category === "single", isConcertSong: category === "concert_song" } : {}),
       };
       await adminLibraryApi.updateTrack(trackId, input);
       // Album Artwork Is Master Artwork: a track assigned to an album has no
@@ -237,13 +248,26 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
           variant="panel"
           className="px-3 py-2 text-base"
         >
-          <option value="">No album (single)</option>
+          <option value="">No album</option>
           {albumsForArtist.map((al) => (
             <option key={al.id} value={al.id}>
               {al.title}
+              {al.albumType === "live" ? " (Concert Album)" : ""}
             </option>
           ))}
         </SelectField>
+        {!albumId && (
+          <SelectField
+            value={category}
+            onChange={(e) => setCategory(e.target.value as typeof category)}
+            variant="panel"
+            className="px-3 py-2 text-base"
+          >
+            <option value="none">Not categorized</option>
+            <option value="single">Single</option>
+            <option value="concert_song">Concert Song (standalone)</option>
+          </SelectField>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <TextField
             type="number"
@@ -654,6 +678,7 @@ function EditAlbumModal({ album, onClose, onSaved }: EditAlbumModalProps) {
   const [genre, setGenre] = useState(album.genre ?? "");
   const [releaseDate, setReleaseDate] = useState(album.releaseDate ?? "");
   const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [error, setError] = useState("");
 
   const save = async () => {
@@ -674,6 +699,22 @@ function EditAlbumModal({ album, onClose, onSaved }: EditAlbumModalProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
       setSaving(false);
+    }
+  };
+
+  // Flips this row from a regular Album to a Concert Album (same Album row,
+  // just albumType — see routes/albums.ts) — it'll show up in Home's
+  // Concerts section and stop appearing here/in the artist's own
+  // discography from the next fetch on.
+  const convertToConcert = async () => {
+    setConverting(true);
+    setError("");
+    try {
+      await albumsApi.update(album.id, { albumType: "live" });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not convert to a Concert Album");
+      setConverting(false);
     }
   };
 
@@ -714,6 +755,14 @@ function EditAlbumModal({ album, onClose, onSaved }: EditAlbumModalProps) {
             className="px-3 py-2 text-base"
           />
         </div>
+        <button
+          onClick={convertToConcert}
+          disabled={converting}
+          className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg transition-colors self-start disabled:opacity-60"
+        >
+          <Ticket size={14} />
+          {converting ? "Converting…" : "Convert to Concert Album"}
+        </button>
         {error && <p className="text-xs text-accent-red">{error}</p>}
       </div>
       <div className="flex justify-end gap-2 mt-5">

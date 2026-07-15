@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
 import Card from "../components/Card";
+import ConcertSongTile from "../components/home/ConcertSongTile";
 import ForYouCard from "../components/home/ForYouCard";
 import HeroCarousel, { type HeroSlide } from "../components/home/HeroCarousel";
 import QuickActionGrid, { type QuickAction } from "../components/home/QuickActionGrid";
@@ -12,6 +13,7 @@ import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
+import { isConcertSongItem } from "../lib/concerts";
 import {
   albumsApi,
   artistsApi,
@@ -27,6 +29,7 @@ import {
   type ApiFeaturedBanner,
   type ApiPlaylist,
   type ApiPodcast,
+  type ApiConcertItem,
   type ApiSermon,
   type ApiTrack,
 } from "../lib/api";
@@ -53,7 +56,7 @@ export default function Home() {
   const [podcasts, setPodcasts] = useState<ApiPodcast[]>([]);
   const [ownedPlaylists, setOwnedPlaylists] = useState<ApiPlaylist[]>([]);
   const [featuredBanners, setFeaturedBanners] = useState<ApiFeaturedBanner[]>([]);
-  const [concerts, setConcerts] = useState<ApiAlbum[]>([]);
+  const [concerts, setConcerts] = useState<ApiConcertItem[]>([]);
   const [singles, setSingles] = useState<ApiTrack[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -289,26 +292,20 @@ export default function Home() {
       )}
 
       {recommended.length > 0 && (
-        <section className="mb-10">
-          <div className="flex items-center gap-3 mb-5">
-            <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-cyan to-brand" />
-            <h2 className="font-bold tracking-tight text-2xl">{t("forYou")}</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {recommended.slice(0, 2).map((item) => (
-              <ForYouCard
-                key={item.id}
-                title={item.title}
-                subtitle={item.subtitle}
-                gradient={item.gradient}
-                to={item.to}
-                onCardClick={item.to ? undefined : () => playTrack(item.track, recommended.map((r) => r.track))}
-                photoUrl={item.photoUrl}
-                onPlay={() => playTrack(item.track, recommended.map((r) => r.track))}
-              />
-            ))}
-          </div>
-        </section>
+        <SectionRow title={t("forYou")} accent="cyan" large edgeInset={20} scroll>
+          {recommended.map((item) => (
+            <ForYouCard
+              key={item.id}
+              title={item.title}
+              subtitle={item.subtitle}
+              gradient={item.gradient}
+              to={item.to}
+              onCardClick={item.to ? undefined : () => playTrack(item.track, recommended.map((r) => r.track))}
+              photoUrl={item.photoUrl}
+              onPlay={() => playTrack(item.track, recommended.map((r) => r.track))}
+            />
+          ))}
+        </SectionRow>
       )}
 
       {artists.length > 0 && (
@@ -439,24 +436,41 @@ export default function Home() {
         </div>
         {concerts.length > 0 ? (
           <div
-            className="flex overflow-x-auto overscroll-x-contain no-scrollbar gap-3 pb-1 scroll-smooth"
+            className="flex overflow-x-auto overscroll-x-contain no-scrollbar gap-3 pb-1 scroll-smooth items-start"
             style={{ marginInline: "-20px", paddingInline: "20px" }}
           >
-            {concerts.map((album) => (
-              <div key={album.id} className="shrink-0 w-40">
-                <ArtTile
-                  title={album.title}
-                  subtitle={album.artistName}
-                  gradient={album.gradient}
-                  to={`/concert/${album.id}`}
-                  photoUrl={album.coverUrl}
-                  entityType="album"
-                  entityId={album.id}
-                  artworkFrame={album.artworkFrame}
-                  playing={isPlaying && currentTrack?.albumId === album.id}
-                />
-              </div>
-            ))}
+            {concerts.map((item) =>
+              item.kind === "album" ? (
+                <div key={item.id} className="shrink-0 w-40">
+                  <ArtTile
+                    title={item.title}
+                    subtitle={item.artistName}
+                    gradient={item.gradient}
+                    to={`/concert/${item.id}`}
+                    photoUrl={item.coverUrl}
+                    entityType="album"
+                    entityId={item.id}
+                    artworkFrame={item.artworkFrame}
+                    playing={isPlaying && currentTrack?.albumId === item.id}
+                  />
+                </div>
+              ) : (
+                // A standalone Concert Song has no tracklist/detail page —
+                // tapping it plays immediately, same as a Single's tile.
+                <div key={item.id} className="shrink-0 w-28">
+                  <ConcertSongTile
+                    title={item.title}
+                    subtitle={item.artistName}
+                    gradient={item.gradient}
+                    photoUrl={item.coverUrl}
+                    entityId={item.id}
+                    artworkFrame={item.artworkFrame}
+                    playing={isPlaying && currentTrack?.id === item.id}
+                    onPlay={() => playTrack(item, concerts.filter(isConcertSongItem))}
+                  />
+                </div>
+              )
+            )}
           </div>
         ) : (
           <div className="text-fg-muted text-sm bg-elevated/50 rounded-lg p-4">No concerts available yet.</div>

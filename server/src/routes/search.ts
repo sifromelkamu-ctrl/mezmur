@@ -14,7 +14,14 @@ router.get("/", async (req, res) => {
 
   const [tracks, artists, albums, playlists] = await Promise.all([
     prisma.track.findMany({
-      where: { title: { contains: q, mode: "insensitive" } },
+      // Concerts are a completely separate content type, browsed only via
+      // Home's Concerts section (see routes/concerts.ts) — never surfaced
+      // here, same as every other track-based endpoint.
+      where: {
+        title: { contains: q, mode: "insensitive" },
+        NOT: { album: { albumType: "live" } },
+        isConcertSong: false,
+      },
       include: { artist: true, album: true },
       take: 25,
     }),

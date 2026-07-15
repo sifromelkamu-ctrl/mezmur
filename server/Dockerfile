@@ -5,7 +5,7 @@
 FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg ca-certificates curl git \
+      ffmpeg ca-certificates curl git unzip \
     && rm -rf /var/lib/apt/lists/* \
     # yt-dlp's plain "yt-dlp" release asset is a Python zipapp (its shebang
     # execs python3 at runtime) — this image never installed python3, so
@@ -16,6 +16,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # on PATH) for every existing spawn("yt-dlp", ...) call in this app.
     && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
+
+# YouTube increasingly wraps stream URLs in a JS-computed challenge (n-sig/
+# sig transforms) that yt-dlp can't solve with its own bundled interpreter —
+# it shells out to an external JS runtime instead (bun/deno/node/quickjs, in
+# that preference order). This image's Node doesn't qualify (yt-dlp reports
+# it "unavailable" for this specific purpose, confirmed both locally and in
+# this exact image), so without one of the others every real download
+# resolved to "Requested format is not available" once cookies were added —
+# fewer formats survive without a working sig-solver, and none matched
+# -f bestaudio/best. Deno is yt-dlp's top preference after bun; installing
+# it here is the fix, verified against a local Debian build of this exact
+# Dockerfile before deploying.
+RUN curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip \
+    && unzip -o /tmp/deno.zip -d /usr/local/bin \
+    && chmod a+rx /usr/local/bin/deno \
+    && rm /tmp/deno.zip
 
 # YouTube's bot-check increasingly requires a proof-of-origin token for the
 # default "web" player client — cookies alone don't satisfy it (confirmed

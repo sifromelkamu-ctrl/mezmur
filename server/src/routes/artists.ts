@@ -189,7 +189,11 @@ router.get("/:id", optionalAuth, async (req, res) => {
         orderBy: { year: "desc" },
       },
       tracks: {
-        where: { NOT: { album: { albumType: "live" } } },
+        // Excludes both a concert album's own tracks (album.albumType) and
+        // a standalone Concert Song (isConcertSong, no album at all) — see
+        // routes/concerts.ts, the only place either kind of concert content
+        // is meant to surface.
+        where: { NOT: { album: { albumType: "live" } }, isConcertSong: false },
         include: { album: true },
         orderBy: { playCount: "desc" },
         take: 10,
