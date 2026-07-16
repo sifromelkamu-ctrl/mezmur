@@ -215,10 +215,10 @@
   /* Deep near-black navy — the premium "expensive" dark base the redesign
      calls for, with cards a touch lighter so they lift off the background
      without a hard border. */
-  --color-base: #070a14;
-  --color-panel: #0a0e1c;
-  --color-elevated: #101726;
-  --color-elevated-hover: #161f33;
+  --color-base: #12172a;
+  --color-panel: #161c33;
+  --color-elevated: #1e2740;
+  --color-elevated-hover: #262f4d;
   --color-fg: #ffffff;
   --color-fg-muted: #9ba6b5;
   --color-fg-subtle: #6b7482;
@@ -250,10 +250,10 @@
      white for cards, and text uses warm near-black/brown/taupe tones rather
      than neutral grays, so the whole theme reads as one warm family instead
      of "dark mode's grays, inverted." */
-  --color-base: #faf8f3;
-  --color-panel: #f9f7f2;
-  --color-elevated: #ffffff;
-  --color-elevated-hover: #f1ece3;
+  --color-base: #e3dccb;
+  --color-panel: #dfd8c6;
+  --color-elevated: #ede6d8;
+  --color-elevated-hover: #d6cdb8;
   --color-fg: #1f1a17;
   --color-fg-muted: #6b5e4a;
   --color-fg-subtle: #9e9688;
