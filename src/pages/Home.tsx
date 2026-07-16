@@ -100,13 +100,18 @@ export default function Home() {
   );
   const continueListening = useMemo(() => {
     const ids = getRecentlyPlayedIds();
+    // Standalone Concert Songs are ApiTrack-shaped but live in `concerts`,
+    // not the general `tracks` list — playing one from the Concerts row
+    // still logs it via recordPlayed(), but a lookup against `tracks` alone
+    // would silently drop it here since it's never actually in that array.
+    const concertSongs = concerts.filter(isConcertSongItem);
     // Keeps recency order but only the most-recent track per artist — the
     // raw play log otherwise repeats the same artist's tiles whenever the
     // listener replayed a few of their songs back to back.
     const seenArtists = new Set<string>();
     const result: ApiTrack[] = [];
     for (const id of ids) {
-      const tr = tracks.find((t) => t.id === id);
+      const tr = tracks.find((t) => t.id === id) ?? concertSongs.find((t) => t.id === id);
       if (!tr) continue;
       if (tr.artistId) {
         if (seenArtists.has(tr.artistId)) continue;
@@ -115,7 +120,7 @@ export default function Home() {
       result.push(tr);
     }
     return result;
-  }, [tracks]);
+  }, [tracks, concerts]);
 
   const playAlbum = useCallback(
     async (id: string) => {
