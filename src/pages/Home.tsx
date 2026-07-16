@@ -334,7 +334,6 @@ export default function Home() {
               title={artist.name}
               subtitle=""
               showSubtitle={false}
-              titleClassName="text-base font-bold tracking-tight"
               gradient={artist.gradient}
               to={`/artist/${artist.id}`}
               portrait
@@ -443,7 +442,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-violet to-indigo-900" />
-            <h2 className="font-playfair font-bold tracking-tight text-2xl text-fg">{t("concerts")}</h2>
+            <h2 className="font-playfair text-xl font-bold tracking-tight text-fg">{t("concerts")}</h2>
           </div>
           <div className="flex items-center gap-4 shrink-0">
             {user?.role === "admin" && (

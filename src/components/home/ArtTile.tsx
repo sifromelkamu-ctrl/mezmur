@@ -83,8 +83,8 @@ export default function ArtTile({
         )}
       </div>
       <div className="mt-3 px-0.5">
-        <p className="text-sm font-semibold text-fg truncate">{title}</p>
-        {subtitle && <p className="text-xs text-fg-muted truncate mt-0.5">{subtitle}</p>}
+        <p className="text-[13px] font-semibold text-fg truncate">{title}</p>
+        {subtitle && <p className="text-[11px] text-fg-muted truncate mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );

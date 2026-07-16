@@ -50,9 +50,11 @@ export default function SectionRow({
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <span className={`w-1 h-6 rounded-full bg-gradient-to-b ${ACCENT_CLASSES[accent]}`} />
-          <h2 className={`font-playfair font-bold tracking-tight text-fg ${large ? "text-2xl" : "text-xl"}`}>
-            {title}
-          </h2>
+          {/* Same size regardless of `large` — matches Continue Listening's
+              bespoke header exactly, so every section title on Home reads
+              at one consistent scale instead of some being noticeably
+              bigger than others. */}
+          <h2 className="font-playfair text-xl font-bold tracking-tight text-fg">{title}</h2>
         </div>
         {onShowAll && (
           <button

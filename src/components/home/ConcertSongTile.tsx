@@ -67,7 +67,7 @@ export default function ConcertSongTile({
         )}
       </div>
       <div className="mt-2 px-0.5">
-        <p className="text-xs font-semibold text-fg truncate">{title}</p>
+        <p className="text-[13px] font-semibold text-fg truncate">{title}</p>
         {subtitle && <p className="text-[11px] text-fg-muted truncate mt-0.5">{subtitle}</p>}
       </div>
     </div>

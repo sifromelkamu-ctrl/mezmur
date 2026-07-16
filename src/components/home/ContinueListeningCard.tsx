@@ -62,7 +62,7 @@ export default function ContinueListeningCard({ track, playing, onPlay, onCardCl
         </button>
 
         <div className="absolute inset-x-0 bottom-0 p-3">
-          <p className="font-playfair italic text-sm font-bold text-white leading-tight truncate">{track.title}</p>
+          <p className="font-playfair italic text-[13px] font-bold text-white leading-tight truncate">{track.title}</p>
           <p className="text-[11px] text-white/70 truncate mt-0.5">{track.artistName}</p>
         </div>
       </div>

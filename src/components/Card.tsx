@@ -129,7 +129,7 @@ export default function Card({
               is a premium touch that keeps it legible over bright photos
               regardless of what's directly behind it. */}
           <p
-            className={`font-bold text-[12.5px] leading-tight tracking-tight text-white line-clamp-2 [text-shadow:0_1px_4px_rgba(0,0,0,0.65)] ${titleClassName}`}
+            className={`font-bold text-[13px] leading-tight tracking-tight text-white line-clamp-2 [text-shadow:0_1px_4px_rgba(0,0,0,0.65)] ${titleClassName}`}
           >
             {title}
           </p>
