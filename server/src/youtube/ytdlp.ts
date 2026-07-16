@@ -105,14 +105,6 @@ if (pluginArgs.length) {
   console.log(`[yt-dlp] ${PLUGIN_DIR} not found — running without the PO-token plugin (expected outside the Docker image).`);
 }
 
-// Proxy support (routing yt-dlp through a residential/ISP proxy) was tried
-// and removed — even with it configured, production still hit YouTube's
-// bot-check, so it wasn't the fix it looked like on paper. Cookies +
-// player-client + the PO-token plugin above are the current mitigation
-// stack; if bot-check resistance regresses again, reach for a *verified*
-// residential proxy (test it standalone against a real failing video
-// first) rather than re-adding this blind.
-
 // Shared prefix for every yt-dlp invocation in this file — one definition so
 // TAB_ARGS (or any future flag) only needs adding once instead of staying in
 // sync across every spawn() call site by hand.
@@ -407,12 +399,11 @@ export async function downloadYoutubeAudio(
       "--audio-quality",
       "160K",
       // yt-dlp's defaults (10 retries, no socket timeout) are tuned for an
-      // interactive user waiting on one download — against a free-tier
-      // proxy under load, that let a single stalled connection eat 7-8
-      // minutes before giving up (confirmed in production). A flaky
-      // attempt now fails in well under a minute instead of stalling the
-      // whole sequential queue behind it; a healthy connection is
-      // unaffected either way.
+      // interactive user waiting on one download — under load, that let a
+      // single stalled connection eat 7-8 minutes before giving up
+      // (confirmed in production). A flaky attempt now fails in well under
+      // a minute instead of stalling the whole sequential queue behind it;
+      // a healthy connection is unaffected either way.
       "--retries",
       "3",
       "--fragment-retries",

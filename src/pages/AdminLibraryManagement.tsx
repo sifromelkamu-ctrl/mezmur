@@ -1,6 +1,8 @@
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  Disc3,
   GitMerge,
   Loader2,
   Music2,
@@ -15,7 +17,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import CoverArt from "../components/CoverArt";
+import EditConcertModal from "../components/EditConcertModal";
 import { emitArtworkChanged } from "../lib/artworkEvents";
+import { isConcertAlbumItem } from "../lib/concerts";
 import SelectField from "../components/form/SelectField";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
@@ -25,12 +29,15 @@ import {
   adminLibraryApi,
   albumsApi,
   artistsApi,
+  concertsApi,
+  singlesApi,
   type AdminTrackEditInput,
   type ApiAdminTrack,
   type ApiAlbum,
   type ApiAlbumDetail,
   type ApiArtist,
   type ApiArtistDetail,
+  type ApiConcertItem,
   type ApiTrack,
 } from "../lib/api";
 
@@ -110,15 +117,18 @@ function ConfirmDialog({
   );
 }
 
+const NEW_ARTIST_OPTION = "__new_artist__";
+
 interface EditSongModalProps {
   trackId: string;
   artists: ApiArtist[];
   albums: ApiAlbum[];
   onClose: () => void;
   onSaved: () => void;
+  onArtistCreated: (artist: ApiArtist) => void;
 }
 
-function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongModalProps) {
+function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistCreated }: EditSongModalProps) {
   const [track, setTrack] = useState<ApiAdminTrack | null>(null);
   const [title, setTitle] = useState("");
   const [artistId, setArtistId] = useState("");
@@ -137,6 +147,11 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
   // from the album dropdown below, since a Concert Album is still a regular
   // Album row.
   const [category, setCategory] = useState<"none" | "single" | "concert_song">("none");
+  // Lets an admin properly name a Single that has no linked Artist yet (an
+  // unmatched YouTube import — see ApiTrack.artistName's doc comment) by
+  // creating a real Artist row inline, mirroring AdminUpload.tsx's pattern.
+  const [creatingArtist, setCreatingArtist] = useState(false);
+  const [newArtistName, setNewArtistName] = useState("");
 
   useEffect(() => {
     adminLibraryApi.getTrack(trackId).then((t) => {
@@ -156,9 +171,24 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
 
   const albumsForArtist = useMemo(() => albums.filter((a) => a.artistId === artistId), [albums, artistId]);
 
+  const confirmNewArtist = async () => {
+    const name = newArtistName.trim();
+    if (!name) return;
+    const artist = await adminApi.createArtist(name);
+    onArtistCreated(artist);
+    setArtistId(artist.id);
+    setAlbumId("");
+    setCreatingArtist(false);
+    setNewArtistName("");
+  };
+
   const save = async () => {
     if (!title.trim()) {
       setError("Title is required");
+      return;
+    }
+    if (!artistId) {
+      setError("Artist is required");
       return;
     }
     setSaving(true);
@@ -221,21 +251,61 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved }: EditSongM
           variant="panel"
           className="px-3 py-2 text-base"
         />
-        <SelectField
-          value={artistId}
-          onChange={(e) => {
-            setArtistId(e.target.value);
-            setAlbumId("");
-          }}
-          variant="panel"
-          className="px-3 py-2 text-base"
-        >
-          {artists.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </SelectField>
+        {creatingArtist ? (
+          <div className="flex items-center gap-2">
+            <TextField
+              autoFocus
+              type="text"
+              value={newArtistName}
+              onChange={(e) => setNewArtistName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmNewArtist()}
+              placeholder="New artist name"
+              variant="panel"
+              className="px-3 py-2 text-base flex-1"
+            />
+            <button
+              onClick={confirmNewArtist}
+              disabled={!newArtistName.trim()}
+              className="w-9 h-9 shrink-0 rounded-md bg-brand text-black flex items-center justify-center disabled:opacity-50"
+              aria-label="Create artist"
+            >
+              <Check size={16} />
+            </button>
+            <button
+              onClick={() => {
+                setCreatingArtist(false);
+                setNewArtistName("");
+              }}
+              className="w-9 h-9 shrink-0 rounded-md text-fg-muted hover:text-fg flex items-center justify-center"
+              aria-label="Cancel"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ) : (
+          <SelectField
+            value={artistId}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === NEW_ARTIST_OPTION) {
+                setCreatingArtist(true);
+                return;
+              }
+              setArtistId(value);
+              setAlbumId("");
+            }}
+            variant="panel"
+            className="px-3 py-2 text-base"
+          >
+            <option value="">Select artist...</option>
+            {artists.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+            <option value={NEW_ARTIST_OPTION}>+ New artist...</option>
+          </SelectField>
+        )}
         <SelectField
           value={albumId}
           onChange={(e) => {
@@ -784,7 +854,7 @@ function EditAlbumModal({ album, onClose, onSaved }: EditAlbumModalProps) {
   );
 }
 
-type Level = "artists" | "albums" | "tracks";
+type Level = "artists" | "albums" | "tracks" | "concerts" | "singles";
 
 export default function AdminLibraryManagement() {
   const navigate = useNavigate();
@@ -792,7 +862,11 @@ export default function AdminLibraryManagement() {
 
   const [artists, setArtists] = useState<ApiArtist[]>([]);
   const [albums, setAlbums] = useState<ApiAlbum[]>([]);
+  const [concerts, setConcerts] = useState<ApiConcertItem[]>([]);
+  const [singles, setSingles] = useState<ApiTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [concertsLoading, setConcertsLoading] = useState(false);
+  const [singlesLoading, setSinglesLoading] = useState(false);
 
   const [level, setLevel] = useState<Level>("artists");
   const [selectedArtist, setSelectedArtist] = useState<ApiArtistDetail | null>(null);
@@ -809,6 +883,11 @@ export default function AdminLibraryManagement() {
   // completed move can be undone by moving them straight back.
   const [moveRequest, setMoveRequest] = useState<{ trackIds: string[]; sourceAlbumId: string } | null>(null);
   const [editAlbum, setEditAlbum] = useState<ApiAlbum | null>(null);
+  // A Concert Album selected for editing — reuses the same full-featured
+  // EditConcertModal the Concerts page itself uses (rename/artwork/
+  // reorder/add-remove tracks/convert-to-regular-album/delete), rather
+  // than rebuilding any of that here.
+  const [editConcert, setEditConcert] = useState<ApiAlbumDetail | null>(null);
   const [mergeSourceAlbum, setMergeSourceAlbum] = useState<ApiAlbum | null>(null);
   const [confirmDeleteTrack, setConfirmDeleteTrack] = useState<ApiTrack | null>(null);
   const [confirmDeleteAlbum, setConfirmDeleteAlbum] = useState<ApiAlbum | null>(null);
@@ -863,6 +942,15 @@ export default function AdminLibraryManagement() {
     setSelectedTrackIds(new Set());
   };
 
+  // Opens a Concert Album in the same full-featured EditConcertModal the
+  // Concerts page itself uses — no separate tracks-drilldown view needed
+  // here, that modal already covers rename/artwork/reorder/add-remove
+  // tracks/convert-to-regular-album/delete.
+  const openEditConcert = async (albumId: string) => {
+    const detail = await albumsApi.get(albumId);
+    setEditConcert(detail);
+  };
+
   const refreshSelectedAlbum = async () => {
     if (!selectedAlbum) return;
     const detail = await albumsApi.get(selectedAlbum.id);
@@ -875,6 +963,24 @@ export default function AdminLibraryManagement() {
     setQuery("");
     setLastMove(null);
     loadCatalog();
+  };
+
+  const refreshConcerts = () => concertsApi.list().then(setConcerts);
+
+  const openConcerts = () => {
+    setLevel("concerts");
+    setQuery("");
+    setConcertsLoading(true);
+    refreshConcerts().finally(() => setConcertsLoading(false));
+  };
+
+  const refreshSingles = () => singlesApi.list().then(setSingles);
+
+  const openSingles = () => {
+    setLevel("singles");
+    setQuery("");
+    setSinglesLoading(true);
+    refreshSingles().finally(() => setSinglesLoading(false));
   };
 
   const backToAlbums = async () => {
@@ -932,6 +1038,8 @@ export default function AdminLibraryManagement() {
       setConfirmDeleteTrack(null);
       await refreshSelectedAlbum();
       loadCatalog();
+      if (level === "concerts") await refreshConcerts();
+      if (level === "singles") await refreshSingles();
     } finally {
       setBusy(false);
     }
@@ -949,6 +1057,7 @@ export default function AdminLibraryManagement() {
       }
       await refreshSelectedArtist();
       loadCatalog();
+      if (level === "concerts") await refreshConcerts();
     } finally {
       setBusy(false);
     }
@@ -981,6 +1090,16 @@ export default function AdminLibraryManagement() {
     return q ? list.filter((a) => a.title.toLowerCase().includes(q)) : list;
   }, [selectedArtist, query]);
 
+  const filteredConcerts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? concerts.filter((c) => c.title.toLowerCase().includes(q)) : concerts;
+  }, [concerts, query]);
+
+  const filteredSingles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? singles.filter((s) => s.title.toLowerCase().includes(q)) : singles;
+  }, [singles, query]);
+
   const filteredTracks = useMemo(() => {
     const list = selectedAlbum?.tracks ?? [];
     const q = query.trim().toLowerCase();
@@ -996,9 +1115,21 @@ export default function AdminLibraryManagement() {
   }
 
   const headerBack =
-    level === "tracks" ? backToAlbums : level === "albums" ? backToArtists : () => navigate("/settings");
+    level === "tracks"
+      ? backToAlbums
+      : level === "albums" || level === "concerts" || level === "singles"
+        ? backToArtists
+        : () => navigate("/settings");
   const headerTitle =
-    level === "tracks" ? selectedAlbum?.title ?? "" : level === "albums" ? selectedArtist?.name ?? "" : "Library Management";
+    level === "tracks"
+      ? selectedAlbum?.title ?? ""
+      : level === "albums"
+        ? selectedArtist?.name ?? ""
+        : level === "concerts"
+          ? "Concerts"
+          : level === "singles"
+            ? "Singles"
+            : "Library Management";
   const headerSubtitle =
     level === "tracks"
       ? selectedTrackIds.size > 0
@@ -1006,7 +1137,11 @@ export default function AdminLibraryManagement() {
         : "Songs"
       : level === "albums"
         ? "Albums"
-        : "Browse artists, albums, and songs";
+        : level === "concerts"
+          ? "Concert Albums & Songs"
+          : level === "singles"
+            ? "Standalone Singles"
+            : "Browse artists, albums, and songs";
   const allVisibleSelected =
     filteredTracks.length > 0 && filteredTracks.every((t) => selectedTrackIds.has(t.id));
 
@@ -1032,7 +1167,15 @@ export default function AdminLibraryManagement() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={level === "artists" ? "Search artists..." : level === "albums" ? "Search albums..." : "Search songs..."}
+          placeholder={
+            level === "artists"
+              ? "Search artists..."
+              : level === "albums"
+                ? "Search albums..."
+                : level === "concerts"
+                  ? "Search concerts..."
+                  : "Search songs..."
+          }
           pill
           className="pl-9 pr-4 py-2 text-base w-full"
         />
@@ -1046,6 +1189,32 @@ export default function AdminLibraryManagement() {
 
       {!loading && level === "artists" && (
         <div className="flex flex-col gap-1">
+          <button
+            onClick={openConcerts}
+            className="flex items-center gap-3 px-2 py-2.5 rounded-md hover:bg-hover transition-colors text-left mb-2"
+          >
+            <span className="w-9 h-9 shrink-0 rounded-full bg-brand/15 flex items-center justify-center text-brand">
+              <Ticket size={16} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Concerts</p>
+              <p className="text-xs text-fg-muted truncate">Manage Concert Albums &amp; standalone Concert Songs</p>
+            </div>
+            <ChevronRight size={16} className="text-fg-subtle shrink-0" />
+          </button>
+          <button
+            onClick={openSingles}
+            className="flex items-center gap-3 px-2 py-2.5 rounded-md hover:bg-hover transition-colors text-left mb-2"
+          >
+            <span className="w-9 h-9 shrink-0 rounded-full bg-brand/15 flex items-center justify-center text-brand">
+              <Disc3 size={16} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Singles</p>
+              <p className="text-xs text-fg-muted truncate">Manage standalone Singles &amp; their artist name</p>
+            </div>
+            <ChevronRight size={16} className="text-fg-subtle shrink-0" />
+          </button>
           {filteredArtists.map((artist) => (
             <div key={artist.id} className="flex items-center gap-1 rounded-md hover:bg-hover transition-colors group">
               <button
@@ -1271,6 +1440,147 @@ export default function AdminLibraryManagement() {
         </>
       )}
 
+      {concertsLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={22} className="animate-spin text-fg-muted" />
+        </div>
+      )}
+
+      {!concertsLoading && level === "concerts" && (
+        <div className="flex flex-col gap-1">
+          {filteredConcerts.map((item) =>
+            isConcertAlbumItem(item) ? (
+              <div key={item.id} className="flex items-center gap-1 rounded-md hover:bg-hover transition-colors group">
+                <button
+                  onClick={() => openEditConcert(item.id)}
+                  className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+                >
+                  <CoverArt
+                    gradient={item.gradient}
+                    size="sm"
+                    photoUrl={item.coverUrl}
+                    entityType="album"
+                    entityId={item.id}
+                    artworkFrame={item.artworkFrame}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{item.title}</p>
+                    <p className="text-xs text-fg-muted truncate">
+                      {item.artistName ? `${item.artistName} · ` : ""}
+                      {item.trackCount ?? 0} songs · Concert Album
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => openEditConcert(item.id)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Edit ${item.title}`}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteAlbum(item)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
+                  aria-label={`Delete ${item.title}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ) : (
+              <div key={item.id} className="flex items-center gap-1 rounded-md hover:bg-hover transition-colors group">
+                <button
+                  onClick={() => setEditSongId(item.id)}
+                  className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+                >
+                  <CoverArt
+                    gradient={item.gradient}
+                    size="sm"
+                    photoUrl={item.coverUrl}
+                    entityType="track"
+                    entityId={item.id}
+                    artworkFrame={item.artworkFrame}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{item.title}</p>
+                    <p className="text-xs text-fg-muted truncate">
+                      {item.artistName ? `${item.artistName} · ` : ""}Concert Song
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setEditSongId(item.id)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Edit ${item.title}`}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteTrack(item)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
+                  aria-label={`Delete ${item.title}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )
+          )}
+          {filteredConcerts.length === 0 && (
+            <p className="text-sm text-fg-muted px-2 py-8 text-center">No concerts found.</p>
+          )}
+        </div>
+      )}
+
+      {singlesLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={22} className="animate-spin text-fg-muted" />
+        </div>
+      )}
+
+      {!singlesLoading && level === "singles" && (
+        <div className="flex flex-col gap-1">
+          {filteredSingles.map((track) => (
+            <div key={track.id} className="flex items-center gap-1 rounded-md hover:bg-hover transition-colors group">
+              <button
+                onClick={() => setEditSongId(track.id)}
+                className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+              >
+                <CoverArt
+                  gradient={track.gradient}
+                  size="sm"
+                  photoUrl={track.coverUrl}
+                  entityType="track"
+                  entityId={track.id}
+                  artworkFrame={track.artworkFrame}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{track.title}</p>
+                  <p className="text-xs text-fg-muted truncate">
+                    {track.artistName ? track.artistName : "No artist"} · Single
+                  </p>
+                </div>
+              </button>
+              <button
+                onClick={() => setEditSongId(track.id)}
+                className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                aria-label={`Edit ${track.title}`}
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                onClick={() => setConfirmDeleteTrack(track)}
+                className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
+                aria-label={`Delete ${track.title}`}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          {filteredSingles.length === 0 && (
+            <p className="text-sm text-fg-muted px-2 py-8 text-center">No singles found.</p>
+          )}
+        </div>
+      )}
+
       {editSongId && (
         <EditSongModal
           trackId={editSongId}
@@ -1281,7 +1591,12 @@ export default function AdminLibraryManagement() {
             setEditSongId(null);
             await refreshSelectedAlbum();
             loadCatalog();
+            if (level === "concerts") await refreshConcerts();
+            if (level === "singles") await refreshSingles();
           }}
+          onArtistCreated={(artist) =>
+            setArtists((prev) => [...prev, artist].sort((a, b) => a.name.localeCompare(b.name)))
+          }
         />
       )}
 
@@ -1327,6 +1642,26 @@ export default function AdminLibraryManagement() {
           onMerged={async () => {
             setMergeSourceAlbum(null);
             await refreshSelectedArtist();
+            loadCatalog();
+          }}
+        />
+      )}
+
+      {editConcert && (
+        <EditConcertModal
+          concert={editConcert}
+          onClose={() => setEditConcert(null)}
+          onSaved={async (updated) => {
+            setEditConcert(updated);
+            await refreshConcerts();
+          }}
+          onDeleted={() => {
+            setEditConcert(null);
+            refreshConcerts();
+          }}
+          onConvertedToAlbum={() => {
+            setEditConcert(null);
+            refreshConcerts();
             loadCatalog();
           }}
         />
