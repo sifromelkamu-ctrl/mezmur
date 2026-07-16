@@ -125,10 +125,13 @@ interface EditSongModalProps {
   albums: ApiAlbum[];
   onClose: () => void;
   onSaved: () => void;
-  onArtistCreated: (artist: ApiArtist) => void;
+  // Called after either creating a brand-new artist or renaming an existing
+  // one — same shape either way (an ApiArtist to upsert into the parent's
+  // artists list by id), so one callback covers both.
+  onArtistUpserted: (artist: ApiArtist) => void;
 }
 
-function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistCreated }: EditSongModalProps) {
+function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistUpserted }: EditSongModalProps) {
   const [track, setTrack] = useState<ApiAdminTrack | null>(null);
   const [title, setTitle] = useState("");
   const [artistId, setArtistId] = useState("");
@@ -152,6 +155,11 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistCre
   // creating a real Artist row inline, mirroring AdminUpload.tsx's pattern.
   const [creatingArtist, setCreatingArtist] = useState(false);
   const [newArtistName, setNewArtistName] = useState("");
+  // Renames the artist currently assigned to this track in place, rather
+  // than reassigning to a different one — for correcting a name (typo,
+  // an unmatched import's raw text-derived name, etc).
+  const [renamingArtist, setRenamingArtist] = useState(false);
+  const [renameArtistValue, setRenameArtistValue] = useState("");
 
   useEffect(() => {
     adminLibraryApi.getTrack(trackId).then((t) => {
@@ -175,11 +183,24 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistCre
     const name = newArtistName.trim();
     if (!name) return;
     const artist = await adminApi.createArtist(name);
-    onArtistCreated(artist);
+    onArtistUpserted(artist);
     setArtistId(artist.id);
     setAlbumId("");
     setCreatingArtist(false);
     setNewArtistName("");
+  };
+
+  const startRenameArtist = () => {
+    setRenameArtistValue(artists.find((a) => a.id === artistId)?.name ?? "");
+    setRenamingArtist(true);
+  };
+
+  const confirmRenameArtist = async () => {
+    const name = renameArtistValue.trim();
+    if (!name || !artistId) return;
+    const artist = await artistsApi.update(artistId, { name });
+    onArtistUpserted(artist);
+    setRenamingArtist(false);
   };
 
   const save = async () => {
@@ -282,29 +303,68 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistCre
               <Trash2 size={14} />
             </button>
           </div>
+        ) : renamingArtist ? (
+          <div className="flex items-center gap-2">
+            <TextField
+              autoFocus
+              type="text"
+              value={renameArtistValue}
+              onChange={(e) => setRenameArtistValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmRenameArtist()}
+              placeholder="Artist name"
+              variant="panel"
+              className="px-3 py-2 text-base flex-1"
+            />
+            <button
+              onClick={confirmRenameArtist}
+              disabled={!renameArtistValue.trim()}
+              className="w-9 h-9 shrink-0 rounded-md bg-brand text-black flex items-center justify-center disabled:opacity-50"
+              aria-label="Save artist name"
+            >
+              <Check size={16} />
+            </button>
+            <button
+              onClick={() => setRenamingArtist(false)}
+              className="w-9 h-9 shrink-0 rounded-md text-fg-muted hover:text-fg flex items-center justify-center"
+              aria-label="Cancel"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ) : (
-          <SelectField
-            value={artistId}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === NEW_ARTIST_OPTION) {
-                setCreatingArtist(true);
-                return;
-              }
-              setArtistId(value);
-              setAlbumId("");
-            }}
-            variant="panel"
-            className="px-3 py-2 text-base"
-          >
-            <option value="">Select artist...</option>
-            {artists.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-            <option value={NEW_ARTIST_OPTION}>+ New artist...</option>
-          </SelectField>
+          <div className="flex items-center gap-2">
+            <SelectField
+              value={artistId}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === NEW_ARTIST_OPTION) {
+                  setCreatingArtist(true);
+                  return;
+                }
+                setArtistId(value);
+                setAlbumId("");
+              }}
+              variant="panel"
+              className="px-3 py-2 text-base flex-1"
+            >
+              <option value="">Select artist...</option>
+              {artists.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+              <option value={NEW_ARTIST_OPTION}>+ New artist...</option>
+            </SelectField>
+            {artistId && (
+              <button
+                onClick={startRenameArtist}
+                className="w-9 h-9 shrink-0 rounded-md text-fg-muted hover:text-fg hover:bg-elevated-hover flex items-center justify-center"
+                aria-label="Rename artist"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
         )}
         <SelectField
           value={albumId}
@@ -1594,9 +1654,15 @@ export default function AdminLibraryManagement() {
             if (level === "concerts") await refreshConcerts();
             if (level === "singles") await refreshSingles();
           }}
-          onArtistCreated={(artist) =>
-            setArtists((prev) => [...prev, artist].sort((a, b) => a.name.localeCompare(b.name)))
-          }
+          onArtistUpserted={(artist) => {
+            setArtists((prev) => {
+              const exists = prev.some((a) => a.id === artist.id);
+              const next = exists ? prev.map((a) => (a.id === artist.id ? artist : a)) : [...prev, artist];
+              return next.sort((a, b) => a.name.localeCompare(b.name));
+            });
+            if (level === "concerts") refreshConcerts();
+            if (level === "singles") refreshSingles();
+          }}
         />
       )}
 
