@@ -97,7 +97,7 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
                     <TrendingUp size={11} strokeWidth={2.5} />
                     {slide.tag}
                   </span>
-                  <h2 className="font-playfair text-3xl font-bold tracking-tight text-white leading-tight mb-1 drop-shadow-sm">
+                  <h2 className="font-abyssinica text-3xl font-bold tracking-tight text-white leading-tight mb-1 drop-shadow-sm">
                     {slide.title}
                   </h2>
                   <p className="text-sm font-semibold text-gold mb-4">{slide.subtitle}</p>
