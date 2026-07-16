@@ -196,7 +196,7 @@ export default function ConcertDetail() {
       )}
 
       <div
-        className="relative flex flex-col items-center text-center gap-4 px-6 pb-6"
+        className="relative flex flex-col items-center text-center gap-4 px-6 pt-10 sm:pt-12 md:pt-14 pb-6"
         style={{
           backgroundImage: `linear-gradient(180deg, ${concert.gradient[0]}66, ${concert.gradient[1]}22)`,
         }}
