@@ -10,7 +10,7 @@ import {
 } from "react";
 import { tracksApi, type ApiTrack } from "../lib/api";
 import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
-import { recordPlayed } from "../lib/recentlyPlayed";
+import { recordPlayed, recordPosition } from "../lib/recentlyPlayed";
 import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
 
 interface PlayerContextValue {
@@ -44,6 +44,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [repeat, setRepeat] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Kept in sync via the effect below so the timeupdate listener (attached
+  // once, not re-attached per track — see its own comment) always reads the
+  // live track without needing to be in that effect's dependency array.
+  const currentTrackRef = useRef<ApiTrack | null>(null);
+  const lastSavedPositionSecondRef = useRef<number>(-1);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+    lastSavedPositionSecondRef.current = -1;
+  }, [currentTrack]);
 
   if (!audioRef.current && typeof Audio !== "undefined") {
     audioRef.current = new Audio();
@@ -213,6 +223,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     else audio.pause();
   }, [isPlaying, hasRealAudio]);
 
+  // Saves an exact position on pause, real audio or simulated alike — the
+  // periodic saves elsewhere only land every 5s, so a deliberate pause
+  // could otherwise be off by up to that much when the listener comes back.
+  useEffect(() => {
+    if (!isPlaying && currentTrackRef.current) {
+      recordPosition(currentTrackRef.current.id, progress);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]);
+
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
@@ -221,7 +241,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const handleTimeUpdate = () => setProgress(audio.currentTime);
+    const handleTimeUpdate = () => {
+      setProgress(audio.currentTime);
+      // Throttled to once per ~5s of playback (not every timeupdate tick,
+      // which fires several times a second) — powers Home's Continue
+      // Listening progress bars without hammering localStorage.
+      const sec = Math.floor(audio.currentTime);
+      if (sec > 0 && sec % 5 === 0 && sec !== lastSavedPositionSecondRef.current) {
+        lastSavedPositionSecondRef.current = sec;
+        if (currentTrackRef.current) recordPosition(currentTrackRef.current.id, audio.currentTime);
+      }
+    };
     const handleEnded = () => {
       if (repeat) {
         audio.currentTime = 0;
@@ -239,21 +269,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [repeat, next]);
 
-  // Simulated playback fallback for tracks with no real audio file.
+  // Simulated playback fallback for tracks with no real audio file — most
+  // of the catalog, so this needs the same throttled position save the
+  // real-audio timeupdate handler gets above, or Continue Listening's
+  // progress bars would only ever work for the handful of admin-uploaded
+  // tracks with a real audioUrl.
   useEffect(() => {
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     if (isPlaying && currentTrack && !hasRealAudio) {
       intervalRef.current = window.setInterval(() => {
         setProgress((p) => {
           const duration = currentTrack.duration ?? 0;
-          if (p + 1 >= duration) {
+          const nextP = p + 1;
+          if (nextP >= duration) {
             if (repeat) {
+              recordPosition(currentTrack.id, 0);
               return 0;
             }
             window.setTimeout(() => next(), 0);
             return 0;
           }
-          return p + 1;
+          if (nextP % 5 === 0) recordPosition(currentTrack.id, nextP);
+          return nextP;
         });
       }, 1000);
     }

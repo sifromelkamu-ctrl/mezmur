@@ -1,9 +1,10 @@
-import { Bell, Flame, Heart, Music, Plus, Shuffle, Sparkles, User } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Bell, ChevronRight, Flame, Heart, Music, Plus, Shuffle, Sparkles, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ArtTile from "../components/home/ArtTile";
 import Card from "../components/Card";
 import ConcertSongTile from "../components/home/ConcertSongTile";
+import ContinueListeningCard from "../components/home/ContinueListeningCard";
 import ForYouCard from "../components/home/ForYouCard";
 import HeroCarousel, { type HeroSlide } from "../components/home/HeroCarousel";
 import QuickActionGrid, { type QuickAction } from "../components/home/QuickActionGrid";
@@ -194,10 +195,22 @@ export default function Home() {
   );
 
   const quickActions: QuickAction[] = [
-    { id: "trending", label: t("trending"), icon: Flame, glow: "red", onClick: () => navigate("/songs") },
-    { id: "new", label: t("newReleases"), icon: Sparkles, glow: "cyan", onClick: () => navigate("/library?filter=albums") },
-    { id: "favorites", label: t("favorites"), icon: Heart, glow: "brand", onClick: () => navigate("/library?filter=favorites") },
-    { id: "shuffle", label: t("shuffle"), icon: Shuffle, glow: "gold", onClick: shufflePlay },
+    { id: "trending", label: t("trending"), count: `${tracks.length} Songs`, icon: Flame, onClick: () => navigate("/songs") },
+    {
+      id: "new",
+      label: t("newReleases"),
+      count: `${newReleases.length} Albums`,
+      icon: Sparkles,
+      onClick: () => navigate("/library?filter=albums"),
+    },
+    {
+      id: "favorites",
+      label: t("favorites"),
+      count: `${favorites.length} Songs`,
+      icon: Heart,
+      onClick: () => navigate("/library?filter=favorites"),
+    },
+    { id: "shuffle", label: t("shuffle"), count: "All Songs", icon: Shuffle, onClick: shufflePlay },
   ];
 
   if (loading) {
@@ -230,48 +243,30 @@ export default function Home() {
 
   return (
     <div className="px-5 py-5">
-      {/* Compact header: greeting + devotional line, notification, profile */}
+      {/* Compact header: greeting + devotional line, notification, profile.
+          Home has its own fixed warm-gold identity here (like the Bible
+          section's pinned teal) — independent of the accent color picker,
+          which still drives the shared bottom nav and every other page. */}
       <div className="flex items-center justify-between gap-3 mb-6">
-        <div className="min-w-0">
-          {/* Same premium language as the buttons beside it — a soft
-              brand-colored ambient glow, here behind a gently faded
-              gradient fill instead of a bevel (which only reads on a
-              round tile, not a line of text). */}
-          <h1
-            className="text-xl font-black tracking-tight leading-tight bg-gradient-to-r from-fg to-fg/65 bg-clip-text text-transparent"
-            style={{ filter: "drop-shadow(0 2px 14px color-mix(in oklab, var(--color-brand) 45%, transparent))" }}
-          >
-            {t(greetingKey())}
-          </h1>
-          <p className="text-xs text-fg-muted italic mt-0.5">{devotionalLine}</p>
+        <div className="min-w-0 relative pl-3">
+          <span className="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-full bg-gold" />
+          <h1 className="font-playfair text-[1.7rem] font-bold leading-tight text-fg">{t(greetingKey())}</h1>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/80 mt-1">{devotionalLine}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
             aria-label={t("notifications")}
-            className="tile-glow w-10 h-10 rounded-full flex items-center justify-center ring-1 ring-white/15 text-fg-muted hover:text-fg active:scale-90 transition-all"
-            style={
-              {
-                "--tile-glow": "color-mix(in oklab, var(--color-fg-subtle) 35%, transparent)",
-                background:
-                  "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-fg) 10%, var(--color-elevated)) 0%, var(--color-elevated) 100%)",
-              } as CSSProperties
-            }
+            className="relative w-10 h-10 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted hover:text-fg active:scale-90 transition-all"
           >
             <Bell size={17} />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-gold ring-2 ring-base" />
           </button>
           <button
             onClick={() => (user ? navigate("/settings") : navigate("/auth"))}
             aria-label={user ? t("settings") : t("logIn")}
-            className="tile-glow w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ring-1 ring-white/30 active:scale-90 transition-all"
-            style={
-              {
-                "--tile-glow": "color-mix(in oklab, var(--color-brand) 65%, transparent)",
-                background:
-                  "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-brand) 40%, white) 0%, var(--color-brand) 55%, color-mix(in oklab, var(--color-accent-cyan) 70%, black) 100%)",
-              } as CSSProperties
-            }
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-black text-gold font-bold text-sm ring-2 ring-gold/50 active:scale-90 transition-all"
           >
-            {user ? initial : <User size={15} />}
+            {user ? initial : <User size={16} />}
           </button>
         </div>
       </div>
@@ -281,28 +276,37 @@ export default function Home() {
       <QuickActionGrid actions={quickActions} />
 
       {continueListening.length > 0 && (
-        <SectionRow title={t("continueListening")} accent="brand" large edgeInset={20} scroll>
-          {continueListening.map((track) => (
-            <ArtTile
-              key={track.id}
-              title={track.title}
-              subtitle={track.artistName}
-              gradient={track.gradient}
-              to={track.albumId ? `/album/${track.albumId}` : undefined}
-              // No album to browse into — clicking the tile just plays it,
-              // same as the play icon, instead of opening the artist page.
-              onCardClick={track.albumId ? undefined : () => playTrack(track, continueListening)}
-              photoUrl={track.coverUrl}
-              entityType="track"
-              entityId={track.id}
-              artworkFrame={track.artworkFrame}
-              readOnlyArtwork={Boolean(track.albumId)}
-              playing={isPlaying && currentTrack?.id === track.id}
-              showPlayIcon
-              onPlay={() => playTrack(track, continueListening)}
-            />
-          ))}
-        </SectionRow>
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <span className="w-1 h-6 rounded-full bg-gold" />
+              <h2 className="font-playfair text-xl font-bold tracking-tight text-fg">{t("continueListening")}</h2>
+            </div>
+            <button
+              onClick={() => navigate("/library")}
+              className="flex items-center gap-0.5 text-sm font-semibold text-gold hover:text-gold-glow transition-colors shrink-0"
+            >
+              See All
+              <ChevronRight size={15} />
+            </button>
+          </div>
+          <div
+            className="flex overflow-x-auto overscroll-x-contain no-scrollbar pb-1 scroll-smooth gap-3"
+            style={{ marginInline: "-20px", paddingInline: "20px" }}
+          >
+            {continueListening.map((track) => (
+              <ContinueListeningCard
+                key={track.id}
+                track={track}
+                playing={isPlaying && currentTrack?.id === track.id}
+                onPlay={() => playTrack(track, continueListening)}
+                // No album to browse into — clicking the card just plays it,
+                // same as the play button, instead of opening the artist page.
+                onCardClick={track.albumId ? undefined : () => playTrack(track, continueListening)}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {recommended.length > 0 && (
@@ -439,13 +443,13 @@ export default function Home() {
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <span className="w-1 h-6 rounded-full bg-gradient-to-b from-accent-violet to-indigo-900" />
-            <h2 className="font-bold tracking-tight text-2xl">{t("concerts")}</h2>
+            <h2 className="font-playfair font-bold tracking-tight text-2xl text-fg">{t("concerts")}</h2>
           </div>
           <div className="flex items-center gap-4 shrink-0">
             {user?.role === "admin" && (
               <button
                 onClick={() => navigate("/admin/youtube-catalog-import?destination=concert")}
-                className="flex items-center gap-1 text-sm font-semibold text-fg-muted hover:text-brand transition-colors"
+                className="flex items-center gap-1 text-sm font-semibold text-fg-muted hover:text-fg transition-colors"
                 aria-label="Import a concert album"
               >
                 <Plus size={15} />
@@ -454,9 +458,10 @@ export default function Home() {
             )}
             <button
               onClick={() => navigate("/concerts")}
-              className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors"
+              className="flex items-center gap-0.5 text-sm font-semibold text-gold hover:text-gold-glow transition-colors"
             >
-              Show all
+              See All
+              <ChevronRight size={15} />
             </button>
           </div>
         </div>

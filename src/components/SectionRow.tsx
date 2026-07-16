@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { Children } from "react";
 import type { ReactNode } from "react";
 
@@ -49,14 +50,17 @@ export default function SectionRow({
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <span className={`w-1 h-6 rounded-full bg-gradient-to-b ${ACCENT_CLASSES[accent]}`} />
-          <h2 className={`font-bold tracking-tight ${large ? "text-2xl" : "text-xl"}`}>{title}</h2>
+          <h2 className={`font-playfair font-bold tracking-tight text-fg ${large ? "text-2xl" : "text-xl"}`}>
+            {title}
+          </h2>
         </div>
         {onShowAll && (
           <button
             onClick={onShowAll}
-            className="text-sm font-semibold text-fg-muted hover:text-brand transition-colors shrink-0"
+            className="flex items-center gap-0.5 text-sm font-semibold text-gold hover:text-gold-glow transition-colors shrink-0"
           >
-            Show all
+            See All
+            <ChevronRight size={15} />
           </button>
         )}
       </div>

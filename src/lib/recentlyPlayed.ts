@@ -9,6 +9,11 @@ const MAX_ENTRIES = 50;
 interface RecentlyPlayedEntry {
   trackId: string;
   playedAt: number;
+  // Last known playback position, in seconds — powers the Continue
+  // Listening cards' progress bar/"3:24 / 5:48" label on Home. Absent (not
+  // 0) until at least one position save has happened, so a track that was
+  // only ever glanced at doesn't render a bar frozen at the very start.
+  positionSeconds?: number;
 }
 
 function load(): RecentlyPlayedEntry[] {
@@ -36,4 +41,23 @@ export function getRecentlyPlayedIds(limit = MAX_ENTRIES): string[] {
   return load()
     .slice(0, limit)
     .map((e) => e.trackId);
+}
+
+// Called periodically (throttled) and on pause by PlayerContext — a no-op
+// if the track has since fallen out of the recently-played log entirely
+// (e.g. bumped off the end by MAX_ENTRIES), rather than resurrecting it.
+export function recordPosition(trackId: string, seconds: number): void {
+  try {
+    const entries = load();
+    const idx = entries.findIndex((e) => e.trackId === trackId);
+    if (idx === -1) return;
+    entries[idx] = { ...entries[idx], positionSeconds: seconds };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // best-effort, see recordPlayed above
+  }
+}
+
+export function getPosition(trackId: string): number {
+  return load().find((e) => e.trackId === trackId)?.positionSeconds ?? 0;
 }

@@ -1,5 +1,6 @@
-import { Play } from "lucide-react";
+import { Check, Play, Plus, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { isBannerSaved, toggleBannerSaved } from "../../lib/savedBanners";
 
 export interface HeroSlide {
   id: string;
@@ -22,6 +23,13 @@ const AUTO_SLIDE_MS = 5500;
 export default function HeroCarousel({ slides }: HeroCarouselProps) {
   const [index, setIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  // Which slide ids are "saved" (the "+" button) — read once per slide set
+  // change rather than per-render; toggled optimistically on click.
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set(slides.filter((s) => isBannerSaved(s.id)).map((s) => s.id)));
+
+  useEffect(() => {
+    setSavedIds(new Set(slides.filter((s) => isBannerSaved(s.id)).map((s) => s.id)));
+  }, [slides]);
 
   useEffect(() => {
     if (slides.length < 2) return;
@@ -46,10 +54,20 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
     touchStartX.current = null;
   };
 
+  const handleToggleSave = (id: string) => {
+    const nowSaved = toggleBannerSaved(id);
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (nowSaved) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
   return (
     <div className="mb-8">
       <div
-        className="relative w-full h-[240px] rounded-[28px] overflow-hidden shadow-[0_24px_60px_-20px_rgba(124,92,255,0.45)]"
+        className="relative w-full h-[300px] rounded-[28px] overflow-hidden border border-gold/25 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -57,42 +75,58 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${index * 100}%)` }}
         >
-          {slides.map((slide) => (
-            <div key={slide.id} className="relative w-full h-full shrink-0 cursor-pointer" onClick={slide.onOpen}>
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: slide.photoUrl
-                    ? `url(${slide.photoUrl})`
-                    : `linear-gradient(150deg, ${slide.gradient[0]}, ${slide.gradient[1]})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/10 to-transparent" />
-
-              <div className="relative h-full flex flex-col justify-end p-6">
-                <span className="inline-flex w-fit items-center rounded-full bg-black/45 backdrop-blur-md ring-1 ring-white/25 text-white text-[10px] font-bold uppercase tracking-[0.16em] px-3 py-1 mb-3">
-                  {slide.tag}
-                </span>
-                <h2 className="text-2xl font-black tracking-tight text-white leading-tight mb-1 drop-shadow-sm">
-                  {slide.title}
-                </h2>
-                <p className="text-sm font-semibold text-accent-cyan mb-4">{slide.subtitle}</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    slide.onPlay();
+          {slides.map((slide) => {
+            const saved = savedIds.has(slide.id);
+            return (
+              <div key={slide.id} className="relative w-full h-full shrink-0 cursor-pointer" onClick={slide.onOpen}>
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: slide.photoUrl
+                      ? `url(${slide.photoUrl})`
+                      : `linear-gradient(150deg, ${slide.gradient[0]}, ${slide.gradient[1]})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
                   }}
-                  className="w-fit flex items-center gap-2 rounded-full bg-gradient-to-r from-gold to-gold-dark text-black text-sm font-bold pl-4 pr-5 py-2.5 shadow-[0_8px_24px_-6px_rgba(243,201,105,0.7)] active:scale-95 transition-transform"
-                >
-                  <Play size={15} fill="black" />
-                  {slide.buttonText}
-                </button>
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/10 to-transparent" />
+
+                <div className="relative h-full flex flex-col justify-end p-6">
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-black/30 backdrop-blur-md ring-1 ring-gold/50 text-gold text-[10px] font-bold uppercase tracking-[0.16em] px-3 py-1 mb-3">
+                    <TrendingUp size={11} strokeWidth={2.5} />
+                    {slide.tag}
+                  </span>
+                  <h2 className="font-playfair text-3xl font-bold tracking-tight text-white leading-tight mb-1 drop-shadow-sm">
+                    {slide.title}
+                  </h2>
+                  <p className="text-sm font-semibold text-gold mb-4">{slide.subtitle}</p>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        slide.onPlay();
+                      }}
+                      className="w-fit flex items-center gap-2 rounded-full bg-gradient-to-r from-gold to-gold-dark text-black text-sm font-bold pl-4 pr-5 py-2.5 shadow-[0_8px_24px_-6px_rgba(243,201,105,0.7)] active:scale-95 transition-transform"
+                    >
+                      <Play size={15} fill="black" />
+                      {slide.buttonText}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSave(slide.id);
+                      }}
+                      aria-label={saved ? "Remove from saved" : "Save"}
+                      className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-md ring-1 ring-white/25 text-white active:scale-90 transition-all"
+                    >
+                      {saved ? <Check size={16} className="text-gold" /> : <Plus size={16} />}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -104,7 +138,7 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
               onClick={() => setIndex(i)}
               aria-label={`Go to slide ${i + 1}`}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === index ? "w-5 bg-brand shadow-[0_0_8px_rgba(124,92,255,0.8)]" : "w-1.5 bg-white/20"
+                i === index ? "w-5 bg-gold shadow-[0_0_8px_rgba(243,201,105,0.8)]" : "w-1.5 bg-fg-subtle/30"
               }`}
             />
           ))}
