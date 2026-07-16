@@ -5,12 +5,12 @@ import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { useSmartFrame } from "../hooks/useSmartFrame";
 import { adminApi, type ArtworkEntityType, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
-import { computeRenderRect, hasLetterbox } from "../utils/artworkTransform";
+import { coverZoom, computeRenderRect, hasLetterbox } from "../utils/artworkTransform";
 import ArtworkEditor from "./ArtworkEditor";
 
 interface CoverArtProps {
   gradient: [string, string];
-  size?: "sm" | "md" | "lg" | "xl" | "artist" | "card" | "albumHero";
+  size?: "sm" | "md" | "lg" | "xl" | "artist" | "card" | "albumHero" | "albumHeroLg";
   rounded?: boolean;
   photoUrl?: string;
   className?: string;
@@ -34,6 +34,14 @@ interface CoverArtProps {
   // the (album-sourced) artworkFrame normally. Distinct from hideEditButton,
   // which suppresses the button for a page that has its own edit trigger.
   readOnlyArtwork?: boolean;
+  // Skips the smart-crop heuristic (see smartCrop.ts) in favor of a plain
+  // centered crop — for content whose source images routinely defeat that
+  // heuristic. Concert Album art is typically an unedited YouTube thumbnail
+  // with a bold text banner/title card across the top; the energy-map
+  // analysis reads that high-contrast text as the focal point and drags the
+  // crop up, cutting off the actual photo below it. A saved artworkFrame
+  // (a deliberate manual edit) still always wins over this.
+  preferCenter?: boolean;
 }
 
 const sizeClasses: Record<string, string> = {
@@ -50,6 +58,9 @@ const sizeClasses: Record<string, string> = {
   // Spotify-style oversized album hero art (AlbumDetail only) — roughly
   // 55-80% bigger than `xl`'s 144px, scaling up further on wider viewports.
   albumHero: "w-56 h-56 sm:w-64 sm:h-64 md:w-72 md:h-72",
+  // Concert Album hero art (ConcertDetail only) — exactly 20% bigger than
+  // albumHero at every breakpoint.
+  albumHeroLg: "w-[269px] h-[269px] sm:w-[307px] sm:h-[307px] md:w-[346px] md:h-[346px]",
 };
 
 const roundedXlClass = "w-20 h-20";
@@ -65,12 +76,13 @@ const badgeSizes: Record<string, { badge: string; icon: number }> = {
   artist: { badge: "w-12 h-12", icon: 26 },
   card: { badge: "w-16 h-16", icon: 32 },
   albumHero: { badge: "w-24 h-24", icon: 44 },
+  albumHeroLg: { badge: "w-28 h-28", icon: 52 },
 };
 
 // Editing the tiny 48px row thumbnails (track rows, queue, mini player)
 // would be too cramped to be usable — admins edit those covers from a
 // larger showcase view of the same artwork (album/track detail, etc.).
-const EDITABLE_SIZES = new Set(["md", "lg", "xl", "artist", "card", "albumHero"]);
+const EDITABLE_SIZES = new Set(["md", "lg", "xl", "artist", "card", "albumHero", "albumHeroLg"]);
 
 export default function CoverArt({
   gradient,
@@ -84,6 +96,7 @@ export default function CoverArt({
   onFrameSaved,
   hideEditButton = false,
   readOnlyArtwork = false,
+  preferCenter = false,
 }: CoverArtProps) {
   const { user } = useAuth();
   const [loaded, setLoaded] = useState(false);
@@ -104,8 +117,14 @@ export default function CoverArt({
   // "Singles only" gate for the freeform crop floor below.
   const allowFreeformCrop = entityType === "track" && !readOnlyArtwork;
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
-  const smartFrame = useSmartFrame(canFrame ? photoUrl : undefined);
-  const activeFrame = savedOverride ?? artworkFrame ?? smartFrame;
+  // preferCenter skips the smart-crop analysis (and its canvas work)
+  // entirely in favor of a plain centered frame, still correctly zoomed to
+  // fully cover the square once the image's natural size is known.
+  const smartFrame = useSmartFrame(canFrame && !preferCenter ? photoUrl : undefined);
+  const centerFrame: ArtworkFrame | null = preferCenter
+    ? { x: 0.5, y: 0.5, zoom: natural ? coverZoom(natural.w, natural.h) : 1, rotation: 0, flipH: false, flipV: false }
+    : null;
+  const activeFrame = savedOverride ?? artworkFrame ?? (preferCenter ? centerFrame : smartFrame);
   const frameReady = canFrame && Boolean(natural) && Boolean(activeFrame);
 
   const canEdit = Boolean(
@@ -132,7 +151,8 @@ export default function CoverArt({
 
   const resolvedSizeClass = rounded && size === "xl" ? roundedXlClass : sizeClasses[size];
   const badge = badgeSizes[size];
-  const roundedClass = rounded ? "rounded-full" : size === "card" || size === "albumHero" ? "rounded-2xl" : "rounded-md";
+  const roundedClass =
+    rounded ? "rounded-full" : size === "card" || size === "albumHero" || size === "albumHeroLg" ? "rounded-2xl" : "rounded-md";
 
   // Until the smart/saved frame and natural dimensions are both known, fall
   // back to plain object-cover so something reasonable shows immediately —

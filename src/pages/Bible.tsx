@@ -107,7 +107,6 @@ export default function Bible() {
   const [searchScope, setSearchScope] = useState<"chapter" | "book">("book");
   const [jumpToVerse, setJumpToVerse] = useState<number | null>(null);
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
-  const booksSectionRef = useRef<HTMLDivElement>(null);
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
@@ -707,12 +706,12 @@ export default function Bible() {
   const TESTAMENT_THEME = {
     old: {
       icon: ScrollText,
-      accent: "text-gold",
-      dot: "bg-gold",
-      ring: "ring-gold/40",
-      glow: "shadow-[0_0_18px_rgba(242,183,5,0.25)]",
-      iconBg: "bg-gradient-to-br from-gold/25 to-transparent",
-      badgeBg: "bg-gold/15 text-gold",
+      accent: "text-accent-violet",
+      dot: "bg-accent-violet",
+      ring: "ring-accent-violet/40",
+      glow: "shadow-[0_0_18px_rgba(139,92,246,0.25)]",
+      iconBg: "bg-gradient-to-br from-accent-violet/25 to-transparent",
+      badgeBg: "bg-accent-violet/15 text-accent-violet",
       label: "ብሉይ ኪዳን",
     },
     new: {
@@ -837,16 +836,10 @@ export default function Bible() {
   });
 
   const QUICK_ACCESS = [
-    {
-      id: "bible",
-      label: "ቅዱስ መጽሐፍ",
-      icon: BookOpen,
-      onClick: () => booksSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    },
-    { id: "bookmarks", label: "የመጽሐፍ ምልክት", icon: Bookmark, onClick: () => setActiveModal("bookmarks") },
-    { id: "notes", label: "ማስታወሻዎች", icon: StickyNote, onClick: () => setActiveModal("notes") },
-    { id: "history", label: "ታሪክ", icon: Clock, onClick: () => setActiveModal("history") },
-    { id: "favorites", label: "የሚወደዱ", icon: Heart, onClick: () => setActiveModal("favorites") },
+    { id: "bookmarks", label: "Bookmarks", icon: Bookmark, onClick: () => setActiveModal("bookmarks") },
+    { id: "notes", label: "Notes", icon: StickyNote, onClick: () => setActiveModal("notes") },
+    { id: "history", label: "History", icon: Clock, onClick: () => setActiveModal("history") },
+    { id: "favorites", label: "Favorites", icon: Heart, onClick: () => setActiveModal("favorites") },
   ] as const;
 
   const BookList = ({
@@ -898,41 +891,42 @@ export default function Bible() {
     return (
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-        className={`text-left bg-elevated hover:bg-elevated-hover rounded-2xl p-4 transition-all ${
-          isOpen ? `ring-1 ${theme.ring}` : ""
-        }`}
+        className={`text-left p-3.5 transition-colors hover:bg-white/5 ${id === "new" ? "border-l border-border" : ""}`}
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme.iconBg} ring-1 ${theme.ring} ${theme.glow}`}>
-            <Icon size={17} className={theme.accent} />
+        <div className="flex items-center justify-between mb-2">
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${theme.iconBg} ring-1 ${theme.ring} ${theme.glow}`}>
+            <Icon size={15} className={theme.accent} />
           </div>
           <ChevronDown
-            size={16}
+            size={14}
             className={`shrink-0 transition-transform ${isOpen ? `rotate-180 ${theme.accent}` : "text-fg-subtle"}`}
           />
         </div>
-        <p className="font-abyssinica text-base font-bold text-fg truncate">
-          {id === "old" ? "የብሉይ ኪዳን" : "የአዲስ ኪዳን"}
+        <p className="font-abyssinica text-sm font-bold text-fg truncate">
+          {id === "old" ? "ብሉይ ኪዳን" : "አዲስ ኪዳን"}
         </p>
-        <p className="text-[11px] text-fg-muted mb-2.5">{books.length} መጻሕፍት</p>
-        <div className="h-1.5 rounded-full bg-border overflow-hidden mb-1.5">
+        <p className="text-[10px] text-fg-muted mb-2">{books.length} መጻሕፍት</p>
+        <div className="h-1.5 rounded-full bg-black/15 overflow-hidden mb-1">
           <div className={`h-full rounded-full ${theme.dot}`} style={{ width: `${percent}%` }} />
         </div>
-        <p className="text-[10px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
+        <p className="text-[9px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
       </button>
     );
   };
 
   return (
-    <div className="bible-scope bg-base min-h-full px-6 py-6 max-w-2xl">
+    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl">
       {/* Hero — a featured verse (Psalm 119:105, fetched from the real book
           data) instead of a plain title card, with two keywords picked out
           in gold and a CTA straight into reading. Warm amber/candlelight
           tones stand in for the reference photo (an open Bible + candle) —
           no stock photography is sourced into the app, so the same mood is
-          built from gradients + a soft glow instead. */}
-      <div
-        className="relative rounded-3xl overflow-hidden mb-6 border border-gold/20 shadow-2xl"
+          built from gradients + a soft glow instead. Kept deliberately
+          compact (small padding, single-line clamp) — this whole page is
+          meant to read as one non-scrolling screen. */}
+      <button
+        onClick={startReading}
+        className="relative w-full text-left rounded-2xl overflow-hidden mb-3 border border-gold/20 shadow-2xl active:scale-[0.99] transition-transform"
         style={{
           backgroundImage: isLight
             ? "linear-gradient(135deg, #fff3dd 0%, #fbe4b8 45%, #edc888 100%)"
@@ -940,15 +934,15 @@ export default function Bible() {
         }}
       >
         <div
-          className="absolute -right-12 top-1/2 -translate-y-1/2 w-72 h-72 rounded-full blur-3xl pointer-events-none"
+          className="absolute -right-12 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none"
           style={{
             background: isLight ? "rgba(243,201,105,0.5)" : "rgba(243,201,105,0.22)",
             animation: "orb-float 6s ease-in-out infinite",
           }}
         />
         <Cross
-          size={170}
-          className={`absolute -right-6 -bottom-10 rotate-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
+          size={90}
+          className={`absolute -right-4 -bottom-6 rotate-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
         />
         <div
           className="absolute inset-0 opacity-[0.04] pointer-events-none"
@@ -958,36 +952,31 @@ export default function Bible() {
           }}
         />
 
-        <div className="relative px-6 py-8">
-          {heroVerse ? (
-            <>
-              <p className="font-agbalumo text-2xl leading-snug text-fg mb-3">
-                {renderHighlightedVerse(heroVerse.text, ["መብራት", "ብርሃን"])}
-              </p>
-              <p className="text-xs font-semibold text-gold/80 mb-5">{heroVerse.ref}</p>
-            </>
-          ) : (
-            <div className="h-24" />
-          )}
-          <button
-            onClick={startReading}
-            className="flex items-center gap-2 bg-gold text-black font-bold text-sm px-5 py-3 rounded-full hover:scale-105 transition-transform shadow-lg"
-          >
-            <BookOpen size={16} />
-            ቅዱስ መጽሐፍ ይንብቡ
-            <ChevronRight size={15} />
-          </button>
+        <div className="relative px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            {heroVerse ? (
+              <>
+                <p className="font-agbalumo text-sm leading-snug text-fg mb-1 line-clamp-2">
+                  {renderHighlightedVerse(heroVerse.text, ["መብራት", "ብርሃን"])}
+                </p>
+                <p className="text-[10px] font-semibold text-gold/80">{heroVerse.ref}</p>
+              </>
+            ) : (
+              <div className="h-8" />
+            )}
+          </div>
+          <ChevronRight size={16} className={isLight ? "text-black/40 shrink-0" : "text-gold/60 shrink-0"} />
         </div>
-      </div>
+      </button>
 
-      {/* Quick Access */}
-      <div className="mb-7">
-        <h2 className="text-sm font-bold text-fg-muted mb-3">ቁልፍ መደረሻ</h2>
-        <div className="grid grid-cols-5 gap-2">
+      {/* Quick Access — no heading, matches the rest of the page's push to
+          stay compact and non-scrolling. */}
+      <div className="mb-3">
+        <div className="grid grid-cols-4 gap-2">
           {QUICK_ACCESS.map((item) => (
-            <button key={item.id} onClick={item.onClick} className="flex flex-col items-center gap-2 min-w-0">
+            <button key={item.id} onClick={item.onClick} className="flex flex-col items-center gap-1 min-w-0">
               <span
-                className="tile-glow w-12 h-12 rounded-full flex items-center justify-center ring-1 ring-white/25"
+                className="tile-glow w-10 h-10 rounded-full flex items-center justify-center ring-1 ring-white/25"
                 style={
                   {
                     "--tile-glow": "color-mix(in oklab, var(--color-gold) 60%, transparent)",
@@ -996,9 +985,9 @@ export default function Bible() {
                   } as CSSProperties
                 }
               >
-                <item.icon size={17} className="text-[#3a2410]" />
+                <item.icon size={15} className="text-[#3a2410]" />
               </span>
-              <span className="text-[9.5px] font-semibold text-fg-muted text-center leading-tight w-full line-clamp-2">
+              <span className="text-[10px] font-semibold text-fg-muted text-center leading-tight w-full truncate">
                 {item.label}
               </span>
             </button>
@@ -1015,7 +1004,7 @@ export default function Bible() {
           theme far more than the previous flat indigo did. */}
       {dailyVerse && (
         <div
-          className="relative overflow-hidden rounded-xl p-6 mb-7"
+          className="relative overflow-hidden rounded-xl p-4 mb-3"
           style={{
             backgroundImage: isLight
               ? "radial-gradient(130% 110% at 88% -15%, #fff6df 0%, #fbe4b0 20%, #f0c988 42%, #dba668 62%, #c98f5c 100%)"
@@ -1024,20 +1013,20 @@ export default function Bible() {
           }}
         >
           <div
-            className="absolute -right-6 -top-6"
+            className="absolute -right-4 -top-4"
             style={{ animation: "verse-glow-pulse 4s ease-in-out infinite", color: isLight ? "#6b3a12" : undefined }}
           >
-            <Sunrise size={120} className={isLight ? "" : "text-gold"} />
+            <Sunrise size={70} className={isLight ? "" : "text-gold"} />
           </div>
           <button
             onClick={handleShareDailyVerse}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center bg-black/15 hover:bg-black/25 transition-colors"
+            className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center bg-black/15 hover:bg-black/25 transition-colors"
             aria-label="Share verse"
           >
             {dailyVerseShared ? (
-              <Check size={15} style={{ color: isLight ? "#6b3a12" : undefined }} className={isLight ? "" : "text-gold"} />
+              <Check size={13} style={{ color: isLight ? "#6b3a12" : undefined }} className={isLight ? "" : "text-gold"} />
             ) : (
-              <Share2 size={15} className="text-fg/70" />
+              <Share2 size={13} className="text-fg/70" />
             )}
           </button>
           {/* This card's own accent — the shared gold token is tuned for a
@@ -1046,40 +1035,46 @@ export default function Bible() {
               gets its own deep amber/brown here instead (dark mode's
               background stays dark enough that the shared gold is still
               plenty legible, unchanged). */}
-          <div className="relative flex items-center gap-2 mb-3" style={{ color: isLight ? "#6b3a12" : undefined }}>
-            <Sunrise size={16} className={isLight ? "" : "text-gold"} />
+          <div className="relative flex items-center gap-1.5 mb-1.5" style={{ color: isLight ? "#6b3a12" : undefined }}>
+            <Sunrise size={13} className={isLight ? "" : "text-gold"} />
             <h3
-              className={`text-sm font-black uppercase tracking-widest ${isLight ? "" : WORD_ART_TITLE}`}
+              className={`text-xs font-black uppercase tracking-widest ${isLight ? "" : WORD_ART_TITLE}`}
               style={isLight ? { color: "#5c3410" } : undefined}
             >
               የዕለቱ መና
             </h3>
           </div>
-          <p className="relative font-menbere italic text-base text-fg/90 leading-relaxed">“{dailyVerse.text}”</p>
-          <p
-            className={`relative text-xs font-semibold mt-3 text-right ${isLight ? "" : "text-gold/80"}`}
-            style={isLight ? { color: "#6b3a12" } : undefined}
-          >
-            {dailyVerse.ref}
+          <p className="relative font-menbere italic text-sm text-fg/90 leading-relaxed line-clamp-3">
+            “{dailyVerse.text}”
           </p>
-          <button
-            onClick={() => openVerse(dailyVerse.slug, dailyVerse.chapter, dailyVerse.verseIndex)}
-            className={`relative flex items-center gap-1 text-xs font-bold transition-colors mt-4 ${
-              isLight ? "hover:opacity-75" : "text-gold hover:text-gold-glow"
-            }`}
-            style={isLight ? { color: "#6b3a12" } : undefined}
-          >
-            መሱ ቃል ይንብቡ
-            <ChevronRight size={14} />
-          </button>
+          <div className="relative flex items-center justify-between mt-2">
+            <button
+              onClick={() => openVerse(dailyVerse.slug, dailyVerse.chapter, dailyVerse.verseIndex)}
+              className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                isLight ? "hover:opacity-75" : "text-gold hover:text-gold-glow"
+              }`}
+              style={isLight ? { color: "#6b3a12" } : undefined}
+            >
+              ሙሉ ቃል ያንብቡ
+              <ChevronRight size={12} />
+            </button>
+            <p
+              className={`text-[10px] font-semibold ${isLight ? "" : "text-gold/80"}`}
+              style={isLight ? { color: "#6b3a12" } : undefined}
+            >
+              {dailyVerse.ref}
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Books — progress cards replace the old plain expand rows; still
-          toggle the same book list open/closed beneath them. */}
-      <div ref={booksSectionRef} className="mb-7">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-fg-muted">መጻሕፍት</h2>
+      {/* Books — a single unified card holding both testaments side by side
+          (redesigned from two separate square cards) so the gold/green
+          accents read as one cohesive piece instead of two disconnected
+          tiles; still toggles the same book list open/closed beneath it. */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-bold text-fg-muted">መጻሕፍት</h2>
           <button
             onClick={() => setExpanded({ old: true, new: true })}
             className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
@@ -1088,9 +1083,18 @@ export default function Bible() {
             <ChevronRight size={12} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TestamentProgressCard id="old" books={oldTestament} />
-          <TestamentProgressCard id="new" books={newTestament} />
+        <div
+          className="rounded-2xl overflow-hidden border border-border shadow-lg"
+          style={{
+            backgroundImage: isLight
+              ? "linear-gradient(90deg, rgba(139,92,246,0.10) 0%, rgba(139,92,246,0.03) 48%, rgba(20,184,102,0.03) 52%, rgba(20,184,102,0.10) 100%)"
+              : "linear-gradient(90deg, rgba(139,92,246,0.14) 0%, rgba(10,10,14,0.65) 48%, rgba(10,10,14,0.65) 52%, rgba(20,184,102,0.14) 100%)",
+          }}
+        >
+          <div className="grid grid-cols-2">
+            <TestamentProgressCard id="old" books={oldTestament} />
+            <TestamentProgressCard id="new" books={newTestament} />
+          </div>
         </div>
         {expanded.old && (
           <div className="mt-3">
