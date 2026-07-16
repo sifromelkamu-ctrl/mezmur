@@ -9,6 +9,11 @@ const MAX_ENTRIES = 50;
 interface RecentlyPlayedEntry {
   trackId: string;
   playedAt: number;
+  // How many times playTrack() has picked this track, ever — kept across
+  // replays (unlike playedAt, which always resets to now) so a personal
+  // favorite the listener returns to often can outrank something merely
+  // played once a minute ago. See getContinueListeningIds below.
+  playCount: number;
   // Last known playback position, in seconds — powers the Continue
   // Listening cards' progress bar/"3:24 / 5:48" label on Home. Absent (not
   // 0) until at least one position save has happened, so a track that was
@@ -27,9 +32,11 @@ function load(): RecentlyPlayedEntry[] {
 
 export function recordPlayed(trackId: string): void {
   try {
-    const entries = load().filter((e) => e.trackId !== trackId);
-    entries.unshift({ trackId, playedAt: Date.now() });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+    const entries = load();
+    const prior = entries.find((e) => e.trackId === trackId);
+    const rest = entries.filter((e) => e.trackId !== trackId);
+    rest.unshift({ trackId, playedAt: Date.now(), playCount: (prior?.playCount ?? 0) + 1 });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest.slice(0, MAX_ENTRIES)));
   } catch {
     // localStorage unavailable (private browsing, quota, etc.) — recently-
     // played is a best-effort personalization signal, never worth breaking
@@ -41,6 +48,25 @@ export function getRecentlyPlayedIds(limit = MAX_ENTRIES): string[] {
   return load()
     .slice(0, limit)
     .map((e) => e.trackId);
+}
+
+// Home's Continue Listening row — a blend of "played recently" and "played
+// a lot", not pure recency. A track played many times still ranks near the
+// top even a few days after the last spin (that's the actual signal of a
+// favorite), while a track played once seconds ago still gets a boost so
+// "continue where you left off" still feels immediate — the recency bonus
+// just fades out over ~5 days instead of dominating forever.
+export function getContinueListeningIds(limit = 12): string[] {
+  const now = Date.now();
+  return load()
+    .map((e) => {
+      const daysSince = (now - e.playedAt) / (1000 * 60 * 60 * 24);
+      const recencyBonus = Math.max(0, 5 - daysSince);
+      return { id: e.trackId, score: (e.playCount ?? 1) + recencyBonus };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((s) => s.id);
 }
 
 // Called periodically (throttled) and on pause by PlayerContext — a no-op

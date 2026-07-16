@@ -31,7 +31,7 @@ import {
   type ApiSermon,
   type ApiTrack,
 } from "../lib/api";
-import { getRecentlyPlayedIds } from "../lib/recentlyPlayed";
+import { getContinueListeningIds } from "../lib/recentlyPlayed";
 
 function greetingKey(): "goodMorning" | "goodAfternoon" | "goodEvening" {
   const hour = new Date().getHours();
@@ -99,7 +99,7 @@ export default function Home() {
     [catalogAlbums]
   );
   const continueListening = useMemo(() => {
-    const ids = getRecentlyPlayedIds();
+    const ids = getContinueListeningIds();
     // Standalone Concert Songs are ApiTrack-shaped but live in `concerts`,
     // not the general `tracks` list — playing one from the Concerts row
     // still logs it via recordPlayed(), but a lookup against `tracks` alone
@@ -230,7 +230,13 @@ export default function Home() {
         <div className="min-w-0 relative pl-3">
           <span className="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-full bg-gold" />
           <h1 className="font-playfair text-[1.7rem] font-bold leading-tight text-fg">{t(greetingKey())}</h1>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gold/80 mt-1">{devotionalLine}</p>
+          {/* line-clamp-2 (not a free-wrapping <p>) so the longer lines in
+              the devotional pool can't wrap to a cramped 3rd line right
+              above the hero card — always exactly one tidy shape, with a
+              graceful ellipsis on the rare line that still doesn't fit. */}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gold/80 mt-1 leading-snug line-clamp-2">
+            {devotionalLine}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
