@@ -24,10 +24,6 @@ interface ArtTileProps {
   // track tile with no real detail page of its own, where a single click
   // should just play it. Mirrors Card's onCardClick.
   onCardClick?: () => void;
-  // Overrides the gap between the cover art and the title/subtitle text
-  // below it — every other section is fine with the default, but Home's
-  // Concerts row wants the artist name sitting further down from the cover.
-  captionMarginClassName?: string;
 }
 
 // A bare, borderless artwork tile — cover art plus title/artist beneath it,
@@ -47,7 +43,6 @@ export default function ArtTile({
   showPlayIcon = false,
   onPlay,
   onCardClick,
-  captionMarginClassName = "mt-3",
 }: ArtTileProps) {
   const navigate = useNavigate();
 
@@ -87,7 +82,7 @@ export default function ArtTile({
           </button>
         )}
       </div>
-      <div className={`${captionMarginClassName} px-0.5`}>
+      <div className="mt-3 px-0.5">
         <p className="text-[13px] font-semibold text-fg truncate">{title}</p>
         {subtitle && <p className="text-[11px] text-fg-muted truncate mt-0.5">{subtitle}</p>}
       </div>

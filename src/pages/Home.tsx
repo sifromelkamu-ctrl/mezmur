@@ -482,7 +482,6 @@ export default function Home() {
                     entityId={item.id}
                     artworkFrame={item.artworkFrame}
                     playing={isPlaying && currentTrack?.albumId === item.id}
-                    captionMarginClassName="mt-5"
                   />
                 </div>
               ) : (

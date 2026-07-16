@@ -184,6 +184,7 @@ export default function ConcertDetail() {
                   entityId={c.id}
                   artworkFrame={c.artworkFrame}
                   hideEditButton
+                  preferCenter
                   className={active ? "ring-2 ring-brand shadow-[0_0_14px_rgba(124,92,255,0.6)]" : ""}
                 />
                 <p className={`text-[10px] font-medium truncate w-14 text-center ${active ? "text-fg" : "text-fg-subtle"}`}>
