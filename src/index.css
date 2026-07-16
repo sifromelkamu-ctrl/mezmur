@@ -11,28 +11,6 @@
   }
 }
 
-@keyframes verse-glow-pulse {
-  0%,
-  100% {
-    opacity: 0.1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.22;
-    transform: scale(1.06);
-  }
-}
-
-@keyframes orb-float {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(12px, -14px) scale(1.1);
-  }
-}
-
 @keyframes icon-ring-pulse {
   0%,
   100% {

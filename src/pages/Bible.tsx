@@ -909,7 +909,7 @@ export default function Bible() {
         <div className="h-1.5 rounded-full bg-black/15 overflow-hidden mb-1">
           <div className={`h-full rounded-full ${theme.dot}`} style={{ width: `${percent}%` }} />
         </div>
-        <p className="text-[9px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
+        <p className="text-[10px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
       </button>
     );
   };
@@ -926,7 +926,7 @@ export default function Bible() {
           meant to read as one non-scrolling screen. */}
       <button
         onClick={startReading}
-        className="relative w-full text-left rounded-2xl overflow-hidden mb-3 border border-gold/20 shadow-2xl active:scale-[0.99] transition-transform"
+        className="relative w-full text-left rounded-2xl overflow-hidden mb-4 border border-gold/20 shadow-2xl active:scale-[0.99] transition-transform"
         style={{
           backgroundImage: isLight
             ? "linear-gradient(135deg, #fff3dd 0%, #fbe4b8 45%, #edc888 100%)"
@@ -935,14 +935,11 @@ export default function Bible() {
       >
         <div
           className="absolute -right-12 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none"
-          style={{
-            background: isLight ? "rgba(243,201,105,0.5)" : "rgba(243,201,105,0.22)",
-            animation: "orb-float 6s ease-in-out infinite",
-          }}
+          style={{ background: isLight ? "rgba(243,201,105,0.5)" : "rgba(243,201,105,0.22)" }}
         />
         <Cross
-          size={90}
-          className={`absolute -right-4 -bottom-6 rotate-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
+          size={80}
+          className={`absolute -right-4 -bottom-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
         />
         <div
           className="absolute inset-0 opacity-[0.04] pointer-events-none"
@@ -952,14 +949,14 @@ export default function Bible() {
           }}
         />
 
-        <div className="relative px-4 py-3 flex items-center gap-3">
+        <div className="relative px-5 py-4 flex items-center gap-3">
           <div className="flex-1 min-w-0">
             {heroVerse ? (
               <>
-                <p className="font-agbalumo text-sm leading-snug text-fg mb-1 line-clamp-2">
+                <p className="font-agbalumo text-base leading-snug text-fg mb-1.5 line-clamp-2">
                   {renderHighlightedVerse(heroVerse.text, ["መብራት", "ብርሃን"])}
                 </p>
-                <p className="text-[10px] font-semibold text-gold/80">{heroVerse.ref}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gold/80">{heroVerse.ref}</p>
               </>
             ) : (
               <div className="h-8" />
@@ -971,7 +968,7 @@ export default function Bible() {
 
       {/* Quick Access — no heading, matches the rest of the page's push to
           stay compact and non-scrolling. */}
-      <div className="mb-3">
+      <div className="mb-4">
         <div className="grid grid-cols-4 gap-2">
           {QUICK_ACCESS.map((item) => (
             <button key={item.id} onClick={item.onClick} className="flex flex-col items-center gap-1 min-w-0">
@@ -1004,7 +1001,7 @@ export default function Bible() {
           theme far more than the previous flat indigo did. */}
       {dailyVerse && (
         <div
-          className="relative overflow-hidden rounded-xl p-4 mb-3"
+          className="relative overflow-hidden rounded-2xl border border-gold/20 p-4 mb-4"
           style={{
             backgroundImage: isLight
               ? "radial-gradient(130% 110% at 88% -15%, #fff6df 0%, #fbe4b0 20%, #f0c988 42%, #dba668 62%, #c98f5c 100%)"
@@ -1012,11 +1009,8 @@ export default function Bible() {
             animation: "verse-fade-in 0.6s ease-out",
           }}
         >
-          <div
-            className="absolute -right-4 -top-4"
-            style={{ animation: "verse-glow-pulse 4s ease-in-out infinite", color: isLight ? "#6b3a12" : undefined }}
-          >
-            <Sunrise size={70} className={isLight ? "" : "text-gold"} />
+          <div className="absolute -right-4 -top-4" style={{ color: isLight ? "#6b3a12" : undefined }}>
+            <Sunrise size={60} className={isLight ? "" : "text-gold"} />
           </div>
           <button
             onClick={handleShareDailyVerse}
@@ -1050,7 +1044,7 @@ export default function Bible() {
           <div className="relative flex items-center justify-between mt-2">
             <button
               onClick={() => openVerse(dailyVerse.slug, dailyVerse.chapter, dailyVerse.verseIndex)}
-              className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${
+              className={`flex items-center gap-1 text-xs font-bold transition-colors ${
                 isLight ? "hover:opacity-75" : "text-gold hover:text-gold-glow"
               }`}
               style={isLight ? { color: "#6b3a12" } : undefined}
@@ -1072,9 +1066,9 @@ export default function Bible() {
           (redesigned from two separate square cards) so the gold/green
           accents read as one cohesive piece instead of two disconnected
           tiles; still toggles the same book list open/closed beneath it. */}
-      <div className="mb-3">
+      <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold text-fg-muted">መጻሕፍት</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">መጻሕፍት</h2>
           <button
             onClick={() => setExpanded({ old: true, new: true })}
             className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
@@ -1112,7 +1106,7 @@ export default function Bible() {
       {recentHistory.length > 0 && (
         <div className="mb-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-fg-muted">በቅርብ የተነበቡ</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">በቅርብ የተነበቡ</h2>
             <button
               onClick={() => setActiveModal("history")}
               className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
@@ -1133,7 +1127,7 @@ export default function Bible() {
                   className="shrink-0 w-32 bg-elevated hover:bg-elevated-hover rounded-xl p-3 text-left transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`text-[9.5px] font-bold uppercase ${theme.accent}`}>{theme.label}</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.accent}`}>{theme.label}</span>
                     <Bookmark size={13} className="text-fg-subtle shrink-0" />
                   </div>
                   <p className="font-abyssinica text-sm font-bold text-fg truncate">
