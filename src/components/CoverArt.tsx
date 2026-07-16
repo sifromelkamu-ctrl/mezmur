@@ -118,11 +118,15 @@ export default function CoverArt({
   const allowFreeformCrop = entityType === "track" && !readOnlyArtwork;
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
   // preferCenter skips the smart-crop analysis (and its canvas work)
-  // entirely in favor of a plain centered frame, still correctly zoomed to
-  // fully cover the square once the image's natural size is known.
+  // entirely in favor of a plain frame anchored a bit below dead-center —
+  // still correctly zoomed to fully cover the square once the image's
+  // natural size is known. Biased downward (not a flat 0.5) because a
+  // Concert Album's unedited YouTube thumbnail routinely has its title-card
+  // banner text in the top portion, which a plain center crop still caught
+  // too much of.
   const smartFrame = useSmartFrame(canFrame && !preferCenter ? photoUrl : undefined);
   const centerFrame: ArtworkFrame | null = preferCenter
-    ? { x: 0.5, y: 0.5, zoom: natural ? coverZoom(natural.w, natural.h) : 1, rotation: 0, flipH: false, flipV: false }
+    ? { x: 0.5, y: 0.65, zoom: natural ? coverZoom(natural.w, natural.h) : 1, rotation: 0, flipH: false, flipV: false }
     : null;
   const activeFrame = savedOverride ?? artworkFrame ?? (preferCenter ? centerFrame : smartFrame);
   const frameReady = canFrame && Boolean(natural) && Boolean(activeFrame);
