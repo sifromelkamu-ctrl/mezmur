@@ -78,8 +78,8 @@ const CLIENT_ARGS = ["--extractor-args", "youtube:player_client=android,web"];
 // Public channels/playlists routinely fail with "[youtubetab] Playlists
 // that require authentication may not extract correctly without a
 // successful webpage download" whenever the initial webpage fetch itself
-// gets blocked (the same bot-check IP-reputation issue CLIENT_ARGS/cookies/
-// the proxy above all work around) — yt-dlp then can't tell whether the
+// gets blocked (the same bot-check IP-reputation issue CLIENT_ARGS/cookies
+// above work around) — yt-dlp then can't tell whether the
 // list actually needs auth or not, and some versions treat that as fatal
 // even though the tab data itself came back fine via the API. This is
 // yt-dlp's own documented flag for exactly this case: it skips that
@@ -105,49 +105,18 @@ if (pluginArgs.length) {
   console.log(`[yt-dlp] ${PLUGIN_DIR} not found — running without the PO-token plugin (expected outside the Docker image).`);
 }
 
-// Optional: routes every yt-dlp request through a proxy (expects a
-// residential/ISP proxy, not another datacenter one — a datacenter proxy
-// just swaps one flagged IP for another). This is the actual root-cause
-// fix for what cookies/player-client alone couldn't fully solve: verified
-// in production that YouTube blocks Render's IP probabilistically based on
-// IP reputation combined with per-video signals (a popular reference video
-// succeeded, real lower-traffic channel content failed consistently — same
-// video worked instantly from a residential IP with the exact same
-// cookies). Format: a standard proxy URL, e.g.
-// http://user:pass@host:port or socks5://user:pass@host:port — whatever
-// your proxy provider gives you. Unset (the default) is a complete no-op.
-const proxyArgs: string[] = (() => {
-  const url = process.env.YTDLP_PROXY_URL?.trim();
-  if (!url) {
-    console.log("[yt-dlp] YTDLP_PROXY_URL not set — requests go out on Render's own IP.");
-    return [];
-  }
-  let host = "(unparsed)";
-  try {
-    host = new URL(url).host;
-  } catch {
-    // still usable by yt-dlp even if the URL module can't parse it (e.g. a
-    // bare socks5h:// scheme it doesn't recognize) — this is just for the log
-  }
-  console.log(`[yt-dlp] routing requests through proxy host ${host} (from YTDLP_PROXY_URL)`);
-  return ["--proxy", url];
-})();
+// Proxy support (routing yt-dlp through a residential/ISP proxy) was tried
+// and removed — even with it configured, production still hit YouTube's
+// bot-check, so it wasn't the fix it looked like on paper. Cookies +
+// player-client + the PO-token plugin above are the current mitigation
+// stack; if bot-check resistance regresses again, reach for a *verified*
+// residential proxy (test it standalone against a real failing video
+// first) rather than re-adding this blind.
 
 // Shared prefix for every yt-dlp invocation in this file — one definition so
 // TAB_ARGS (or any future flag) only needs adding once instead of staying in
 // sync across every spawn() call site by hand.
-const BASE_ARGS_NO_PROXY = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs];
-const BASE_ARGS = [...BASE_ARGS_NO_PROXY, ...proxyArgs];
-
-// A misconfigured or (as observed in production) unfunded/expired proxy
-// account fails at the connection layer, before yt-dlp ever reaches
-// YouTube — every single request hard-fails identically regardless of URL,
-// which is strictly worse than not using a proxy at all. Matches yt-dlp's
-// own wording for these ("Unable to connect to proxy", the ProxyError
-// class name, an explicit tunnel failure) rather than YouTube-side content
-// errors, so a real "this video is private" etc. is never misclassified
-// as a proxy problem.
-const PROXY_FAILURE_RE = /unable to connect to proxy|proxyerror|tunnel connection failed/i;
+const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs];
 
 export interface YoutubeMetadata {
   id: string;
@@ -233,13 +202,7 @@ function spawnOnce(
   });
 }
 
-// Shared entry point for every yt-dlp invocation in this file. Retries
-// exactly once, without the proxy, if a proxy is configured and the
-// failure is specifically a proxy connection failure (see PROXY_FAILURE_RE)
-// — a dead/unfunded proxy account fails identically on every request, so
-// falling back to a direct connection (still carrying cookies/player-client/
-// PO-token) is strictly better than hard-failing every single import until
-// someone notices and fixes the proxy account.
+// Shared entry point for every yt-dlp invocation in this file.
 async function execYtDlp(
   args: string[],
   context: string,
@@ -253,20 +216,6 @@ async function execYtDlp(
   }
 
   if (attempt.code === 0) return attempt.stdout;
-
-  if (proxyArgs.length > 0 && PROXY_FAILURE_RE.test(attempt.stderr)) {
-    console.error(
-      `[yt-dlp:${context}] proxy connection failed (YTDLP_PROXY_URL looks misconfigured, expired, or out of funds) — retrying once without it.`
-    );
-    try {
-      const retry = await spawnOnce([...BASE_ARGS_NO_PROXY, ...args], onLine);
-      if (retry.code === 0) return retry.stdout;
-      throw toYtDlpError(retry.stderr, retry.stdout, retry.code, context, args);
-    } catch (err) {
-      if (err instanceof YtDlpError) throw err;
-      throw ytDlpSpawnError(err as NodeJS.ErrnoException, context);
-    }
-  }
 
   throw toYtDlpError(attempt.stderr, attempt.stdout, attempt.code, context, args);
 }

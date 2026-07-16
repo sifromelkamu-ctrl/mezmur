@@ -5,7 +5,6 @@ import ArtTile from "../components/home/ArtTile";
 import Card from "../components/Card";
 import ConcertSongTile from "../components/home/ConcertSongTile";
 import ContinueListeningCard from "../components/home/ContinueListeningCard";
-import ForYouCard from "../components/home/ForYouCard";
 import HeroCarousel, { type HeroSlide } from "../components/home/HeroCarousel";
 import QuickActionGrid, { type QuickAction } from "../components/home/QuickActionGrid";
 import SectionRow from "../components/SectionRow";
@@ -20,7 +19,6 @@ import {
   artistsApi,
   concertsApi,
   featuredBannersApi,
-  playlistsApi,
   podcastsApi,
   sermonsApi,
   singlesApi,
@@ -28,14 +26,12 @@ import {
   type ApiAlbum,
   type ApiArtist,
   type ApiFeaturedBanner,
-  type ApiPlaylist,
   type ApiPodcast,
   type ApiConcertItem,
   type ApiSermon,
   type ApiTrack,
 } from "../lib/api";
 import { getRecentlyPlayedIds } from "../lib/recentlyPlayed";
-import { buildRecommendations } from "../lib/recommendations";
 
 function greetingKey(): "goodMorning" | "goodAfternoon" | "goodEvening" {
   const hour = new Date().getHours();
@@ -55,7 +51,6 @@ export default function Home() {
   const [tracks, setTracks] = useState<ApiTrack[]>([]);
   const [sermons, setSermons] = useState<ApiSermon[]>([]);
   const [podcasts, setPodcasts] = useState<ApiPodcast[]>([]);
-  const [ownedPlaylists, setOwnedPlaylists] = useState<ApiPlaylist[]>([]);
   const [featuredBanners, setFeaturedBanners] = useState<ApiFeaturedBanner[]>([]);
   const [concerts, setConcerts] = useState<ApiConcertItem[]>([]);
   const [singles, setSingles] = useState<ApiTrack[]>([]);
@@ -84,13 +79,6 @@ export default function Home() {
       })
       .finally(() => setLoading(false));
   }, []);
-
-  // Only a personalization signal for the "For You" cards below — not
-  // rendered directly, so a fetch failure/logged-out state is harmless.
-  useEffect(() => {
-    if (user) playlistsApi.mine().then(setOwnedPlaylists);
-    else setOwnedPlaylists([]);
-  }, [user]);
 
   const devotionalLine = useMemo(() => devotionalLineOfTheDay(), []);
 
@@ -128,20 +116,6 @@ export default function Home() {
     }
     return result;
   }, [tracks]);
-  const recommended = useMemo(
-    () =>
-      buildRecommendations(
-        {
-          artists,
-          tracks,
-          favoriteTracks: favorites,
-          recentlyPlayedIds: getRecentlyPlayedIds(),
-          ownedPlaylists,
-        },
-        6
-      ),
-    [artists, tracks, favorites, ownedPlaylists]
-  );
 
   const playAlbum = useCallback(
     async (id: string) => {
@@ -307,23 +281,6 @@ export default function Home() {
             ))}
           </div>
         </section>
-      )}
-
-      {recommended.length > 0 && (
-        <SectionRow title={t("forYou")} accent="cyan" large edgeInset={20} scroll>
-          {recommended.map((item) => (
-            <ForYouCard
-              key={item.id}
-              title={item.title}
-              subtitle={item.subtitle}
-              gradient={item.gradient}
-              to={item.to}
-              onCardClick={item.to ? undefined : () => playTrack(item.track, recommended.map((r) => r.track))}
-              photoUrl={item.photoUrl}
-              onPlay={() => playTrack(item.track, recommended.map((r) => r.track))}
-            />
-          ))}
-        </SectionRow>
       )}
 
       {artists.length > 0 && (
