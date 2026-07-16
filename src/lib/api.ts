@@ -389,6 +389,11 @@ export type ApiConcertItem = ApiConcertAlbumItem | ApiConcertSongItem;
 
 export const concertsApi = {
   list: () => request<ApiConcertItem[]>("/concerts"),
+  // Every track that belongs to a Concert Album, flattened across albums —
+  // list() only returns each album's summary (title/trackCount), not its
+  // tracks, so this is the only way to resolve a played-from-inside-a-
+  // Concert-Album track id back to a track (see Home's Continue Listening).
+  tracks: () => request<ApiTrack[]>("/concerts/tracks"),
 };
 
 // A dedicated category too: a track with no album at all — never a regular

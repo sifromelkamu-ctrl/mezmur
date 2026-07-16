@@ -10,6 +10,11 @@ interface ContinueListeningCardProps {
   playing: boolean;
   onPlay: () => void;
   onCardClick?: () => void;
+  // Where clicking the card navigates when onCardClick is unset — the
+  // parent knows whether track.albumId points at a regular Album or a
+  // Concert Album (only it has the concerts list to check against), so it
+  // computes this rather than this card guessing "/album/:id" for both.
+  albumHref?: string;
 }
 
 // Bespoke card for Home's Continue Listening row — wider than the bare
@@ -18,9 +23,15 @@ interface ContinueListeningCardProps {
 // recentlyPlayed.ts's recordPosition, written throttled during playback
 // and on pause). A track never played past its first save just shows an
 // empty bar rather than fabricating a number.
-export default function ContinueListeningCard({ track, playing, onPlay, onCardClick }: ContinueListeningCardProps) {
+export default function ContinueListeningCard({
+  track,
+  playing,
+  onPlay,
+  onCardClick,
+  albumHref,
+}: ContinueListeningCardProps) {
   const navigate = useNavigate();
-  const to = track.albumId ? `/album/${track.albumId}` : undefined;
+  const to = albumHref ?? (track.albumId ? `/album/${track.albumId}` : undefined);
   const position = getPosition(track.id);
   const duration = track.duration ?? 0;
   const percent = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;

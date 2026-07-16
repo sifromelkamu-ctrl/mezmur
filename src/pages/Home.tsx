@@ -13,7 +13,7 @@ import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
-import { isConcertSongItem } from "../lib/concerts";
+import { isConcertAlbumItem, isConcertSongItem } from "../lib/concerts";
 import {
   albumsApi,
   artistsApi,
@@ -53,6 +53,7 @@ export default function Home() {
   const [podcasts, setPodcasts] = useState<ApiPodcast[]>([]);
   const [featuredBanners, setFeaturedBanners] = useState<ApiFeaturedBanner[]>([]);
   const [concerts, setConcerts] = useState<ApiConcertItem[]>([]);
+  const [concertAlbumTracks, setConcertAlbumTracks] = useState<ApiTrack[]>([]);
   const [singles, setSingles] = useState<ApiTrack[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,9 +66,10 @@ export default function Home() {
       podcastsApi.list(),
       featuredBannersApi.list(),
       concertsApi.list(),
+      concertsApi.tracks(),
       singlesApi.list(),
     ])
-      .then(([ar, al, tr, se, po, fb, co, si]) => {
+      .then(([ar, al, tr, se, po, fb, co, cat, si]) => {
         setArtists(ar);
         setAlbums(al);
         setTracks(tr);
@@ -75,6 +77,7 @@ export default function Home() {
         setPodcasts(po);
         setFeaturedBanners(fb);
         setConcerts(co);
+        setConcertAlbumTracks(cat);
         setSingles(si);
       })
       .finally(() => setLoading(false));
@@ -104,6 +107,10 @@ export default function Home() {
     // not the general `tracks` list — playing one from the Concerts row
     // still logs it via recordPlayed(), but a lookup against `tracks` alone
     // would silently drop it here since it's never actually in that array.
+    // A track played from inside a Concert Album is excluded from `tracks`
+    // the same way, so it needs its own flattened list too (see
+    // concertsApi.tracks()) — neither kind of concert content should be
+    // held to a different Continue Listening bar than anything else.
     const concertSongs = concerts.filter(isConcertSongItem);
     // Keeps recency order but only the most-recent track per artist — the
     // raw play log otherwise repeats the same artist's tiles whenever the
@@ -111,7 +118,10 @@ export default function Home() {
     const seenArtists = new Set<string>();
     const result: ApiTrack[] = [];
     for (const id of ids) {
-      const tr = tracks.find((t) => t.id === id) ?? concertSongs.find((t) => t.id === id);
+      const tr =
+        tracks.find((t) => t.id === id) ??
+        concertSongs.find((t) => t.id === id) ??
+        concertAlbumTracks.find((t) => t.id === id);
       if (!tr) continue;
       if (tr.artistId) {
         if (seenArtists.has(tr.artistId)) continue;
@@ -120,7 +130,16 @@ export default function Home() {
       result.push(tr);
     }
     return result;
-  }, [tracks, concerts]);
+  }, [tracks, concerts, concertAlbumTracks]);
+
+  // A Continue Listening card for a track that belongs to a Concert Album
+  // must link to /concert/:id (ConcertDetail), never /album/:id — Concert
+  // Albums are excluded from GET /api/albums, so AlbumDetail can't resolve
+  // one anyway. See ContinueListeningCard's albumHref prop.
+  const concertAlbumIds = useMemo(
+    () => new Set(concerts.filter(isConcertAlbumItem).map((c) => c.id)),
+    [concerts]
+  );
 
   const playAlbum = useCallback(
     async (id: string) => {
@@ -234,7 +253,13 @@ export default function Home() {
               the devotional pool can't wrap to a cramped 3rd line right
               above the hero card — always exactly one tidy shape, with a
               graceful ellipsis on the rare line that still doesn't fit. */}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gold/80 mt-1 leading-snug line-clamp-2">
+          {/* text-gold-dark, not text-gold — gold's regular shade is close
+              enough in hue+lightness to light mode's warm background that
+              it nearly disappeared there; gold-dark is a theme-aware token
+              that's darker/more saturated in both modes, so it stays
+              legible against light mode's cream without going dim on
+              dark mode's navy. */}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gold-dark mt-1 leading-snug line-clamp-2">
             {devotionalLine}
           </p>
         </div>
@@ -288,6 +313,13 @@ export default function Home() {
                 // No album to browse into — clicking the card just plays it,
                 // same as the play button, instead of opening the artist page.
                 onCardClick={track.albumId ? undefined : () => playTrack(track, continueListening)}
+                albumHref={
+                  track.albumId
+                    ? concertAlbumIds.has(track.albumId)
+                      ? `/concert/${track.albumId}`
+                      : `/album/${track.albumId}`
+                    : undefined
+                }
               />
             ))}
           </div>

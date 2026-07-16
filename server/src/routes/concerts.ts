@@ -49,4 +49,18 @@ router.get("/", async (_req, res) => {
   res.json(items.map(({ kind, item }) => ({ ...item, kind })));
 });
 
+// GET /api/concerts/tracks - every track belonging to a Concert Album,
+// flattened across albums. Concert Album tracks are excluded from
+// GET /api/tracks (see routes/tracks.ts), so without this there's no way
+// for a client to resolve a track id it only knows from a play log (e.g.
+// Home's Continue Listening) back to a track if that track was played from
+// inside a Concert Album rather than the standalone-Concert-Song feed above.
+router.get("/tracks", async (_req, res) => {
+  const tracks = await prisma.track.findMany({
+    where: { album: { albumType: "live", artist: { ownerId: null } } },
+    include: { artist: true, album: true },
+  });
+  res.json(tracks.map((t) => toTrackDTO(t)));
+});
+
 export default router;
