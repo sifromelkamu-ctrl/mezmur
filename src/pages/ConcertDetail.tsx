@@ -184,7 +184,6 @@ export default function ConcertDetail() {
                   entityId={c.id}
                   artworkFrame={c.artworkFrame}
                   hideEditButton
-                  preferCenter
                   className={active ? "ring-2 ring-brand shadow-[0_0_14px_rgba(124,92,255,0.6)]" : ""}
                 />
                 <p className={`text-[10px] font-medium truncate w-14 text-center ${active ? "text-fg" : "text-fg-subtle"}`}>
@@ -204,17 +203,11 @@ export default function ConcertDetail() {
       >
         <CoverArt
           gradient={concert.gradient}
-          size="albumHeroLg"
+          size="albumHero"
           photoUrl={concert.coverUrl}
           entityType="album"
           entityId={concert.id}
           artworkFrame={concert.artworkFrame}
-          // Concert Album art is an unedited YouTube thumbnail more often
-          // than not — its bold text banner/title card up top routinely
-          // fools the smart-crop heuristic into cropping toward it instead
-          // of the actual photo. A saved artworkFrame (an admin's manual
-          // edit) still overrides this.
-          preferCenter
           hideEditButton
         />
         <div className="min-w-0 w-full max-w-2xl">
