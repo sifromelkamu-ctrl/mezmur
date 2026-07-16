@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import mezmurLogo from "../assets/mezmur-logo.png";
 
 const WORDMARK = "MEZMUR";
 const LETTER_STAGGER_MS = 55;
 const LETTERS_START_MS = 350;
 const SHIMMER_START_MS = LETTERS_START_MS + WORDMARK.length * LETTER_STAGGER_MS + 250;
-const HOLD_MS = 2200;
+const TAGLINE_WORDS = ["Worship.", "Listen.", "Inspire."];
+const TAGLINE_STAGGER_MS = 300;
+const HOLD_MS = 2600;
 const EXIT_MS = 550;
 
 interface SplashScreenProps {
@@ -47,31 +50,12 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
             animation: "splash-ring-pulse 1.8s ease-out 0.15s 2",
           }}
         />
-        <svg
-          viewBox="0 0 120 120"
-          className="relative w-16 h-16"
+        <img
+          src={mezmurLogo}
+          alt="Mezmur"
+          className="relative w-20 h-20 rounded-2xl"
           style={{ animation: "splash-icon-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
-        >
-          <defs>
-            <linearGradient id="splashGold" x1="20%" y1="0%" x2="85%" y2="100%">
-              <stop offset="0%" stopColor="#f7e0a0" />
-              <stop offset="45%" stopColor="#d4af37" />
-              <stop offset="100%" stopColor="#a9862b" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M60,16 C77,20 83,31 82,45"
-            fill="none"
-            stroke="url(#splashGold)"
-            strokeWidth="9"
-            strokeLinecap="round"
-          />
-          <rect x="52" y="10" width="8" height="88" rx="4" fill="url(#splashGold)" />
-          <rect x="33" y="27" width="38" height="8" rx="4" fill="url(#splashGold)" />
-          <rect x="75" y="45" width="7" height="52" rx="3.5" fill="url(#splashGold)" />
-          <ellipse cx="56" cy="103" rx="13" ry="10" fill="url(#splashGold)" transform="rotate(-18 56 103)" />
-          <ellipse cx="79" cy="95" rx="10" ry="8" fill="url(#splashGold)" transform="rotate(-18 79 95)" />
-        </svg>
+        />
       </div>
 
       <div className="flex flex-col items-center gap-2.5">
@@ -100,16 +84,23 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
                 </span>
               ))}
         </h1>
-        <p
-          className="text-xs font-semibold uppercase opacity-0"
-          style={{
-            color: "#a9862b",
-            letterSpacing: "0.28em",
-            animation: `splash-tagline-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${SHIMMER_START_MS}ms forwards`,
-          }}
-        >
-          Worship. Listen. Inspire.
-        </p>
+        <div className="flex items-center gap-2">
+          {TAGLINE_WORDS.map((word, i) => (
+            <span
+              key={word}
+              className="text-xs font-semibold uppercase opacity-0"
+              style={{
+                color: "#a9862b",
+                letterSpacing: "0.1em",
+                animation: `splash-tagline-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${
+                  SHIMMER_START_MS + i * TAGLINE_STAGGER_MS
+                }ms forwards`,
+              }}
+            >
+              {word}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div
