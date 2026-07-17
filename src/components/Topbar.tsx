@@ -14,12 +14,16 @@ export default function Topbar() {
   // Library renders its own bespoke header (avatar / centered wordmark /
   // gear) to match its dedicated design, same pattern as Home below.
   const isLibrary = location.pathname === "/library";
+  // Bible's home screen renders its own header (avatar / wordmark / tagline
+  // / notification bell) in its own light purple palette — same reasoning
+  // as Library above.
+  const isBible = location.pathname === "/bible";
   const { user } = useAuth();
   const { t } = useLanguage();
   const { avatarColorId } = useTheme();
   const avatarColor = getAvatarColor(avatarColorId);
 
-  if (isLibrary) return null;
+  if (isLibrary || isBible) return null;
 
   return (
     <header className="sticky top-0 z-10 bg-base/80 backdrop-blur-md">

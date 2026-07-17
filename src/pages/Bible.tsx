@@ -1,29 +1,29 @@
 import {
+  Bell,
   Bookmark,
   BookOpen,
+  CalendarDays,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   Copy,
-  Cross,
-  Flame,
   Heart,
+  Leaf,
   Loader2,
   Pause,
-  ScrollText,
   Search,
   Settings2,
   Share2,
   StickyNote,
-  Sunrise,
+  Sun,
   Volume2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import { BIBLE_BOOKS } from "../data/bibleBooks";
-import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/useAuth";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
@@ -59,27 +59,87 @@ type BookText = Record<string, string[]>; // chapter number -> verses
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
 
-// Highlights specific keywords inline within a verse — used by the Bible
-// home screen's hero banner (Psalm 119:105, "lamp"/"light" picked out in
-// gold), matching the reference design's emphasized key words.
-function renderHighlightedVerse(text: string, keywords: string[]) {
-  if (keywords.length === 0) return text;
-  const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`(${escaped.join("|")})`, "g");
-  return text.split(pattern).map((part, i) =>
-    keywords.includes(part) ? (
-      <span key={i} className="text-gold-glow">
-        {part}
-      </span>
-    ) : (
-      <span key={i}>{part}</span>
-    )
+// The Bible *home* screen (only) renders in its own fixed light purple/green
+// palette, independent of the app's global dark/gold theme toggle — set as
+// inline CSS custom properties (rather than a stylesheet rule) so it always
+// wins regardless of :root.light, with zero cascade fighting. Every other
+// Bible view (chapter reader, book picker, search) is unaffected and keeps
+// the app's usual dark/gold theming.
+const BIBLE_HOME_THEME = {
+  "--color-base": "#F6F5FB",
+  "--color-panel": "#FFFFFF",
+  "--color-elevated": "#FFFFFF",
+  "--color-elevated-hover": "#F4F2FB",
+  "--color-fg": "#1C1B29",
+  "--color-fg-muted": "#6B7280",
+  "--color-fg-subtle": "#9CA3AF",
+  "--color-border": "#ECEAF4",
+  "--color-hover": "rgba(91,63,224,0.06)",
+  "--color-hover-strong": "rgba(91,63,224,0.12)",
+  "--bible-purple": "#5B3FE0",
+  "--bible-purple-soft": "#EDE9FB",
+  "--bible-navy": "#241C3D",
+  "--bible-green": "#2F9E6E",
+  "--bible-green-soft": "#E3F5EC",
+} as CSSProperties;
+
+// Hero carousel slide art — a small hand-built SVG scene (sky, sun/glow,
+// two hill silhouettes, a cross on the peak) stands in for a real photo,
+// since no stock photography or image-generation source is available here.
+// Five color variants (warm sunrise/dusk skies, true to the reference's
+// imagery) cycle across the slides so the carousel still reads as varied.
+const HERO_SKIES = [
+  { top: "#FCE7C8", mid: "#F3A65A", bottom: "#5B3FE0" },
+  { top: "#DDEFE3", mid: "#5FBE8E", bottom: "#1C5A3E" },
+  { top: "#F7D9C4", mid: "#E0704F", bottom: "#3B2A85" },
+  { top: "#E4F3EA", mid: "#3DBE8E", bottom: "#16281F" },
+  { top: "#F3C9D9", mid: "#8B5CF6", bottom: "#241C3D" },
+] as const;
+
+function HeroSlideArt({ variant }: { variant: number }) {
+  const sky = HERO_SKIES[variant % HERO_SKIES.length];
+  const sunCx = 120 + (variant % 3) * 60;
+  const hillShift = (variant % 2) * 20;
+  const uid = `hero-${variant}`;
+
+  return (
+    <svg viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
+      <defs>
+        <linearGradient id={`${uid}-sky`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={sky.top} />
+          <stop offset="55%" stopColor={sky.mid} />
+          <stop offset="100%" stopColor={sky.bottom} />
+        </linearGradient>
+        <radialGradient id={`${uid}-sun`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFF7E8" stopOpacity="0.95" />
+          <stop offset="60%" stopColor={sky.mid} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={sky.mid} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="400" height="280" fill={`url(#${uid}-sky)`} />
+      <circle cx={sunCx} cy="90" r="70" fill={`url(#${uid}-sun)`} />
+      <circle cx={sunCx} cy="90" r="26" fill="#FFF7E8" opacity="0.9" />
+      <path
+        d={`M0,${190 + hillShift} Q100,${150 + hillShift} 200,${180 + hillShift} T400,${170 + hillShift} V280 H0 Z`}
+        fill="var(--bible-navy)"
+        opacity="0.35"
+      />
+      <path
+        d={`M0,${230 - hillShift} Q120,${190 - hillShift} 220,${215 - hillShift} T400,${205 - hillShift} V280 H0 Z`}
+        fill="var(--bible-navy)"
+        opacity="0.65"
+      />
+      <g transform={`translate(${200 + hillShift}, ${150 - hillShift})`}>
+        <rect x="-4" y="0" width="8" height="60" fill="var(--bible-navy)" />
+        <rect x="-16" y="14" width="32" height="8" fill="var(--bible-navy)" />
+      </g>
+    </svg>
   );
 }
 
 export default function Bible() {
-  const { mode } = useTheme();
-  const isLight = mode === "light";
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [bookSlug, setBookSlug] = useState<string | null>(null);
   const [chapter, setChapter] = useState<number | null>(null);
   const [bookText, setBookText] = useState<BookText | null>(null);
@@ -95,18 +155,19 @@ export default function Bible() {
   const [justCopied, setJustCopied] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
-  const [dailyVerse, setDailyVerse] = useState<
-    { ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
-  >(null);
-  const [heroVerse, setHeroVerse] = useState<{ ref: string; text: string } | null>(null);
+  const [heroSlides, setHeroSlides] = useState<
+    { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number }[]
+  >([]);
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [heroSharedId, setHeroSharedId] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<"bookmarks" | "notes" | "favorites" | "history" | null>(null);
-  const [dailyVerseShared, setDailyVerseShared] = useState(false);
 
   const [showBookSearch, setShowBookSearch] = useState(false);
   const [bookSearchQuery, setBookSearchQuery] = useState("");
   const [searchScope, setSearchScope] = useState<"chapter" | "book">("book");
   const [jumpToVerse, setJumpToVerse] = useState<number | null>(null);
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
+  const heroTouchStartX = useRef<number | null>(null);
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
@@ -190,37 +251,51 @@ export default function Bible() {
 
   useEffect(() => stopSpeaking, []);
 
-  // Pick one encouraging verse per local calendar day — since it keys off
-  // each visitor's own device clock, it naturally rotates at their own
-  // midnight regardless of time zone, no server-side scheduling needed.
+  // Home screen's hero carousel — 5 slides: today's verse (picked the same
+  // way the old single daily-verse card was, so it keys off each visitor's
+  // own device clock and rotates at their own midnight) plus the next 4
+  // upcoming picks from the curated list, so swiping forward previews what's
+  // coming rather than repeating today's verse or picking randomly.
   useEffect(() => {
     const now = new Date();
     const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
     let hash = 0;
     for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
-    const pick = MORNING_VERSES[hash % MORNING_VERSES.length];
-    fetch(`/bible/${pick.slug}.json`)
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data: BookText) => {
-        const text = data[String(pick.chapter)]?.[pick.verseIndex];
-        if (text) setDailyVerse({ ref: pick.refAm, text, slug: pick.slug, chapter: pick.chapter, verseIndex: pick.verseIndex });
-      })
-      .catch(() => {});
+    const startIndex = hash % MORNING_VERSES.length;
+    const picks = Array.from({ length: 5 }, (_, i) => MORNING_VERSES[(startIndex + i) % MORNING_VERSES.length]);
+    const uniqueSlugs = [...new Set(picks.map((p) => p.slug))];
+
+    let cancelled = false;
+    Promise.all(
+      uniqueSlugs.map((slug) =>
+        fetch(`/bible/${slug}.json`)
+          .then((res) => (res.ok ? res.json() : Promise.reject()))
+          .then((data: BookText) => [slug, data] as const)
+          .catch(() => [slug, null] as const)
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      const bySlug = new Map(entries);
+      const slides = picks
+        .map((p) => {
+          const text = bySlug.get(p.slug)?.[String(p.chapter)]?.[p.verseIndex];
+          if (!text) return null;
+          return { id: `${p.slug}-${p.chapter}-${p.verseIndex}`, ref: p.refAm, text, slug: p.slug, chapter: p.chapter, verseIndex: p.verseIndex };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+      setHeroSlides(slides);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Fixed "brand anchor" verse for the home screen's big hero banner (Psalm
-  // 119:105, "Your word is a lamp to my feet") — fetched from the real data
-  // file rather than typed inline so the Amharic text is guaranteed exact,
-  // not retyped from a reference image.
+  // Auto-advance the hero carousel, same cadence as Home's own HeroCarousel.
   useEffect(() => {
-    fetch("/bible/psalms.json")
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data: BookText) => {
-        const text = data["119"]?.[104];
-        if (text) setHeroVerse({ ref: "መዝሙረ ዳዊት 119:105", text });
-      })
-      .catch(() => {});
-  }, []);
+    if (heroSlides.length < 2) return;
+    const id = setInterval(() => setHeroIndex((i) => (i + 1) % heroSlides.length), 6000);
+    return () => clearInterval(id);
+  }, [heroSlides.length]);
 
   const toggleListen = () => {
     if (!speechSupported || !verses) return;
@@ -705,30 +780,24 @@ export default function Bible() {
 
   const TESTAMENT_THEME = {
     old: {
-      icon: ScrollText,
-      accent: "text-accent-violet",
-      dot: "bg-accent-violet",
-      ring: "ring-accent-violet/40",
-      glow: "shadow-[0_0_18px_rgba(139,92,246,0.25)]",
-      iconBg: "bg-gradient-to-br from-accent-violet/25 to-transparent",
-      badgeBg: "bg-accent-violet/15 text-accent-violet",
+      icon: BookOpen,
+      accent: "text-[var(--bible-purple)]",
+      badgeBg: "bg-[var(--bible-purple)] text-white",
       label: "ብሉይ ኪዳን",
     },
     new: {
-      icon: Flame,
-      accent: "text-accent-green",
-      dot: "bg-accent-green",
-      ring: "ring-accent-green/40",
-      glow: "shadow-[0_0_18px_rgba(20,184,102,0.25)]",
-      iconBg: "bg-gradient-to-br from-accent-green/25 to-transparent",
-      badgeBg: "bg-accent-green/15 text-accent-green",
+      icon: Leaf,
+      accent: "text-[var(--bible-green)]",
+      badgeBg: "bg-[var(--bible-green)] text-white",
       label: "አዲስ ኪዳን",
     },
   } as const;
 
   // Old/New Testament reading progress — distinct chapters ever opened,
   // divided by each testament's true chapter total (BIBLE_BOOKS.chapterCount
-  // sums), not capped by the recency log below.
+  // sums), not capped by the recency log below. Feeds the "Reading Plan"
+  // cards (repurposes this real progress data rather than inventing a
+  // fictional day-count plan the app has no data model for).
   const readChapterKeys = getReadChapterKeys();
   const oldSlugs = new Set(oldTestament.map((b) => b.slug));
   const newSlugs = new Set(newTestament.map((b) => b.slug));
@@ -743,7 +812,6 @@ export default function Bible() {
   const newTotalChapters = newTestament.reduce((s, b) => s + b.chapterCount, 0);
   const oldPercent = oldTotalChapters ? Math.round((oldReadCount / oldTotalChapters) * 100) : 0;
   const newPercent = newTotalChapters ? Math.round((newReadCount / newTotalChapters) * 100) : 0;
-  const readPercent = { old: oldPercent, new: newPercent } as const;
 
   const recentHistory = getRecentHistory(8);
 
@@ -754,15 +822,8 @@ export default function Bible() {
     setJumpToVerse(verseIndex);
   };
 
-  const startReading = () => {
-    const recent = getRecentHistory(1)[0];
-    if (recent) openVerse(recent.bookSlug, recent.chapter);
-    else openVerse("genesis", 1);
-  };
-
-  const handleShareDailyVerse = async () => {
-    if (!dailyVerse) return;
-    const text = `“${dailyVerse.text}” — ${dailyVerse.ref}`;
+  const handleShareHeroVerse = async (slide: (typeof heroSlides)[number]) => {
+    const text = `“${slide.text}” — ${slide.ref}`;
     if (navigator.share) {
       try {
         await navigator.share({ text });
@@ -773,8 +834,8 @@ export default function Bible() {
     }
     try {
       await navigator.clipboard.writeText(text);
-      setDailyVerseShared(true);
-      setTimeout(() => setDailyVerseShared(false), 1800);
+      setHeroSharedId(slide.id);
+      setTimeout(() => setHeroSharedId(null), 1800);
     } catch {
       // clipboard unavailable — silently ignore
     }
@@ -865,7 +926,7 @@ export default function Bible() {
             {i + 1}
           </span>
           <div className="flex-1 min-w-0">
-            <p className="font-abyssinica font-medium text-base text-gold truncate">{b.nameAm}</p>
+            <p className="font-abyssinica font-medium text-base text-[var(--bible-navy)] truncate">{b.nameAm}</p>
           </div>
           <span className="text-[10px] text-fg-subtle shrink-0">{b.chapterCount} ምዕራፍ</span>
           <ChevronRight size={16} className="text-fg-subtle shrink-0" />
@@ -874,117 +935,181 @@ export default function Bible() {
     </div>
   );
 
-  // Testament stat card — icon, book count, and a real reading-progress bar
-  // (replaces the old plain expand row); still toggles the book list below
-  // it open/closed on click, same interaction as before.
-  const TestamentProgressCard = ({
-    id,
-    books,
-  }: {
-    id: "old" | "new";
-    books: typeof BIBLE_BOOKS;
-  }) => {
-    const isOpen = expanded[id];
+  // Reading Plan card — repurposes the real Old/New Testament reading
+  // progress above into the reference design's plan-card look (icon,
+  // chapter count, progress bar, percent). Still toggles the book list
+  // below it open/closed on click, same interaction as before.
+  const ReadingPlanCard = ({ id }: { id: "old" | "new" }) => {
     const theme = TESTAMENT_THEME[id];
     const Icon = theme.icon;
-    const percent = readPercent[id];
+    const percent = id === "old" ? oldPercent : newPercent;
+    const readCount = id === "old" ? oldReadCount : newReadCount;
+    const totalChapters = id === "old" ? oldTotalChapters : newTotalChapters;
+    const accentVar = id === "old" ? "var(--bible-purple)" : "var(--bible-green)";
+    const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
     return (
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-        className={`text-left p-3.5 transition-colors hover:bg-white/5 ${id === "new" ? "border-l border-border" : ""}`}
+        className="text-left rounded-2xl p-4 transition-transform active:scale-[0.98]"
+        style={{ background: softVar }}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${theme.iconBg} ring-1 ${theme.ring} ${theme.glow}`}>
-            <Icon size={15} className={theme.accent} />
-          </div>
-          <ChevronDown
-            size={14}
-            className={`shrink-0 transition-transform ${isOpen ? `rotate-180 ${theme.accent}` : "text-fg-subtle"}`}
-          />
+        <div className="flex items-center justify-between mb-3">
+          <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: accentVar }}>
+            <Icon size={17} className="text-white" />
+          </span>
+          <span className="w-7 h-7 rounded-full flex items-center justify-center bg-white/70">
+            <ChevronRight size={13} style={{ color: "var(--bible-navy)" }} />
+          </span>
         </div>
-        <p className="font-abyssinica text-sm font-bold text-fg truncate">
-          {id === "old" ? "ብሉይ ኪዳን" : "አዲስ ኪዳን"}
+        <p className="font-playfair text-base font-bold mb-0.5" style={{ color: "var(--bible-navy)" }}>
+          {theme.label}
         </p>
-        <p className="text-[10px] text-fg-muted mb-2">{books.length} መጻሕፍት</p>
-        <div className="h-1.5 rounded-full bg-black/15 overflow-hidden mb-1">
-          <div className={`h-full rounded-full ${theme.dot}`} style={{ width: `${percent}%` }} />
+        <p className="text-xs text-fg-muted mb-3">
+          ምዕራፍ {readCount} ከ {totalChapters}
+        </p>
+        <div className="h-1.5 rounded-full bg-white/60 overflow-hidden mb-1.5">
+          <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
         </div>
-        <p className="text-[10px] font-semibold text-fg-subtle">ንባብ {percent}%</p>
+        <p className="text-[11px] font-semibold text-fg-muted">{percent}% ተጠናቋል</p>
       </button>
     );
   };
 
+  const handleHeroTouchStart = (e: React.TouchEvent) => {
+    heroTouchStartX.current = e.touches[0].clientX;
+  };
+  const handleHeroTouchEnd = (e: React.TouchEvent) => {
+    if (heroTouchStartX.current === null || heroSlides.length < 2) return;
+    const delta = e.changedTouches[0].clientX - heroTouchStartX.current;
+    if (Math.abs(delta) > 40) {
+      setHeroIndex((i) => (delta < 0 ? (i + 1) % heroSlides.length : (i - 1 + heroSlides.length) % heroSlides.length));
+    }
+    heroTouchStartX.current = null;
+  };
+
   return (
-    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl">
-      {/* Hero — a featured verse (Psalm 119:105, fetched from the real book
-          data) instead of a plain title card, with two keywords picked out
-          in gold and a CTA straight into reading. Warm amber/candlelight
-          tones stand in for the reference photo (an open Bible + candle) —
-          no stock photography is sourced into the app, so the same mood is
-          built from gradients + a soft glow instead. Kept deliberately
-          compact (small padding, single-line clamp) — this whole page is
-          meant to read as one non-scrolling screen. */}
-      <button
-        onClick={startReading}
-        className="relative w-full text-left rounded-2xl overflow-hidden mb-4 border border-gold/20 shadow-2xl active:scale-[0.99] transition-transform"
-        style={{
-          backgroundImage: isLight
-            ? "linear-gradient(135deg, #fff3dd 0%, #fbe4b8 45%, #edc888 100%)"
-            : "linear-gradient(135deg, #2b1608 0%, #1a0f05 55%, #0b0603 100%)",
-        }}
-      >
-        <div
-          className="absolute -right-12 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none"
-          style={{ background: isLight ? "rgba(243,201,105,0.5)" : "rgba(243,201,105,0.22)" }}
-        />
-        <Cross
-          size={80}
-          className={`absolute -right-4 -bottom-6 pointer-events-none ${isLight ? "text-black/[0.05]" : "text-white/[0.04]"}`}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle, ${isLight ? "#3a2a12" : "#fff"} 1px, transparent 1px)`,
-            backgroundSize: "16px 16px",
-          }}
-        />
-
-        <div className="relative px-5 py-4 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            {heroVerse ? (
-              <>
-                <p className="font-agbalumo text-base leading-snug text-fg mb-1.5 line-clamp-2">
-                  {renderHighlightedVerse(heroVerse.text, ["መብራት", "ብርሃን"])}
-                </p>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gold/80">{heroVerse.ref}</p>
-              </>
-            ) : (
-              <div className="h-8" />
-            )}
+    <div className="bible-scope bg-base min-h-full px-6 py-5 max-w-2xl" style={BIBLE_HOME_THEME}>
+      {/* Header — this screen's own bespoke header (Topbar suppresses itself
+          on /bible), matching the Home/Library convention: brand mark +
+          settings/login entry point on the left, decorative notification
+          bell on the right (mirrors Home's own not-yet-wired bell). */}
+      <div className="flex items-center justify-between mb-5">
+        <button
+          onClick={() => navigate(user ? "/settings" : "/auth")}
+          className="flex items-center gap-3 text-left -m-1 p-1"
+          aria-label={user ? "Settings" : "Log in"}
+        >
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: "var(--bible-navy)" }}
+          >
+            <span className="text-white font-playfair font-bold text-lg">M</span>
           </div>
-          <ChevronRight size={16} className={isLight ? "text-black/40 shrink-0" : "text-gold/60 shrink-0"} />
-        </div>
-      </button>
+          <div>
+            <h1 className="font-abyssinica font-bold text-xl tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
+              መዝሙር
+            </h1>
+            <p className="text-[11px] text-fg-muted -mt-0.5">ቃልህ። ሕይወትህ።</p>
+          </div>
+        </button>
+        <button
+          aria-label="Notifications"
+          className="relative w-11 h-11 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
+        >
+          <Bell size={19} />
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full ring-2 ring-base" style={{ background: "var(--bible-purple)" }} />
+        </button>
+      </div>
 
-      {/* Quick Access — no heading, matches the rest of the page's push to
-          stay compact and non-scrolling. */}
-      <div className="mb-4">
-        <div className="grid grid-cols-4 gap-2">
-          {QUICK_ACCESS.map((item) => (
-            <button key={item.id} onClick={item.onClick} className="flex flex-col items-center gap-1 min-w-0">
+      {/* Hero — 5-slide "Verse of the Day" carousel (today + the next 4
+          upcoming picks), each slide backed by a small SVG scene instead
+          of a stock photo (see HeroSlideArt above). */}
+      {heroSlides.length === 0 ? (
+        <div className="w-full h-[280px] rounded-3xl mb-5 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
+      ) : (
+        <div className="mb-5">
+          <div
+            className="relative w-full h-[280px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
+            onTouchStart={handleHeroTouchStart}
+            onTouchEnd={handleHeroTouchEnd}
+          >
+            <div
+              className="flex h-full transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${heroIndex * 100}%)` }}
+            >
+              {heroSlides.map((slide, i) => (
+                <div key={slide.id} className="relative w-full h-full shrink-0">
+                  <HeroSlideArt variant={i} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                  <button
+                    onClick={() => handleShareHeroVerse(slide)}
+                    aria-label="Share verse"
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
+                  >
+                    {heroSharedId === slide.id ? (
+                      <Check size={16} style={{ color: "var(--bible-purple)" }} />
+                    ) : (
+                      <Share2 size={15} style={{ color: "var(--bible-navy)" }} />
+                    )}
+                  </button>
+                  <div className="relative h-full flex flex-col justify-end p-5">
+                    <span
+                      className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[10px] font-bold uppercase tracking-[0.14em] px-3 py-1 mb-3"
+                      style={{ color: "var(--bible-purple)" }}
+                    >
+                      <Sun size={12} strokeWidth={2.5} />
+                      የዕለቱ ቃል
+                    </span>
+                    <p className="font-playfair text-xl font-bold text-white leading-snug mb-2 line-clamp-4">{slide.text}</p>
+                    <p className="text-xs font-semibold text-white/80 mb-4">{slide.ref}</p>
+                    <button
+                      onClick={() => openVerse(slide.slug, slide.chapter, slide.verseIndex)}
+                      className="w-fit flex items-center gap-2 rounded-full text-white text-sm font-bold pl-4 pr-5 py-2.5 shadow-lg active:scale-95 transition-transform"
+                      style={{ background: "var(--bible-navy)" }}
+                    >
+                      <BookOpen size={15} />
+                      ሙሉውን ያንብቡ
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {heroSlides.length > 1 && (
+            <div className="flex items-center justify-center gap-1.5 mt-3">
+              {heroSlides.map((slide, i) => (
+                <button
+                  key={slide.id}
+                  onClick={() => setHeroIndex(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  className="h-1.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: i === heroIndex ? 20 : 6,
+                    background: i === heroIndex ? "var(--bible-purple)" : "var(--color-border)",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quick Access — Bookmarks / Notes / History / Favorites in one card. */}
+      <div className="rounded-2xl mb-5 shadow-sm overflow-hidden" style={{ background: "var(--color-elevated)" }}>
+        <div className="grid grid-cols-4">
+          {QUICK_ACCESS.map((item, i) => (
+            <button
+              key={item.id}
+              onClick={item.onClick}
+              className={`flex flex-col items-center gap-2 py-4 min-w-0 ${i > 0 ? "border-l border-border" : ""}`}
+            >
               <span
-                className="tile-glow w-10 h-10 rounded-full flex items-center justify-center ring-1 ring-white/25"
-                style={
-                  {
-                    "--tile-glow": "color-mix(in oklab, var(--color-gold) 60%, transparent)",
-                    background:
-                      "radial-gradient(120% 120% at 30% 22%, color-mix(in oklab, var(--color-gold) 45%, white) 0%, var(--color-gold) 55%, color-mix(in oklab, var(--color-gold) 80%, black) 100%)",
-                  } as CSSProperties
-                }
+                className="w-11 h-11 rounded-full flex items-center justify-center"
+                style={{ background: "var(--bible-purple-soft)" }}
               >
-                <item.icon size={15} className="text-[#3a2410]" />
+                <item.icon size={18} style={{ color: "var(--bible-purple)" }} />
               </span>
-              <span className="text-[10px] font-semibold text-fg-muted text-center leading-tight w-full truncate">
+              <span className="text-xs font-semibold text-center leading-tight w-full truncate" style={{ color: "var(--bible-navy)" }}>
                 {item.label}
               </span>
             </button>
@@ -992,103 +1117,30 @@ export default function Bible() {
         </div>
       </div>
 
-      {/* Daily verse — a different verse from the hero, rotates once per
-          local calendar day (see the fetch effect above). Same rule as the
-          hero above: the reference design's photo (a sunrise over
-          mountains) isn't sourced as a real image — a warm sunrise-toned
-          gradient (gold glow at top-right fading down into dusk) stands in
-          for it instead, matching this card's own "የሃራ ቀል"/Sunrise-icon
-          theme far more than the previous flat indigo did. */}
-      {dailyVerse && (
-        <div
-          className="relative overflow-hidden rounded-2xl border border-gold/20 p-4 mb-4"
-          style={{
-            backgroundImage: isLight
-              ? "radial-gradient(130% 110% at 88% -15%, #fff6df 0%, #fbe4b0 20%, #f0c988 42%, #dba668 62%, #c98f5c 100%)"
-              : "radial-gradient(130% 110% at 88% -15%, #f3c969 0%, #d98f3c 20%, #7a4a24 45%, #2e1c10 72%, #120b06 100%)",
-            animation: "verse-fade-in 0.6s ease-out",
-          }}
-        >
-          <div className="absolute -right-4 -top-4" style={{ color: isLight ? "#6b3a12" : undefined }}>
-            <Sunrise size={60} className={isLight ? "" : "text-gold"} />
+      {/* Reading Plan — repurposes the real Old/New Testament reading
+          progress (see comment above oldPercent/newPercent) into this
+          card look, rather than inventing a fictional day-count plan the
+          app has no data for. */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={16} style={{ color: "var(--bible-navy)" }} />
+            <h2 className="text-sm font-bold" style={{ color: "var(--bible-navy)" }}>
+              የንባብ እቅድ
+            </h2>
           </div>
-          <button
-            onClick={handleShareDailyVerse}
-            className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center bg-black/15 hover:bg-black/25 transition-colors"
-            aria-label="Share verse"
-          >
-            {dailyVerseShared ? (
-              <Check size={13} style={{ color: isLight ? "#6b3a12" : undefined }} className={isLight ? "" : "text-gold"} />
-            ) : (
-              <Share2 size={13} className="text-fg/70" />
-            )}
-          </button>
-          {/* This card's own accent — the shared gold token is tuned for a
-              neutral background, and reads as near-invisible gold-on-gold
-              against the warm sunrise gradient above in light mode, so it
-              gets its own deep amber/brown here instead (dark mode's
-              background stays dark enough that the shared gold is still
-              plenty legible, unchanged). */}
-          <div className="relative flex items-center gap-1.5 mb-1.5" style={{ color: isLight ? "#6b3a12" : undefined }}>
-            <Sunrise size={13} className={isLight ? "" : "text-gold"} />
-            <h3
-              className={`text-xs font-black uppercase tracking-widest ${isLight ? "" : WORD_ART_TITLE}`}
-              style={isLight ? { color: "#5c3410" } : undefined}
-            >
-              የዕለቱ መና
-            </h3>
-          </div>
-          <p className="relative font-menbere italic text-sm text-fg/90 leading-relaxed line-clamp-3">
-            “{dailyVerse.text}”
-          </p>
-          <div className="relative flex items-center justify-between mt-2">
-            <button
-              onClick={() => openVerse(dailyVerse.slug, dailyVerse.chapter, dailyVerse.verseIndex)}
-              className={`flex items-center gap-1 text-xs font-bold transition-colors ${
-                isLight ? "hover:opacity-75" : "text-gold hover:text-gold-glow"
-              }`}
-              style={isLight ? { color: "#6b3a12" } : undefined}
-            >
-              ሙሉ ቃል ያንብቡ
-              <ChevronRight size={12} />
-            </button>
-            <p
-              className={`text-[10px] font-semibold ${isLight ? "" : "text-gold/80"}`}
-              style={isLight ? { color: "#6b3a12" } : undefined}
-            >
-              {dailyVerse.ref}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Books — a single unified card holding both testaments side by side
-          (redesigned from two separate square cards) so the gold/green
-          accents read as one cohesive piece instead of two disconnected
-          tiles; still toggles the same book list open/closed beneath it. */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">መጻሕፍት</h2>
           <button
             onClick={() => setExpanded({ old: true, new: true })}
-            className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
+            className="flex items-center gap-0.5 text-xs font-semibold transition-colors"
+            style={{ color: "var(--bible-purple)" }}
           >
             ሁሉንም ይመልከቱ
             <ChevronRight size={12} />
           </button>
         </div>
-        <div
-          className="rounded-2xl overflow-hidden border border-border shadow-lg"
-          style={{
-            backgroundImage: isLight
-              ? "linear-gradient(90deg, rgba(139,92,246,0.10) 0%, rgba(139,92,246,0.03) 48%, rgba(20,184,102,0.03) 52%, rgba(20,184,102,0.10) 100%)"
-              : "linear-gradient(90deg, rgba(139,92,246,0.14) 0%, rgba(10,10,14,0.65) 48%, rgba(10,10,14,0.65) 52%, rgba(20,184,102,0.14) 100%)",
-          }}
-        >
-          <div className="grid grid-cols-2">
-            <TestamentProgressCard id="old" books={oldTestament} />
-            <TestamentProgressCard id="new" books={newTestament} />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <ReadingPlanCard id="old" />
+          <ReadingPlanCard id="new" />
         </div>
         {expanded.old && (
           <div className="mt-3">
@@ -1102,37 +1154,65 @@ export default function Bible() {
         )}
       </div>
 
-      {/* Recently Read */}
+      {/* Continue Reading — vertical list (matches the reference design),
+          capped at 2 like the reference; "View All" opens the full history
+          modal. Percent is real progress through the book (chapter / total
+          chapters) — there's no per-chapter scroll-position tracking to
+          derive a truer in-chapter percentage from. */}
       {recentHistory.length > 0 && (
         <div className="mb-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-fg-muted">በቅርብ የተነበቡ</h2>
+            <div className="flex items-center gap-2">
+              <BookOpen size={16} style={{ color: "var(--bible-navy)" }} />
+              <h2 className="text-sm font-bold" style={{ color: "var(--bible-navy)" }}>
+                ንባብ ይቀጥሉ
+              </h2>
+            </div>
             <button
               onClick={() => setActiveModal("history")}
-              className="flex items-center gap-0.5 text-xs font-semibold text-gold hover:text-gold-glow transition-colors"
+              className="flex items-center gap-0.5 text-xs font-semibold transition-colors"
+              style={{ color: "var(--bible-purple)" }}
             >
               ሁሉንም ይመልከቱ
               <ChevronRight size={12} />
             </button>
           </div>
-          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-            {recentHistory.map((entry) => {
+          <div className="space-y-3">
+            {recentHistory.slice(0, 2).map((entry, i) => {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;
-              const theme = TESTAMENT_THEME[b.testament];
+              const percent = Math.round((entry.chapter / b.chapterCount) * 100);
+              const accentVar = i % 2 === 0 ? "var(--bible-purple)" : "var(--bible-green)";
+              const tileGradient =
+                i % 2 === 0
+                  ? "linear-gradient(160deg, #6D4FEA, #3B2A85)"
+                  : "linear-gradient(160deg, #2F9E6E, #1C5A3E)";
               return (
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
                   onClick={() => openVerse(entry.bookSlug, entry.chapter)}
-                  className="shrink-0 w-32 bg-elevated hover:bg-elevated-hover rounded-xl p-3 text-left transition-colors"
+                  className="w-full flex items-center gap-3 rounded-2xl p-3 text-left shadow-sm"
+                  style={{ background: "var(--color-elevated)" }}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-[10px] font-bold uppercase tracking-wide ${theme.accent}`}>{theme.label}</span>
-                    <Bookmark size={13} className="text-fg-subtle shrink-0" />
+                  <div
+                    className="w-20 h-20 rounded-xl flex flex-col items-center justify-center shrink-0 gap-0.5"
+                    style={{ backgroundImage: tileGradient }}
+                  >
+                    <span className="font-playfair text-white font-bold text-sm leading-tight text-center px-1 line-clamp-2">
+                      {b.nameAm}
+                    </span>
+                    <span className="text-white/80 text-[11px] font-semibold">{entry.chapter}</span>
                   </div>
-                  <p className="font-abyssinica text-sm font-bold text-fg truncate">
-                    {b.nameAm} {entry.chapter}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm mb-1.5 truncate" style={{ color: "var(--bible-navy)" }}>
+                      {b.nameAm} {entry.chapter}
+                    </p>
+                    <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mb-1.5">
+                      <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
+                    </div>
+                    <p className="text-[11px] font-semibold text-fg-muted">{percent}%</p>
+                  </div>
+                  <ChevronRight size={16} className="text-fg-subtle shrink-0" />
                 </button>
               );
             })}
