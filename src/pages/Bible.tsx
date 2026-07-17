@@ -409,7 +409,7 @@ export default function Bible() {
               onChange={(e) => setBookSearchQuery(e.target.value)}
               placeholder={`${book.nameAm} ውስጥ ጥቅስ ፈልግ...`}
               pill
-              className="w-full pl-10 pr-9 py-2.5 text-base"
+              className="w-full pl-10 pr-9 py-2.5 text-[1rem]"
             />
             {bookSearchQuery && (
               <button
@@ -485,7 +485,7 @@ export default function Bible() {
             <p className="text-xs text-gold font-semibold uppercase tracking-widest">
               {book.testament === "old" ? "ብሉይ ኪዳን" : "አዲስ ኪዳን"}
             </p>
-            <h1 className={`font-agbalumo text-2xl font-black tracking-tight truncate ${WORD_ART_TITLE}`}>
+            <h1 className={`font-abyssinica text-2xl font-black tracking-tight truncate ${WORD_ART_TITLE}`}>
               {book.nameAm} {chapter}
             </h1>
           </div>
@@ -549,7 +549,7 @@ export default function Bible() {
                         key={s}
                         onClick={() => updatePrefs({ fontSize: s })}
                         className={`flex-1 py-2 rounded-md font-semibold border transition-colors ${
-                          s === "sm" ? "text-xs" : s === "md" ? "text-sm" : s === "lg" ? "text-base" : "text-lg"
+                          s === "sm" ? "text-xs" : s === "md" ? "text-sm" : s === "lg" ? "text-[1rem]" : "text-lg"
                         } ${
                           prefs.fontSize === s
                             ? "bg-white text-black border-transparent"
@@ -572,7 +572,7 @@ export default function Bible() {
                             : "border-border text-fg-muted hover:text-fg"
                         }`}
                       >
-                        <span className={`block text-base leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
+                        <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
                         <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
                       </button>
                     ))}
@@ -638,7 +638,7 @@ export default function Bible() {
                         placeholder="Add a note for this verse..."
                         rows={2}
                         variant="panel"
-                        className="w-full px-3 py-2 text-base resize-none"
+                        className="w-full px-3 py-2 text-[1rem] resize-none"
                       />
                       <div className="flex items-center gap-2 mt-2">
                         <button
@@ -755,7 +755,7 @@ export default function Bible() {
             <ChevronLeft size={22} />
           </button>
           <div>
-            <h1 className={`font-agbalumo text-xl font-bold ${WORD_ART_TITLE}`}>{book.nameAm}</h1>
+            <h1 className={`font-abyssinica text-xl font-bold ${WORD_ART_TITLE}`}>{book.nameAm}</h1>
           </div>
         </div>
         <div className="grid grid-cols-6 gap-2">
@@ -926,7 +926,7 @@ export default function Bible() {
             {i + 1}
           </span>
           <div className="flex-1 min-w-0">
-            <p className="font-abyssinica font-medium text-base text-[var(--bible-navy)] truncate">{b.nameAm}</p>
+            <p className="font-abyssinica font-medium text-[1rem] text-[var(--bible-navy)] truncate">{b.nameAm}</p>
           </div>
           <span className="text-[10px] text-fg-subtle shrink-0">{b.chapterCount} ምዕራፍ</span>
           <ChevronRight size={16} className="text-fg-subtle shrink-0" />
@@ -961,7 +961,7 @@ export default function Bible() {
             <ChevronRight size={13} style={{ color: "var(--bible-navy)" }} />
           </span>
         </div>
-        <p className="font-playfair text-base font-bold mb-0.5" style={{ color: "var(--bible-navy)" }}>
+        <p className="font-abyssinica text-base font-bold mb-0.5" style={{ color: "var(--bible-navy)" }}>
           {theme.label}
         </p>
         <p className="text-xs text-fg-muted mb-3">
@@ -988,36 +988,38 @@ export default function Bible() {
   };
 
   return (
-    <div className="bible-scope bg-base min-h-full px-6 py-5 max-w-2xl" style={BIBLE_HOME_THEME}>
+    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl" style={BIBLE_HOME_THEME}>
       {/* Header — this screen's own bespoke header (Topbar suppresses itself
           on /bible), matching the Home/Library convention: brand mark +
           settings/login entry point on the left, decorative notification
-          bell on the right (mirrors Home's own not-yet-wired bell). */}
-      <div className="flex items-center justify-between mb-5">
+          bell on the right (mirrors Home's own not-yet-wired bell). Kept
+          compact — the whole page is meant to fit one non-scrolling
+          screen, same rule the previous design held to. */}
+      <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => navigate(user ? "/settings" : "/auth")}
-          className="flex items-center gap-3 text-left -m-1 p-1"
+          className="flex items-center gap-2.5 text-left -m-1 p-1"
           aria-label={user ? "Settings" : "Log in"}
         >
           <div
-            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
             style={{ background: "var(--bible-navy)" }}
           >
-            <span className="text-white font-playfair font-bold text-lg">M</span>
+            <span className="text-white font-playfair font-bold text-[1rem]">M</span>
           </div>
           <div>
-            <h1 className="font-abyssinica font-bold text-xl tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
+            <h1 className="font-abyssinica font-bold text-base tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
               መዝሙር
             </h1>
-            <p className="text-[11px] text-fg-muted -mt-0.5">ቃልህ። ሕይወትህ።</p>
+            <p className="text-[10px] text-fg-muted -mt-0.5">ቃልህ። ሕይወትህ።</p>
           </div>
         </button>
         <button
           aria-label="Notifications"
-          className="relative w-11 h-11 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
+          className="relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
         >
-          <Bell size={19} />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full ring-2 ring-base" style={{ background: "var(--bible-purple)" }} />
+          <Bell size={16} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-base" style={{ background: "var(--bible-purple)" }} />
         </button>
       </div>
 
@@ -1025,11 +1027,11 @@ export default function Bible() {
           upcoming picks), each slide backed by a small SVG scene instead
           of a stock photo (see HeroSlideArt above). */}
       {heroSlides.length === 0 ? (
-        <div className="w-full h-[280px] rounded-3xl mb-5 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
+        <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
-        <div className="mb-5">
+        <div className="mb-3">
           <div
-            className="relative w-full h-[280px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
+            className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
             onTouchStart={handleHeroTouchStart}
             onTouchEnd={handleHeroTouchEnd}
           >
@@ -1044,30 +1046,30 @@ export default function Bible() {
                   <button
                     onClick={() => handleShareHeroVerse(slide)}
                     aria-label="Share verse"
-                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
                   >
                     {heroSharedId === slide.id ? (
-                      <Check size={16} style={{ color: "var(--bible-purple)" }} />
+                      <Check size={14} style={{ color: "var(--bible-purple)" }} />
                     ) : (
-                      <Share2 size={15} style={{ color: "var(--bible-navy)" }} />
+                      <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
                     )}
                   </button>
-                  <div className="relative h-full flex flex-col justify-end p-5">
+                  <div className="relative h-full flex flex-col justify-end p-4">
                     <span
-                      className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[10px] font-bold uppercase tracking-[0.14em] px-3 py-1 mb-3"
+                      className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
                       style={{ color: "var(--bible-purple)" }}
                     >
-                      <Sun size={12} strokeWidth={2.5} />
+                      <Sun size={11} strokeWidth={2.5} />
                       የዕለቱ ቃል
                     </span>
-                    <p className="font-playfair text-xl font-bold text-white leading-snug mb-2 line-clamp-4">{slide.text}</p>
-                    <p className="text-xs font-semibold text-white/80 mb-4">{slide.ref}</p>
+                    <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2">{slide.text}</p>
+                    <p className="text-[11px] font-semibold text-white/80 mb-2.5">{slide.ref}</p>
                     <button
                       onClick={() => openVerse(slide.slug, slide.chapter, slide.verseIndex)}
-                      className="w-fit flex items-center gap-2 rounded-full text-white text-sm font-bold pl-4 pr-5 py-2.5 shadow-lg active:scale-95 transition-transform"
+                      className="w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
                       style={{ background: "var(--bible-navy)" }}
                     >
-                      <BookOpen size={15} />
+                      <BookOpen size={13} />
                       ሙሉውን ያንብቡ
                     </button>
                   </div>
@@ -1076,7 +1078,7 @@ export default function Bible() {
             </div>
           </div>
           {heroSlides.length > 1 && (
-            <div className="flex items-center justify-center gap-1.5 mt-3">
+            <div className="flex items-center justify-center gap-1.5 mt-2">
               {heroSlides.map((slide, i) => (
                 <button
                   key={slide.id}
@@ -1155,13 +1157,15 @@ export default function Bible() {
       </div>
 
       {/* Continue Reading — vertical list (matches the reference design),
-          capped at 2 like the reference; "View All" opens the full history
-          modal. Percent is real progress through the book (chapter / total
-          chapters) — there's no per-chapter scroll-position tracking to
-          derive a truer in-chapter percentage from. */}
+          as a compact horizontal row (not the reference's taller vertical
+          list) — the whole home screen is meant to fit one non-scrolling
+          view, and a vertical list here would push it past that. Percent is
+          real progress through the book (chapter / total chapters) —
+          there's no per-chapter scroll-position tracking to derive a truer
+          in-chapter percentage from. */}
       {recentHistory.length > 0 && (
         <div className="mb-2">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <BookOpen size={16} style={{ color: "var(--bible-navy)" }} />
               <h2 className="text-sm font-bold" style={{ color: "var(--bible-navy)" }}>
@@ -1177,8 +1181,8 @@ export default function Bible() {
               <ChevronRight size={12} />
             </button>
           </div>
-          <div className="space-y-3">
-            {recentHistory.slice(0, 2).map((entry, i) => {
+          <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+            {recentHistory.slice(0, 6).map((entry, i) => {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;
               const percent = Math.round((entry.chapter / b.chapterCount) * 100);
@@ -1191,28 +1195,20 @@ export default function Bible() {
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
                   onClick={() => openVerse(entry.bookSlug, entry.chapter)}
-                  className="w-full flex items-center gap-3 rounded-2xl p-3 text-left shadow-sm"
+                  className="shrink-0 w-28 rounded-xl p-2.5 text-left shadow-sm"
                   style={{ background: "var(--color-elevated)" }}
                 >
                   <div
-                    className="w-20 h-20 rounded-xl flex flex-col items-center justify-center shrink-0 gap-0.5"
+                    className="w-full h-12 rounded-lg flex items-center justify-between px-2 mb-2"
                     style={{ backgroundImage: tileGradient }}
                   >
-                    <span className="font-playfair text-white font-bold text-sm leading-tight text-center px-1 line-clamp-2">
-                      {b.nameAm}
-                    </span>
-                    <span className="text-white/80 text-[11px] font-semibold">{entry.chapter}</span>
+                    <span className="font-abyssinica text-white font-bold text-xs leading-tight line-clamp-1">{b.nameAm}</span>
+                    <span className="text-white/80 text-[10px] font-semibold shrink-0">{entry.chapter}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm mb-1.5 truncate" style={{ color: "var(--bible-navy)" }}>
-                      {b.nameAm} {entry.chapter}
-                    </p>
-                    <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mb-1.5">
-                      <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
-                    </div>
-                    <p className="text-[11px] font-semibold text-fg-muted">{percent}%</p>
+                  <div className="h-1 rounded-full bg-black/[0.06] overflow-hidden mb-1">
+                    <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
                   </div>
-                  <ChevronRight size={16} className="text-fg-subtle shrink-0" />
+                  <p className="text-[10px] font-semibold text-fg-muted">{percent}%</p>
                 </button>
               );
             })}
