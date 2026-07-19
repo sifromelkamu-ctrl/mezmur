@@ -176,9 +176,14 @@ function HeroSlideArt({ variant }: { variant: number }) {
           <stop offset="100%" stopColor={sky.top} />
         </linearGradient>
         <radialGradient id={`${uid}-sun`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#FFF7E8" stopOpacity="0.95" />
+          <stop offset="0%" stopColor="#FFDDA0" stopOpacity="0.95" />
           <stop offset="55%" stopColor={sky.mid} stopOpacity="0.45" />
           <stop offset="100%" stopColor={sky.mid} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}-sun-core`} cx="38%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="#FFF3D0" />
+          <stop offset="45%" stopColor="#FFC65C" />
+          <stop offset="100%" stopColor="#F0863A" />
         </radialGradient>
         <linearGradient id={`${uid}-far`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.22" />
@@ -216,7 +221,7 @@ function HeroSlideArt({ variant }: { variant: number }) {
       ))}
 
       <circle cx={sunCx} cy={sunCy} r="78" fill={`url(#${uid}-sun)`} />
-      <circle cx={sunCx} cy={sunCy} r="22" fill="#FFF7E8" opacity="0.95" />
+      <circle cx={sunCx} cy={sunCy} r="22" fill={`url(#${uid}-sun-core)`} />
 
       <path d={bgHillPath(farY, 22, hillSeed + 1)} fill={`url(#${uid}-far)`} />
       <path d={bgHillPath(midY, 26, hillSeed + 2)} fill={`url(#${uid}-mid)`} />
@@ -1058,31 +1063,43 @@ export default function Bible() {
     const readCount = id === "old" ? oldReadCount : newReadCount;
     const totalChapters = id === "old" ? oldTotalChapters : newTotalChapters;
     const accentVar = id === "old" ? "var(--bible-purple)" : "var(--bible-green)";
+    const accentDeepVar = id === "old" ? "#3F2AAE" : "#1E6E4C";
     const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
     return (
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-        className="text-left rounded-2xl p-4 transition-transform active:scale-[0.98]"
+        className="relative overflow-hidden text-left rounded-[28px] p-5 transition-transform active:scale-[0.98] shadow-[0_10px_28px_-14px_rgba(36,28,61,0.28)] ring-1 ring-black/[0.04]"
         style={{ background: softVar }}
       >
-        <div className="flex items-center justify-between mb-3">
-          <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: accentVar }}>
-            <Icon size={17} className="text-white" />
+        {/* Oversized, near-invisible icon watermark — the "unique premium
+            stat card" touch that separates this from a plain flat tile. */}
+        <Icon size={104} strokeWidth={1.25} className="absolute -right-5 -bottom-6 opacity-[0.09] pointer-events-none" style={{ color: accentDeepVar }} />
+
+        <div className="relative flex items-center justify-between mb-5">
+          <span
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]"
+            style={{ backgroundImage: `linear-gradient(155deg, ${accentVar}, ${accentDeepVar})` }}
+          >
+            <Icon size={21} className="text-white" />
           </span>
-          <span className="w-7 h-7 rounded-full flex items-center justify-center bg-white/70">
-            <ChevronRight size={13} style={{ color: "var(--bible-navy)" }} />
+          <span className="text-[28px] font-black leading-none" style={{ color: accentDeepVar }}>
+            {percent}%
           </span>
         </div>
-        <p className="font-abyssinica text-base font-black mb-0.5" style={{ color: "var(--bible-navy)" }}>
+
+        <p className="relative font-abyssinica text-xl font-black mb-1 leading-tight" style={{ color: "var(--bible-navy)" }}>
           {theme.label}
         </p>
-        <p className="text-xs font-bold text-fg-muted mb-3">
+        <p className="relative text-sm font-bold text-fg-muted mb-4">
           ምዕራፍ {readCount} ከ {totalChapters}
         </p>
-        <div className="h-1.5 rounded-full bg-white/60 overflow-hidden mb-1.5">
-          <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
+
+        <div className="relative h-2 rounded-full bg-white/60 overflow-hidden">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${percent}%`, backgroundImage: `linear-gradient(90deg, ${accentVar}, ${accentDeepVar})` }}
+          />
         </div>
-        <p className="text-[11px] font-bold text-fg-muted">{percent}% ተጠናቋል</p>
       </button>
     );
   };
@@ -1107,12 +1124,9 @@ export default function Bible() {
           >
             <span className="text-white font-playfair font-bold text-[1rem]">M</span>
           </div>
-          <div>
-            <h1 className="font-abyssinica font-bold text-base tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
-              መዝሙር
-            </h1>
-            <p className="text-[10px] text-fg-muted -mt-0.5">ቃልህ። ሕይወትህ።</p>
-          </div>
+          <h1 className="font-abyssinica font-bold text-base tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
+            መዝሙር
+          </h1>
         </button>
         <button
           onClick={handleToggleNotifications}
@@ -1123,6 +1137,28 @@ export default function Bible() {
         >
           <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
         </button>
+      </div>
+
+      {/* Reading Plan — moved to the top of the page (above the hero) so
+          it's the first thing visible. Repurposes the real Old/New
+          Testament reading progress (see comment above oldPercent/
+          newPercent) into this card look, rather than inventing a
+          fictional day-count plan the app has no data for. */}
+      <div className="mb-5">
+        <div className="grid grid-cols-2 gap-3">
+          <ReadingPlanCard id="old" />
+          <ReadingPlanCard id="new" />
+        </div>
+        {expanded.old && (
+          <div className="mt-3">
+            <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
+          </div>
+        )}
+        {expanded.new && (
+          <div className="mt-3">
+            <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
+          </div>
+        )}
       </div>
 
       {/* Hero — a single "verse of the day" card (one per local calendar
@@ -1188,27 +1224,6 @@ export default function Bible() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Reading Plan — repurposes the real Old/New Testament reading
-          progress (see comment above oldPercent/newPercent) into this
-          card look, rather than inventing a fictional day-count plan the
-          app has no data for. */}
-      <div className="mb-5">
-        <div className="grid grid-cols-2 gap-3">
-          <ReadingPlanCard id="old" />
-          <ReadingPlanCard id="new" />
-        </div>
-        {expanded.old && (
-          <div className="mt-3">
-            <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
-          </div>
-        )}
-        {expanded.new && (
-          <div className="mt-3">
-            <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
-          </div>
-        )}
       </div>
 
       {/* Continue Reading — vertical list (matches the reference design),
