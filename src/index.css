@@ -228,10 +228,14 @@
      white for cards, and text uses warm near-black/brown/taupe tones rather
      than neutral grays, so the whole theme reads as one warm family instead
      of "dark mode's grays, inverted." */
-  --color-base: #e3dccb;
-  --color-panel: #dfd8c6;
-  --color-elevated: #ede6d8;
-  --color-elevated-hover: #d6cdb8;
+  /* Surfaces are 5% brighter (HSL lightness) than the original cream tones,
+     applied uniformly to every light-mode surface across the app —
+     including .bible-scope's light variant below — so no section reads
+     visibly warmer/dimmer than another. Dark mode is untouched. */
+  --color-base: #ece7dc;
+  --color-panel: #e8e3d6;
+  --color-elevated: #f5f1e9;
+  --color-elevated-hover: #dfd8c8;
   --color-fg: #1f1a17;
   --color-fg-muted: #6b5e4a;
   --color-fg-subtle: #9e9688;
@@ -294,9 +298,14 @@ input:-webkit-autofill:focus {
   caret-color: var(--color-fg);
 }
 
-/* The Bible section keeps its exact current colors regardless of the app's
-   theme — pinned here rather than left to inherit, so redesigns of the
-   global background/text tokens above never change how it looks. */
+/* The Bible section's DARK variant keeps its exact current colors
+   regardless of redesigns of the global tokens above — pinned here rather
+   than left to inherit. Its LIGHT variant below is intentionally the
+   exception: it now shares the app's unified light-mode surface tones
+   (base/panel/elevated/elevated-hover) so no section of the app reads
+   brighter or dimmer than another in light mode; only text/border/hover
+   stay Bible-specific (neutral gray, tuned separately from the rest of the
+   app's warm-brown text tones). */
 .bible-scope {
   --color-base: #0b0b0d;
   --color-panel: #121214;
@@ -310,10 +319,10 @@ input:-webkit-autofill:focus {
   --color-hover-strong: rgba(255, 255, 255, 0.2);
 }
 :root.light .bible-scope {
-  --color-base: #ffffff;
-  --color-panel: #f7f7f8;
-  --color-elevated: #efeff1;
-  --color-elevated-hover: #e3e3e6;
+  --color-base: #ece7dc;
+  --color-panel: #e8e3d6;
+  --color-elevated: #f5f1e9;
+  --color-elevated-hover: #dfd8c8;
   --color-fg: #0b0b0d;
   --color-fg-muted: #56565b;
   --color-fg-subtle: #7c7c82;
