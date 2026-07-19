@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { BIBLE_BOOKS } from "../data/bibleBooks";
+import { BIBLE_BOOKS, type BibleBookMeta } from "../data/bibleBooks";
 import { useAuth } from "../context/useAuth";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import TextAreaField from "../components/form/TextAreaField";
@@ -55,6 +55,14 @@ import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../util
 const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
 type BookText = Record<string, string[]>; // chapter number -> verses
+
+// Amharic name in "am" mode (the app's default, matching every existing
+// user's current experience unchanged); English name in "en" mode, where
+// public/bible/en/<slug>.json (King James Version — public domain, no
+// licensing restriction) is the text actually being read.
+function bookDisplayName(book: BibleBookMeta, language: "am" | "en"): string {
+  return language === "en" ? book.name : book.nameAm;
+}
 
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
@@ -178,16 +186,19 @@ export default function Bible() {
     setSpeaking(false);
   };
 
-  // Fetch the whole book once per selection (public/bible/<slug>.json), not
-  // bundled into the app — a full Amharic Bible is ~6MB, too large to ship in
-  // the JS bundle, so each book loads on demand the first time it's opened.
+  // Fetch the whole book once per selection+language (public/bible/<slug>.json
+  // for Amharic, public/bible/en/<slug>.json for the King James Version), not
+  // bundled into the app — a full Bible translation is several MB, too large
+  // to ship in the JS bundle, so each book loads on demand the first time
+  // it's opened (and again if the reader switches language mid-chapter).
   useEffect(() => {
     stopSpeaking();
     setBookText(null);
     setLoadError(false);
     if (!bookSlug) return;
     setLoading(true);
-    fetch(`/bible/${bookSlug}.json`)
+    const path = prefs.language === "en" ? `/bible/en/${bookSlug}.json` : `/bible/${bookSlug}.json`;
+    fetch(path)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
         return res.json();
@@ -196,7 +207,7 @@ export default function Bible() {
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookSlug]);
+  }, [bookSlug, prefs.language]);
 
   useEffect(() => {
     stopSpeaking();
@@ -380,7 +391,9 @@ export default function Bible() {
               type="text"
               value={bookSearchQuery}
               onChange={(e) => setBookSearchQuery(e.target.value)}
-              placeholder={`${book.nameAm} ውስጥ ጥቅስ ፈልግ...`}
+              placeholder={
+                prefs.language === "en" ? `Search in ${book.name}...` : `${book.nameAm} ውስጥ ጥቅስ ፈልግ...`
+              }
               pill
               className="w-full pl-10 pr-9 py-2.5 text-[1rem]"
             />
@@ -418,7 +431,7 @@ export default function Bible() {
 
         {bookSearchQuery.trim().length < 2 ? (
           <p className="text-sm text-fg-muted text-center py-16">
-            Type at least 2 characters to search {book.nameAm}.
+            Type at least 2 characters to search {bookDisplayName(book, prefs.language)}.
           </p>
         ) : bookSearchResults.length === 0 ? (
           <p className="text-sm text-fg-muted text-center py-16">No matching verses found.</p>
@@ -431,7 +444,7 @@ export default function Bible() {
                 className="w-full text-left p-3 rounded-lg bg-elevated hover:bg-elevated-hover transition-colors"
               >
                 <span className="text-xs font-bold text-gold uppercase tracking-wide">
-                  {book.nameAm} {r.chapter}:{r.verseIndex + 1}
+                  {bookDisplayName(book, prefs.language)} {r.chapter}:{r.verseIndex + 1}
                 </span>
                 <p className="text-sm text-fg mt-1 leading-relaxed">{r.text}</p>
               </button>
@@ -456,10 +469,18 @@ export default function Bible() {
           </button>
           <div className="min-w-0">
             <p className="text-xs text-gold font-semibold uppercase tracking-widest">
-              {book.testament === "old" ? "ብሉይ ኪዳን" : "አዲስ ኪዳን"}
+              {prefs.language === "en"
+                ? book.testament === "old"
+                  ? "Old Testament"
+                  : "New Testament"
+                : book.testament === "old"
+                  ? "ብሉይ ኪዳን"
+                  : "አዲስ ኪዳን"}
             </p>
-            <h1 className={`font-abyssinica text-2xl font-black tracking-tight truncate ${WORD_ART_TITLE}`}>
-              {book.nameAm} {chapter}
+            <h1
+              className={`${prefs.language === "en" ? "font-playfair" : "font-abyssinica"} text-2xl font-black tracking-tight truncate ${WORD_ART_TITLE}`}
+            >
+              {bookDisplayName(book, prefs.language)} {chapter}
             </h1>
           </div>
         </div>
@@ -515,6 +536,29 @@ export default function Bible() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowSettings(false)} />
                 <div className="absolute right-0 top-full mt-2 w-80 bg-elevated rounded-lg shadow-2xl p-4 z-20">
+                  <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Language</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <button
+                      onClick={() => updatePrefs({ language: "am" })}
+                      className={`flex-1 py-2 rounded-md font-semibold text-sm border transition-colors ${
+                        prefs.language === "am"
+                          ? "bg-white text-black border-transparent"
+                          : "border-border text-fg-muted hover:text-fg"
+                      }`}
+                    >
+                      አማርኛ
+                    </button>
+                    <button
+                      onClick={() => updatePrefs({ language: "en" })}
+                      className={`flex-1 py-2 rounded-md font-semibold text-sm border transition-colors ${
+                        prefs.language === "en"
+                          ? "bg-white text-black border-transparent"
+                          : "border-border text-fg-muted hover:text-fg"
+                      }`}
+                    >
+                      English (KJV)
+                    </button>
+                  </div>
                   <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Text size</p>
                   <div className="flex items-center gap-2 mb-4">
                     {(["sm", "md", "lg", "xl"] as FontSize[]).map((s) => (
@@ -533,23 +577,27 @@ export default function Bible() {
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Amharic font</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {FONT_FAMILY_OPTIONS.map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => updatePrefs({ fontFamily: f })}
-                        className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                          prefs.fontFamily === f
-                            ? "bg-white text-black border-transparent"
-                            : "border-border text-fg-muted hover:text-fg"
-                        }`}
-                      >
-                        <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
-                        <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {prefs.language === "am" && (
+                    <>
+                      <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Amharic font</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {FONT_FAMILY_OPTIONS.map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => updatePrefs({ fontFamily: f })}
+                            className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                              prefs.fontFamily === f
+                                ? "bg-white text-black border-transparent"
+                                : "border-border text-fg-muted hover:text-fg"
+                            }`}
+                          >
+                            <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
+                            <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -559,7 +607,7 @@ export default function Bible() {
         {loading ? (
           <div className="flex items-center gap-3 text-fg-muted text-sm py-16 justify-center">
             <Loader2 size={18} className="animate-spin" />
-            Loading {book.nameAm}...
+            Loading {bookDisplayName(book, prefs.language)}...
           </div>
         ) : loadError ? (
           <div className="flex items-center gap-3 text-fg-muted text-sm bg-elevated/50 rounded-lg p-4">
@@ -728,7 +776,11 @@ export default function Bible() {
             <ChevronLeft size={22} />
           </button>
           <div>
-            <h1 className={`font-abyssinica text-xl font-bold ${WORD_ART_TITLE}`}>{book.nameAm}</h1>
+            <h1
+              className={`${prefs.language === "en" ? "font-playfair" : "font-abyssinica"} text-xl font-bold ${WORD_ART_TITLE}`}
+            >
+              {bookDisplayName(book, prefs.language)}
+            </h1>
           </div>
         </div>
         <div className="grid grid-cols-6 gap-2">
@@ -756,13 +808,13 @@ export default function Bible() {
       icon: BookOpen,
       accent: "text-[var(--bible-purple)]",
       badgeBg: "bg-[var(--bible-purple)] text-white",
-      label: "ብሉይ ኪዳን",
+      label: prefs.language === "en" ? "Old Testament" : "ብሉይ ኪዳን",
     },
     new: {
       icon: Leaf,
       accent: "text-[var(--bible-green)]",
       badgeBg: "bg-[var(--bible-green)] text-white",
-      label: "አዲስ ኪዳን",
+      label: prefs.language === "en" ? "New Testament" : "አዲስ ኪዳን",
     },
   } as const;
 
@@ -900,9 +952,15 @@ export default function Bible() {
             {i + 1}
           </span>
           <div className="flex-1 min-w-0">
-            <p className="font-abyssinica font-medium text-[1rem] text-[var(--bible-navy)] truncate">{b.nameAm}</p>
+            <p
+              className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} font-medium text-[1rem] text-[var(--bible-navy)] truncate`}
+            >
+              {bookDisplayName(b, prefs.language)}
+            </p>
           </div>
-          <span className="text-[10px] text-fg-subtle shrink-0">{b.chapterCount} ምዕራፍ</span>
+          <span className="text-[10px] text-fg-subtle shrink-0">
+            {b.chapterCount} {prefs.language === "en" ? "chapters" : "ምዕራፍ"}
+          </span>
           <ChevronRight size={16} className="text-fg-subtle shrink-0" />
         </button>
       ))}
@@ -1140,7 +1198,11 @@ export default function Bible() {
                     className="w-full h-12 rounded-lg flex items-center justify-between px-2 mb-2"
                     style={{ backgroundImage: tileGradient }}
                   >
-                    <span className="font-abyssinica text-white font-bold text-xs leading-tight line-clamp-1">{b.nameAm}</span>
+                    <span
+                      className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} text-white font-bold text-xs leading-tight line-clamp-1`}
+                    >
+                      {bookDisplayName(b, prefs.language)}
+                    </span>
                     <span className="text-white/80 text-[10px] font-semibold shrink-0">{entry.chapter}</span>
                   </div>
                   <div className="h-1 rounded-full bg-black/[0.06] overflow-hidden mb-1">

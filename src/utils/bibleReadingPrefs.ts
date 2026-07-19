@@ -1,9 +1,13 @@
 export type FontSize = "sm" | "md" | "lg" | "xl";
 export type FontFamily = "notoSans" | "notoSerif" | "abyssinica" | "menbere" | "agbalumo" | "googleSans" | "nyala";
+// "am" fetches public/bible/{slug}.json (Amharic); "en" fetches
+// public/bible/en/{slug}.json (King James Version — public domain).
+export type BibleLanguage = "am" | "en";
 
 export interface ReadingPrefs {
   fontSize: FontSize;
   fontFamily: FontFamily;
+  language: BibleLanguage;
 }
 
 const STORAGE_KEY = "mezmur:bible-reading-prefs";
@@ -52,7 +56,7 @@ export const FONT_FAMILY_OPTIONS: FontFamily[] = [
   "nyala",
 ];
 
-const DEFAULT_PREFS: ReadingPrefs = { fontSize: "md", fontFamily: "notoSans" };
+const DEFAULT_PREFS: ReadingPrefs = { fontSize: "md", fontFamily: "notoSans", language: "am" };
 
 export function loadReadingPrefs(): ReadingPrefs {
   try {
