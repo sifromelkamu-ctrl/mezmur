@@ -66,14 +66,17 @@ const WORD_ART_TITLE =
 // Bible view (chapter reader, book picker, search) is unaffected and keeps
 // the app's usual dark/gold theming.
 const BIBLE_HOME_THEME = {
-  "--color-base": "#F6F5FB",
-  "--color-panel": "#FFFFFF",
-  "--color-elevated": "#FFFFFF",
-  "--color-elevated-hover": "#F4F2FB",
+  // Cream-toned, matching the same brightened surface tokens every other
+  // page uses (see :root.light in index.css) — was a lavender-white before,
+  // which read as a different, colder page than the rest of the app.
+  "--color-base": "#ECE7DC",
+  "--color-panel": "#E8E3D6",
+  "--color-elevated": "#F5F1E9",
+  "--color-elevated-hover": "#DFD8C8",
   "--color-fg": "#1C1B29",
   "--color-fg-muted": "#6B7280",
   "--color-fg-subtle": "#9CA3AF",
-  "--color-border": "#ECEAF4",
+  "--color-border": "rgba(107, 94, 74, 0.16)",
   "--color-hover": "rgba(91,63,224,0.06)",
   "--color-hover-strong": "rgba(91,63,224,0.12)",
   "--bible-purple": "#5B3FE0",
