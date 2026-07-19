@@ -90,7 +90,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return stored;
   });
   const [mode, setModeState] = useState<ThemeMode>(
-    () => (localStorage.getItem(MODE_STORAGE_KEY) as ThemeMode | null) ?? "dark"
+    () => (localStorage.getItem(MODE_STORAGE_KEY) as ThemeMode | null) ?? "light"
   );
   const [avatarColorId, setAvatarColorIdState] = useState<string>(
     () => localStorage.getItem(AVATAR_COLOR_STORAGE_KEY) ?? DEFAULT_AVATAR_COLOR_ID
