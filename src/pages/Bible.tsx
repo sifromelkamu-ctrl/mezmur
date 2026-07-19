@@ -1058,6 +1058,7 @@ export default function Bible() {
     const accentVar = id === "old" ? "var(--bible-purple)" : "var(--bible-green)";
     const accentDeepVar = id === "old" ? "#3F2AAE" : "#1E6E4C";
     const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
+    const medallionSrc = id === "old" ? "/bible/icons/ot-medallion.jpg" : "/bible/icons/nt-medallion.jpg";
     const radius = 34;
     const circumference = 2 * Math.PI * radius;
     const dashOffset = circumference * (1 - percent / 100);
@@ -1087,11 +1088,8 @@ export default function Bible() {
               style={{ transition: "stroke-dashoffset 0.6s ease" }}
             />
           </svg>
-          <span
-            className="absolute inset-[10px] rounded-full flex items-center justify-center shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]"
-            style={{ backgroundImage: `linear-gradient(155deg, ${accentVar}, ${accentDeepVar})` }}
-          >
-            <Icon size={24} className="text-white" />
+          <span className="absolute inset-[10px] rounded-full overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]">
+            <img src={medallionSrc} alt="" className="w-full h-full object-cover" />
           </span>
         </div>
 
