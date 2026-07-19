@@ -190,13 +190,12 @@
   --color-accent-red: #e0483c;
   --color-accent-violet: #8b5cf6;
   --color-accent-sky: #31d7ff;
-  /* Deep near-black navy — the premium "expensive" dark base the redesign
-     calls for, with cards a touch lighter so they lift off the background
-     without a hard border. */
-  --color-base: #12172a;
-  --color-panel: #161c33;
-  --color-elevated: #1e2740;
-  --color-elevated-hover: #262f4d;
+  /* Neutral 20%-gray base (not navy-tinted) — cards a touch lighter so they
+     lift off the background without a hard border. */
+  --color-base: #333333;
+  --color-panel: #2e2e2e;
+  --color-elevated: #424242;
+  --color-elevated-hover: #4d4d4d;
   --color-fg: #ffffff;
   --color-fg-muted: #9ba6b5;
   --color-fg-subtle: #6b7482;
@@ -298,19 +297,17 @@ input:-webkit-autofill:focus {
   caret-color: var(--color-fg);
 }
 
-/* The Bible section's DARK variant keeps its exact current colors
-   regardless of redesigns of the global tokens above — pinned here rather
-   than left to inherit. Its LIGHT variant below is intentionally the
-   exception: it now shares the app's unified light-mode surface tones
-   (base/panel/elevated/elevated-hover) so no section of the app reads
-   brighter or dimmer than another in light mode; only text/border/hover
+/* The Bible section shares the app's unified surface tones in BOTH modes
+   now (base/panel/elevated/elevated-hover) — neutral 20%-gray in dark mode,
+   brightened cream in light mode — so no section of the app reads
+   brighter/dimmer/differently-tinted than another; only text/border/hover
    stay Bible-specific (neutral gray, tuned separately from the rest of the
    app's warm-brown text tones). */
 .bible-scope {
-  --color-base: #0b0b0d;
-  --color-panel: #121214;
-  --color-elevated: #1a1a1d;
-  --color-elevated-hover: #26262a;
+  --color-base: #333333;
+  --color-panel: #2e2e2e;
+  --color-elevated: #424242;
+  --color-elevated-hover: #4d4d4d;
   --color-fg: #ffffff;
   --color-fg-muted: #a3a3a3;
   --color-fg-subtle: #737373;
