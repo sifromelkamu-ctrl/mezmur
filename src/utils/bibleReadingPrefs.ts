@@ -1,13 +1,25 @@
 export type FontSize = "sm" | "md" | "lg" | "xl";
 export type FontFamily = "notoSans" | "notoSerif" | "abyssinica" | "menbere" | "agbalumo" | "googleSans" | "nyala";
 // "am" fetches public/bible/{slug}.json (Amharic); "en" fetches
-// public/bible/en/{slug}.json (King James Version — public domain).
+// public/bible/en/{englishVersion}/{slug}.json — four public-domain English
+// translations, no modern/copyrighted translation (e.g. NIV) is included.
 export type BibleLanguage = "am" | "en";
+export type EnglishVersion = "kjv" | "asv" | "web" | "ylt";
+
+export const ENGLISH_VERSION_LABELS: Record<EnglishVersion, string> = {
+  kjv: "King James Version",
+  asv: "American Standard Version",
+  web: "World English Bible",
+  ylt: "Young's Literal Translation",
+};
+
+export const ENGLISH_VERSION_OPTIONS: EnglishVersion[] = ["kjv", "asv", "web", "ylt"];
 
 export interface ReadingPrefs {
   fontSize: FontSize;
   fontFamily: FontFamily;
   language: BibleLanguage;
+  englishVersion: EnglishVersion;
 }
 
 const STORAGE_KEY = "mezmur:bible-reading-prefs";
@@ -56,7 +68,7 @@ export const FONT_FAMILY_OPTIONS: FontFamily[] = [
   "nyala",
 ];
 
-const DEFAULT_PREFS: ReadingPrefs = { fontSize: "md", fontFamily: "notoSans", language: "am" };
+const DEFAULT_PREFS: ReadingPrefs = { fontSize: "md", fontFamily: "notoSans", language: "am", englishVersion: "kjv" };
 
 export function loadReadingPrefs(): ReadingPrefs {
   try {

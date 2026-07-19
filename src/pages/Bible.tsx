@@ -41,6 +41,8 @@ import {
   type VerseAnnotation,
 } from "../utils/bibleAnnotations";
 import {
+  ENGLISH_VERSION_LABELS,
+  ENGLISH_VERSION_OPTIONS,
   FONT_FAMILY_CLASSES,
   FONT_FAMILY_LABELS,
   FONT_FAMILY_OPTIONS,
@@ -107,6 +109,27 @@ function dailyVerseIndexFor(date: Date): number {
   return hash % MORNING_VERSES.length;
 }
 
+// The hero photo rotates daily too, independently of which verse is shown —
+// a separate salted hash so the two don't cycle in lockstep.
+const HERO_IMAGES = [
+  "/bible/hero/sunset-verse.jpg",
+  "/bible/hero/wheat-field.jpg",
+  "/bible/hero/three-crosses.jpg",
+  "/bible/hero/beach-sunset.jpg",
+  "/bible/hero/holy-bible.jpg",
+  "/bible/hero/aerial-village-sunset.jpg",
+  "/bible/hero/hebrew-scripture.jpg",
+  "/bible/hero/golden-sunset-sky.jpg",
+  "/bible/hero/misty-road-cross.jpg",
+];
+
+function dailyHeroImageIndexFor(date: Date): number {
+  const dayKey = `img:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  let hash = 0;
+  for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
+  return hash % HERO_IMAGES.length;
+}
+
 export default function Bible() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -129,6 +152,8 @@ export default function Bible() {
     { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
   >(null);
   const [heroShared, setHeroShared] = useState(false);
+  const [heroImageIndex, setHeroImageIndex] = useState(() => dailyHeroImageIndexFor(new Date()));
+  const heroTouchStartX = useRef<number | null>(null);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [activeModal, setActiveModal] = useState<"bookmarks" | "notes" | "favorites" | "history" | null>(null);
@@ -197,7 +222,7 @@ export default function Bible() {
     setLoadError(false);
     if (!bookSlug) return;
     setLoading(true);
-    const path = prefs.language === "en" ? `/bible/en/${bookSlug}.json` : `/bible/${bookSlug}.json`;
+    const path = prefs.language === "en" ? `/bible/en/${prefs.englishVersion}/${bookSlug}.json` : `/bible/${bookSlug}.json`;
     fetch(path)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load");
@@ -207,7 +232,7 @@ export default function Bible() {
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookSlug, prefs.language]);
+  }, [bookSlug, prefs.language, prefs.englishVersion]);
 
   useEffect(() => {
     stopSpeaking();
@@ -556,9 +581,32 @@ export default function Bible() {
                           : "border-border text-fg-muted hover:text-fg"
                       }`}
                     >
-                      English (KJV)
+                      English
                     </button>
                   </div>
+                  {prefs.language === "en" && (
+                    <>
+                      <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Version</p>
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        {ENGLISH_VERSION_OPTIONS.map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => updatePrefs({ englishVersion: v })}
+                            className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                              prefs.englishVersion === v
+                                ? "bg-white text-black border-transparent"
+                                : "border-border text-fg-muted hover:text-fg"
+                            }`}
+                          >
+                            <span className="block text-xs font-bold uppercase">{v}</span>
+                            <span className="block text-[10px] font-semibold opacity-80 leading-tight">
+                              {ENGLISH_VERSION_LABELS[v]}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Text size</p>
                   <div className="flex items-center gap-2 mb-4">
                     {(["sm", "md", "lg", "xl"] as FontSize[]).map((s) => (
@@ -1082,17 +1130,37 @@ export default function Bible() {
       </div>
 
       {/* Hero — a single "verse of the day" card (one per local calendar
-          day, see the fetch effect above), backed by a real photo
-          (public/bible/hero/sunset-verse.jpg) instead of the SVG scene. */}
+          day, see the fetch effect above). The background photo defaults to
+          the day's pick from HERO_IMAGES but is swipeable across the whole
+          set, with dots below to show/jump to position. */}
       {!heroVerse ? (
         <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
-        <div className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)] mb-3">
-          <img
-            src="/bible/hero/sunset-verse.jpg"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+        <div className="mb-3">
+          <div
+            className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
+            onTouchStart={(e) => {
+              heroTouchStartX.current = e.touches[0].clientX;
+            }}
+            onTouchEnd={(e) => {
+              if (heroTouchStartX.current === null) return;
+              const delta = e.changedTouches[0].clientX - heroTouchStartX.current;
+              if (Math.abs(delta) > 40) {
+                setHeroImageIndex((i) =>
+                  delta < 0 ? (i + 1) % HERO_IMAGES.length : (i - 1 + HERO_IMAGES.length) % HERO_IMAGES.length
+                );
+              }
+              heroTouchStartX.current = null;
+            }}
+          >
+            <div
+              className="absolute inset-0 flex h-full transition-transform duration-400 ease-out"
+              style={{ transform: `translateX(-${heroImageIndex * 100}%)` }}
+            >
+              {HERO_IMAGES.map((src) => (
+                <img key={src} src={src} alt="" className="w-full h-full shrink-0 object-cover" />
+              ))}
+            </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10" />
           <button
             onClick={handleShareHeroVerse}
@@ -1125,6 +1193,22 @@ export default function Bible() {
               <BookOpen size={13} />
               ሙሉውን ያንብቡ
             </button>
+          </div>
+          </div>
+          <div className="flex items-center justify-center gap-1.5 mt-2">
+            {HERO_IMAGES.map((src, i) => (
+              <button
+                key={src}
+                onClick={() => setHeroImageIndex(i)}
+                aria-label={`Go to photo ${i + 1}`}
+                className="h-1.5 rounded-full transition-all duration-300"
+                style={{
+                  width: i === heroImageIndex ? "20px" : "6px",
+                  background: i === heroImageIndex ? "var(--bible-purple)" : "var(--color-fg-subtle)",
+                  opacity: i === heroImageIndex ? 1 : 0.4,
+                }}
+              />
+            ))}
           </div>
         </div>
       )}

@@ -365,6 +365,18 @@ export const pushApi = {
     request<{ subscribed: boolean }>(`/push/subscribed?endpoint=${encodeURIComponent(endpoint)}`),
 };
 
+export interface ApiBibleAudio {
+  url: string;
+  durationSeconds: number | null;
+}
+
+// Streamed live from Faith Comes By Hearing's Digital Bible Platform via
+// our own server proxy (see server/src/routes/bibleAudio.ts) — the API key
+// never reaches the client, only the resulting stream URL does.
+export const bibleAudioApi = {
+  get: (slug: string, chapter: number) => request<ApiBibleAudio>(`/bible-audio/${slug}/${chapter}`),
+};
+
 export const tracksApi = {
   list: () => request<ApiTrack[]>("/tracks"),
   trending: (limit = 12) => request<ApiTrack[]>(`/tracks/trending?limit=${limit}`),
