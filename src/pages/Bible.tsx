@@ -102,13 +102,14 @@ const BIBLE_HOME_THEME_LIGHT = {
 } as CSSProperties;
 
 const BIBLE_HOME_THEME_DARK = {
-  // Deep plum-charcoal family (not the main app's navy-black) so it still
-  // reads as "this purple/green Bible section", just lit for dark mode
-  // instead of cream-and-white.
-  "--color-base": "#171320",
-  "--color-panel": "#1D1828",
-  "--color-elevated": "#241F31",
-  "--color-elevated-hover": "#2E273C",
+  // Neutral 20%-gray family for the base surfaces (not purple-tinted), so
+  // the purple/green accents on top (badges, card tints, buttons) stay the
+  // only source of color/brand identity instead of competing with a tinted
+  // background.
+  "--color-base": "#333333",
+  "--color-panel": "#2E2E2E",
+  "--color-elevated": "#424242",
+  "--color-elevated-hover": "#4D4D4D",
   "--color-fg": "#F5F1E9",
   "--color-fg-muted": "#B0A8C0",
   "--color-fg-subtle": "#847C93",
