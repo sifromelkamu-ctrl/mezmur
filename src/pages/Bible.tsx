@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useNavigate } from "react-router-dom";
 import { BIBLE_BOOKS, type BibleBookMeta } from "../data/bibleBooks";
 import { useAuth } from "../context/useAuth";
+import { useTheme } from "../context/ThemeContext";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
@@ -69,13 +70,16 @@ function bookDisplayName(book: BibleBookMeta, language: "am" | "en"): string {
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
 
-// The Bible *home* screen (only) renders in its own fixed light purple/green
-// palette, independent of the app's global dark/gold theme toggle — set as
-// inline CSS custom properties (rather than a stylesheet rule) so it always
-// wins regardless of :root.light, with zero cascade fighting. Every other
-// Bible view (chapter reader, book picker, search) is unaffected and keeps
-// the app's usual dark/gold theming.
-const BIBLE_HOME_THEME = {
+// The Bible *home* screen (only) renders in its own purple/green palette,
+// independent of the app's global dark/gold theme — set as inline CSS
+// custom properties (rather than a stylesheet rule) so it always wins
+// regardless of :root.light, with zero cascade fighting. Every other Bible
+// view (chapter reader, book picker, search) is unaffected and keeps the
+// app's usual dark/gold theming. Unlike the rest of this screen, it DOES
+// still follow the app's light/dark toggle — two variants below, picked at
+// render time — since a purple/green home screen that stayed light while
+// every other tab went dark read as broken, not "on-brand".
+const BIBLE_HOME_THEME_LIGHT = {
   // Cream-toned, matching the same brightened surface tokens every other
   // page uses (see :root.light in index.css) — was a lavender-white before,
   // which read as a different, colder page than the rest of the app.
@@ -92,8 +96,31 @@ const BIBLE_HOME_THEME = {
   "--bible-purple": "#5B3FE0",
   "--bible-purple-soft": "#EDE9FB",
   "--bible-navy": "#241C3D",
+  "--bible-text": "#241C3D",
   "--bible-green": "#2F9E6E",
   "--bible-green-soft": "#E3F5EC",
+} as CSSProperties;
+
+const BIBLE_HOME_THEME_DARK = {
+  // Deep plum-charcoal family (not the main app's navy-black) so it still
+  // reads as "this purple/green Bible section", just lit for dark mode
+  // instead of cream-and-white.
+  "--color-base": "#171320",
+  "--color-panel": "#1D1828",
+  "--color-elevated": "#241F31",
+  "--color-elevated-hover": "#2E273C",
+  "--color-fg": "#F5F1E9",
+  "--color-fg-muted": "#B0A8C0",
+  "--color-fg-subtle": "#847C93",
+  "--color-border": "rgba(255, 255, 255, 0.08)",
+  "--color-hover": "rgba(255, 255, 255, 0.05)",
+  "--color-hover-strong": "rgba(255, 255, 255, 0.1)",
+  "--bible-purple": "#8B6CFF",
+  "--bible-purple-soft": "#2A2140",
+  "--bible-navy": "#241C3D",
+  "--bible-text": "#F5F1E9",
+  "--bible-green": "#3DDB96",
+  "--bible-green-soft": "#182A20",
 } as CSSProperties;
 
 // Picks a single index into MORNING_VERSES (0..364) for a given date, keyed
@@ -133,6 +160,8 @@ function dailyHeroImageIndexFor(date: Date): number {
 export default function Bible() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { mode } = useTheme();
+  const bibleHomeTheme = mode === "light" ? BIBLE_HOME_THEME_LIGHT : BIBLE_HOME_THEME_DARK;
   const [bookSlug, setBookSlug] = useState<string | null>(null);
   const [chapter, setChapter] = useState<number | null>(null);
   const [bookText, setBookText] = useState<BookText | null>(null);
@@ -1001,7 +1030,7 @@ export default function Bible() {
           </span>
           <div className="flex-1 min-w-0">
             <p
-              className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} font-medium text-[1rem] text-[var(--bible-navy)] truncate`}
+              className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} font-medium text-[1rem] text-[var(--bible-text)] truncate`}
             >
               {bookDisplayName(b, prefs.language)}
             </p>
@@ -1035,7 +1064,7 @@ export default function Bible() {
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
         className="relative overflow-hidden text-center rounded-[28px] pt-7 pb-6 px-4 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
-        style={{ backgroundImage: `linear-gradient(165deg, ${softVar} 0%, #FFFFFF 115%)` }}
+        style={{ backgroundImage: `linear-gradient(165deg, ${softVar} 0%, var(--color-elevated) 115%)` }}
       >
         {/* Oversized, near-invisible icon watermark — a soft texture behind
             the centered ring+title composition below. */}
@@ -1065,7 +1094,7 @@ export default function Bible() {
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-navy)" }}>
+        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-text)" }}>
           {theme.label}
         </p>
       </button>
@@ -1073,7 +1102,7 @@ export default function Bible() {
   };
 
   return (
-    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl" style={BIBLE_HOME_THEME}>
+    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl" style={bibleHomeTheme}>
       {/* Header — this screen's own bespoke header (Topbar suppresses itself
           on /bible), matching the Home/Library convention: brand mark +
           settings/login entry point on the left, decorative notification
@@ -1092,7 +1121,7 @@ export default function Bible() {
           >
             <span className="text-white font-playfair font-bold text-[1rem]">M</span>
           </div>
-          <h1 className="font-abyssinica font-bold text-base tracking-tight leading-tight" style={{ color: "var(--bible-navy)" }}>
+          <h1 className="font-abyssinica font-bold text-base tracking-tight leading-tight" style={{ color: "var(--bible-text)" }}>
             መዝሙር
           </h1>
         </button>
@@ -1228,7 +1257,7 @@ export default function Bible() {
               >
                 <item.icon size={18} style={{ color: "var(--bible-purple)" }} />
               </span>
-              <span className="text-xs font-semibold text-center leading-tight w-full truncate" style={{ color: "var(--bible-navy)" }}>
+              <span className="text-xs font-semibold text-center leading-tight w-full truncate" style={{ color: "var(--bible-text)" }}>
                 {item.label}
               </span>
             </button>
@@ -1247,8 +1276,8 @@ export default function Bible() {
         <div className="mb-2">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <BookOpen size={16} style={{ color: "var(--bible-navy)" }} />
-              <h2 className="text-sm font-bold" style={{ color: "var(--bible-navy)" }}>
+              <BookOpen size={16} style={{ color: "var(--bible-text)" }} />
+              <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
                 ንባብ ይቀጥሉ
               </h2>
             </div>
