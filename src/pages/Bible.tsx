@@ -99,149 +99,6 @@ function dailyVerseIndexFor(date: Date): number {
   return hash % MORNING_VERSES.length;
 }
 
-// Hero slide art — a small hand-built SVG scene (sky, sun/glow, hill
-// silhouettes, a cross on the peak) stands in for a real photo, since no
-// stock photography or image-generation source is available here. Five
-// color variants (warm sunrise/dusk skies, true to the reference's
-// imagery) cycle across the slides so the carousel still reads as varied.
-const HERO_SKIES = [
-  { top: "#FCE7C8", mid: "#F3A65A", bottom: "#5B3FE0" },
-  { top: "#DDEFE3", mid: "#5FBE8E", bottom: "#1C5A3E" },
-  { top: "#F7D9C4", mid: "#E0704F", bottom: "#3B2A85" },
-  { top: "#E4F3EA", mid: "#3DBE8E", bottom: "#16281F" },
-  { top: "#F3C9D9", mid: "#8B5CF6", bottom: "#241C3D" },
-] as const;
-
-// Deterministic pseudo-random helper (mulberry32) — gives each slide its
-// own stable star/cloud placement without a real RNG dependency, so the
-// scene doesn't reshuffle on every re-render.
-function seededRandom(seed: number) {
-  let t = seed + 0x6d2b79f5;
-  return () => {
-    t = (t + 0x6d2b79f5) | 0;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function HeroSlideArt({ variant }: { variant: number }) {
-  const sky = HERO_SKIES[variant % HERO_SKIES.length];
-  const rand = seededRandom(variant * 97 + 13);
-  const sunCx = 130 + (variant % 3) * 65;
-  const sunCy = 66 + (variant % 2) * 14;
-  const hillSeed = variant * 31;
-  const uid = `hero-${variant}`;
-
-  const stars = Array.from({ length: 14 }, () => ({
-    cx: rand() * 400,
-    cy: rand() * 110,
-    r: 0.6 + rand() * 1,
-    o: 0.25 + rand() * 0.45,
-  }));
-  const clouds = Array.from({ length: 3 }, (_, i) => ({
-    cx: 40 + rand() * 320,
-    cy: 55 + i * 24 + rand() * 20,
-    rx: 46 + rand() * 30,
-  }));
-
-  // Two background hill silhouettes — loose, randomized rolling curves
-  // (they're just atmospheric depth layers, exact shape doesn't matter).
-  const bgHillPath = (baseY: number, amp: number, seed: number) => {
-    const r2 = seededRandom(seed);
-    const p1 = baseY - r2() * amp;
-    const p2 = baseY - r2() * amp;
-    const p3 = baseY - r2() * amp;
-    return `M0,${baseY + 20} Q90,${p1} 190,${p2} T400,${p3} V280 H0 Z`;
-  };
-  const farY = 175 + (hillSeed % 10);
-  const midY = 205 + ((hillSeed + 5) % 10);
-
-  // The frontmost hill anchors the cross, so — unlike the two behind it —
-  // its path is built explicitly around (crossX, crossPeakY) as a real
-  // on-curve point (the shared joint of two quadratic segments), guaranteeing
-  // the silhouette actually peaks exactly where the cross stands, instead of
-  // the cross floating disconnected above a randomly-shaped hill.
-  const crossX = 190 + (variant % 3) * 20;
-  const crossPeakY = 168 + (hillSeed % 12);
-  const nearHillPath = `M0,${crossPeakY + 42} Q${crossX * 0.55},${crossPeakY - 12} ${crossX},${crossPeakY} Q${crossX + (400 - crossX) * 0.5},${crossPeakY + 28} 400,${crossPeakY + 18} V280 H0 Z`;
-
-  return (
-    <svg viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
-      <defs>
-        <linearGradient id={`${uid}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={sky.bottom} />
-          <stop offset="42%" stopColor={sky.mid} />
-          <stop offset="78%" stopColor={sky.top} />
-          <stop offset="100%" stopColor={sky.top} />
-        </linearGradient>
-        <radialGradient id={`${uid}-sun`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#FFDDA0" stopOpacity="0.95" />
-          <stop offset="55%" stopColor={sky.mid} stopOpacity="0.45" />
-          <stop offset="100%" stopColor={sky.mid} stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id={`${uid}-sun-core`} cx="38%" cy="35%" r="65%">
-          <stop offset="0%" stopColor="#FFF3D0" />
-          <stop offset="45%" stopColor="#FFC65C" />
-          <stop offset="100%" stopColor="#F0863A" />
-        </radialGradient>
-        <linearGradient id={`${uid}-far`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.32" />
-        </linearGradient>
-        <linearGradient id={`${uid}-mid`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.6" />
-        </linearGradient>
-        <linearGradient id={`${uid}-near`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.95" />
-        </linearGradient>
-        <linearGradient id={`${uid}-cross`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.85" />
-          <stop offset="100%" stopColor="var(--bible-navy)" />
-        </linearGradient>
-        <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#FFF7E8" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#FFF7E8" stopOpacity="0" />
-        </radialGradient>
-        <filter id={`${uid}-soft`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="9" />
-        </filter>
-      </defs>
-
-      <rect x="0" y="0" width="400" height="280" fill={`url(#${uid}-sky)`} />
-
-      {stars.map((s, i) => (
-        <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="#FFF7E8" opacity={s.o} />
-      ))}
-
-      {clouds.map((c, i) => (
-        <ellipse key={i} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.rx * 0.34} fill="#FFF7E8" opacity="0.16" filter={`url(#${uid}-soft)`} />
-      ))}
-
-      <circle cx={sunCx} cy={sunCy} r="78" fill={`url(#${uid}-sun)`} />
-      <circle cx={sunCx} cy={sunCy} r="22" fill={`url(#${uid}-sun-core)`} />
-
-      <path d={bgHillPath(farY, 22, hillSeed + 1)} fill={`url(#${uid}-far)`} />
-      <path d={bgHillPath(midY, 26, hillSeed + 2)} fill={`url(#${uid}-mid)`} />
-
-      <ellipse cx={crossX} cy={crossPeakY - 30} rx="58" ry="32" fill={`url(#${uid}-glow)`} />
-
-      <path d={nearHillPath} fill={`url(#${uid}-near)`} />
-
-      {/* Cross stands on the hill peak — (crossX, crossPeakY) is the exact
-          on-curve point nearHillPath passes through above, so its base
-          always sits right on the silhouette rather than floating. */}
-      <g transform={`translate(${crossX}, ${crossPeakY})`}>
-        <ellipse cx="0" cy="2" rx="20" ry="5" fill="var(--bible-navy)" opacity="0.35" />
-        <rect x="-4.5" y="-72" width="9" height="73" rx="1.5" fill={`url(#${uid}-cross)`} />
-        <rect x="-19" y="-56" width="38" height="9" rx="1.5" fill={`url(#${uid}-cross)`} />
-      </g>
-    </svg>
-  );
-}
-
 export default function Bible() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -1053,53 +910,58 @@ export default function Bible() {
   );
 
   // Reading Plan card — repurposes the real Old/New Testament reading
-  // progress above into the reference design's plan-card look (icon,
-  // chapter count, progress bar, percent). Still toggles the book list
-  // below it open/closed on click, same interaction as before.
+  // progress above into a centered "badge" card. The badge itself is a
+  // circular progress ring around the icon (Apple-Watch-style) rather than
+  // a flat medallion + separate bar — progress lives in one place instead
+  // of two, with no percent/chapter-count text (kept deliberately spare).
+  // Still toggles the book list below it open/closed on click.
   const ReadingPlanCard = ({ id }: { id: "old" | "new" }) => {
     const theme = TESTAMENT_THEME[id];
     const Icon = theme.icon;
     const percent = id === "old" ? oldPercent : newPercent;
-    const readCount = id === "old" ? oldReadCount : newReadCount;
-    const totalChapters = id === "old" ? oldTotalChapters : newTotalChapters;
     const accentVar = id === "old" ? "var(--bible-purple)" : "var(--bible-green)";
     const accentDeepVar = id === "old" ? "#3F2AAE" : "#1E6E4C";
     const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
+    const radius = 34;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference * (1 - percent / 100);
     return (
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-        className="relative overflow-hidden text-left rounded-[28px] p-5 transition-transform active:scale-[0.98] shadow-[0_10px_28px_-14px_rgba(36,28,61,0.28)] ring-1 ring-black/[0.04]"
-        style={{ background: softVar }}
+        className="relative overflow-hidden text-center rounded-[28px] pt-7 pb-6 px-4 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
+        style={{ backgroundImage: `linear-gradient(165deg, ${softVar} 0%, #FFFFFF 115%)` }}
       >
-        {/* Oversized, near-invisible icon watermark — the "unique premium
-            stat card" touch that separates this from a plain flat tile. */}
-        <Icon size={104} strokeWidth={1.25} className="absolute -right-5 -bottom-6 opacity-[0.09] pointer-events-none" style={{ color: accentDeepVar }} />
+        {/* Oversized, near-invisible icon watermark — a soft texture behind
+            the centered ring+title composition below. */}
+        <Icon size={116} strokeWidth={1.1} className="absolute -right-6 -bottom-8 opacity-[0.07] pointer-events-none" style={{ color: accentDeepVar }} />
 
-        <div className="relative flex items-center justify-between mb-5">
+        <div className="relative mx-auto mb-4 w-20 h-20">
+          <svg viewBox="0 0 80 80" className="absolute inset-0 w-full h-full -rotate-90">
+            <circle cx="40" cy="40" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="6" />
+            <circle
+              cx="40"
+              cy="40"
+              r={radius}
+              fill="none"
+              stroke={accentVar}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={dashOffset}
+              style={{ transition: "stroke-dashoffset 0.6s ease" }}
+            />
+          </svg>
           <span
-            className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(0,0,0,0.35)]"
+            className="absolute inset-[10px] rounded-full flex items-center justify-center shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]"
             style={{ backgroundImage: `linear-gradient(155deg, ${accentVar}, ${accentDeepVar})` }}
           >
-            <Icon size={21} className="text-white" />
-          </span>
-          <span className="text-[28px] font-black leading-none" style={{ color: accentDeepVar }}>
-            {percent}%
+            <Icon size={24} className="text-white" />
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-xl font-black mb-1 leading-tight" style={{ color: "var(--bible-navy)" }}>
+        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-navy)" }}>
           {theme.label}
         </p>
-        <p className="relative text-sm font-bold text-fg-muted mb-4">
-          ምዕራፍ {readCount} ከ {totalChapters}
-        </p>
-
-        <div className="relative h-2 rounded-full bg-white/60 overflow-hidden">
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${percent}%`, backgroundImage: `linear-gradient(90deg, ${accentVar}, ${accentDeepVar})` }}
-          />
-        </div>
       </button>
     );
   };
@@ -1162,14 +1024,18 @@ export default function Bible() {
       </div>
 
       {/* Hero — a single "verse of the day" card (one per local calendar
-          day, see the fetch effect above), backed by a small SVG scene
-          instead of a stock photo (see HeroSlideArt above). */}
+          day, see the fetch effect above), backed by a real photo
+          (public/bible/hero/sunset-verse.jpg) instead of the SVG scene. */}
       {!heroVerse ? (
         <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
         <div className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)] mb-3">
-          <HeroSlideArt variant={dailyVerseIndexFor(new Date())} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+          <img
+            src="/bible/hero/sunset-verse.jpg"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10" />
           <button
             onClick={handleShareHeroVerse}
             aria-label="Share verse"
@@ -1189,8 +1055,10 @@ export default function Bible() {
               <Sun size={11} strokeWidth={2.5} />
               የዕለቱ ቃል
             </span>
-            <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2">{heroVerse.text}</p>
-            <p className="text-[11px] font-semibold text-white/80 mb-2.5">{heroVerse.ref}</p>
+            <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
+              {heroVerse.text}
+            </p>
+            <p className="text-[11px] font-semibold text-white/90 mb-2.5 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
             <button
               onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
               className="w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
