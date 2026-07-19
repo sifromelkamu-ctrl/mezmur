@@ -350,6 +350,21 @@ export const searchApi = {
   search: (q: string) => request<ApiSearchResults>(`/search?q=${encodeURIComponent(q)}`),
 };
 
+export interface ApiPushSubscriptionKeys {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export const pushApi = {
+  publicKey: () => request<{ publicKey: string }>("/push/public-key"),
+  subscribe: (subscription: ApiPushSubscriptionKeys) =>
+    request<void>("/push/subscribe", { method: "POST", body: JSON.stringify(subscription) }),
+  unsubscribe: (endpoint: string) =>
+    request<void>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
+  isSubscribed: (endpoint: string) =>
+    request<{ subscribed: boolean }>(`/push/subscribed?endpoint=${encodeURIComponent(endpoint)}`),
+};
+
 export const tracksApi = {
   list: () => request<ApiTrack[]>("/tracks"),
   trending: (limit = 12) => request<ApiTrack[]>(`/tracks/trending?limit=${limit}`),

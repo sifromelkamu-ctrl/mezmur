@@ -39,8 +39,26 @@ model Profile {
   playlists         Playlist[]
   auditLogs         AuditLog[]
   importBatches     YoutubeImportBatch[]
+  pushSubscriptions PushSubscription[]
 
   @@map("profiles")
+}
+
+// One row per browser/device the user has enabled daily-verse push
+// notifications on (a user can have several — phone + desktop, etc.).
+// endpoint is the Push API's own unique subscription URL, so it doubles as
+// the natural dedupe key (re-subscribing the same device just updates keys).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  profile   Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model AuditLog {

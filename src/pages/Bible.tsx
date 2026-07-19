@@ -2,7 +2,6 @@ import {
   Bell,
   Bookmark,
   BookOpen,
-  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +27,7 @@ import BibleListModal, { type BibleListModalRow } from "../components/bible/Bibl
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
+import { isDailyVerseSubscribed, pushSupported, subscribeToDailyVerse, unsubscribeFromDailyVerse } from "../lib/pushNotifications";
 import {
   getAllAnnotations,
   HIGHLIGHT_COLORS,
@@ -83,10 +83,23 @@ const BIBLE_HOME_THEME = {
   "--bible-green-soft": "#E3F5EC",
 } as CSSProperties;
 
-// Hero carousel slide art — a small hand-built SVG scene (sky, sun/glow,
-// two hill silhouettes, a cross on the peak) stands in for a real photo,
-// since no stock photography or image-generation source is available here.
-// Five color variants (warm sunrise/dusk skies, true to the reference's
+// Picks a single index into MORNING_VERSES (0..364) for a given date, keyed
+// off the LOCAL calendar day so it rotates at each visitor's own midnight
+// with no server-side scheduling. Exported in spirit only — the server-side
+// daily push job (see server/src/jobs/dailyVerse.ts) must replicate this
+// exact same hash so the push notification always matches what the in-app
+// hero card shows that day.
+function dailyVerseIndexFor(date: Date): number {
+  const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  let hash = 0;
+  for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
+  return hash % MORNING_VERSES.length;
+}
+
+// Hero slide art — a small hand-built SVG scene (sky, sun/glow, hill
+// silhouettes, a cross on the peak) stands in for a real photo, since no
+// stock photography or image-generation source is available here. Five
+// color variants (warm sunrise/dusk skies, true to the reference's
 // imagery) cycle across the slides so the carousel still reads as varied.
 const HERO_SKIES = [
   { top: "#FCE7C8", mid: "#F3A65A", bottom: "#5B3FE0" },
@@ -96,42 +109,126 @@ const HERO_SKIES = [
   { top: "#F3C9D9", mid: "#8B5CF6", bottom: "#241C3D" },
 ] as const;
 
+// Deterministic pseudo-random helper (mulberry32) — gives each slide its
+// own stable star/cloud placement without a real RNG dependency, so the
+// scene doesn't reshuffle on every re-render.
+function seededRandom(seed: number) {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = (t + 0x6d2b79f5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function HeroSlideArt({ variant }: { variant: number }) {
   const sky = HERO_SKIES[variant % HERO_SKIES.length];
-  const sunCx = 120 + (variant % 3) * 60;
-  const hillShift = (variant % 2) * 20;
+  const rand = seededRandom(variant * 97 + 13);
+  const sunCx = 130 + (variant % 3) * 65;
+  const sunCy = 66 + (variant % 2) * 14;
+  const hillSeed = variant * 31;
   const uid = `hero-${variant}`;
+
+  const stars = Array.from({ length: 14 }, () => ({
+    cx: rand() * 400,
+    cy: rand() * 110,
+    r: 0.6 + rand() * 1,
+    o: 0.25 + rand() * 0.45,
+  }));
+  const clouds = Array.from({ length: 3 }, (_, i) => ({
+    cx: 40 + rand() * 320,
+    cy: 55 + i * 24 + rand() * 20,
+    rx: 46 + rand() * 30,
+  }));
+
+  // Two background hill silhouettes — loose, randomized rolling curves
+  // (they're just atmospheric depth layers, exact shape doesn't matter).
+  const bgHillPath = (baseY: number, amp: number, seed: number) => {
+    const r2 = seededRandom(seed);
+    const p1 = baseY - r2() * amp;
+    const p2 = baseY - r2() * amp;
+    const p3 = baseY - r2() * amp;
+    return `M0,${baseY + 20} Q90,${p1} 190,${p2} T400,${p3} V280 H0 Z`;
+  };
+  const farY = 175 + (hillSeed % 10);
+  const midY = 205 + ((hillSeed + 5) % 10);
+
+  // The frontmost hill anchors the cross, so — unlike the two behind it —
+  // its path is built explicitly around (crossX, crossPeakY) as a real
+  // on-curve point (the shared joint of two quadratic segments), guaranteeing
+  // the silhouette actually peaks exactly where the cross stands, instead of
+  // the cross floating disconnected above a randomly-shaped hill.
+  const crossX = 190 + (variant % 3) * 20;
+  const crossPeakY = 168 + (hillSeed % 12);
+  const nearHillPath = `M0,${crossPeakY + 42} Q${crossX * 0.55},${crossPeakY - 12} ${crossX},${crossPeakY} Q${crossX + (400 - crossX) * 0.5},${crossPeakY + 28} 400,${crossPeakY + 18} V280 H0 Z`;
 
   return (
     <svg viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
       <defs>
         <linearGradient id={`${uid}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={sky.top} />
-          <stop offset="55%" stopColor={sky.mid} />
-          <stop offset="100%" stopColor={sky.bottom} />
+          <stop offset="0%" stopColor={sky.bottom} />
+          <stop offset="42%" stopColor={sky.mid} />
+          <stop offset="78%" stopColor={sky.top} />
+          <stop offset="100%" stopColor={sky.top} />
         </linearGradient>
         <radialGradient id={`${uid}-sun`} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#FFF7E8" stopOpacity="0.95" />
-          <stop offset="60%" stopColor={sky.mid} stopOpacity="0.55" />
+          <stop offset="55%" stopColor={sky.mid} stopOpacity="0.45" />
           <stop offset="100%" stopColor={sky.mid} stopOpacity="0" />
         </radialGradient>
+        <linearGradient id={`${uid}-far`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.32" />
+        </linearGradient>
+        <linearGradient id={`${uid}-mid`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.6" />
+        </linearGradient>
+        <linearGradient id={`${uid}-near`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="var(--bible-navy)" stopOpacity="0.95" />
+        </linearGradient>
+        <linearGradient id={`${uid}-cross`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="var(--bible-navy)" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="var(--bible-navy)" />
+        </linearGradient>
+        <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFF7E8" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#FFF7E8" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`${uid}-soft`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="9" />
+        </filter>
       </defs>
+
       <rect x="0" y="0" width="400" height="280" fill={`url(#${uid}-sky)`} />
-      <circle cx={sunCx} cy="90" r="70" fill={`url(#${uid}-sun)`} />
-      <circle cx={sunCx} cy="90" r="26" fill="#FFF7E8" opacity="0.9" />
-      <path
-        d={`M0,${190 + hillShift} Q100,${150 + hillShift} 200,${180 + hillShift} T400,${170 + hillShift} V280 H0 Z`}
-        fill="var(--bible-navy)"
-        opacity="0.35"
-      />
-      <path
-        d={`M0,${230 - hillShift} Q120,${190 - hillShift} 220,${215 - hillShift} T400,${205 - hillShift} V280 H0 Z`}
-        fill="var(--bible-navy)"
-        opacity="0.65"
-      />
-      <g transform={`translate(${200 + hillShift}, ${150 - hillShift})`}>
-        <rect x="-4" y="0" width="8" height="60" fill="var(--bible-navy)" />
-        <rect x="-16" y="14" width="32" height="8" fill="var(--bible-navy)" />
+
+      {stars.map((s, i) => (
+        <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="#FFF7E8" opacity={s.o} />
+      ))}
+
+      {clouds.map((c, i) => (
+        <ellipse key={i} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.rx * 0.34} fill="#FFF7E8" opacity="0.16" filter={`url(#${uid}-soft)`} />
+      ))}
+
+      <circle cx={sunCx} cy={sunCy} r="78" fill={`url(#${uid}-sun)`} />
+      <circle cx={sunCx} cy={sunCy} r="22" fill="#FFF7E8" opacity="0.95" />
+
+      <path d={bgHillPath(farY, 22, hillSeed + 1)} fill={`url(#${uid}-far)`} />
+      <path d={bgHillPath(midY, 26, hillSeed + 2)} fill={`url(#${uid}-mid)`} />
+
+      <ellipse cx={crossX} cy={crossPeakY - 30} rx="58" ry="32" fill={`url(#${uid}-glow)`} />
+
+      <path d={nearHillPath} fill={`url(#${uid}-near)`} />
+
+      {/* Cross stands on the hill peak — (crossX, crossPeakY) is the exact
+          on-curve point nearHillPath passes through above, so its base
+          always sits right on the silhouette rather than floating. */}
+      <g transform={`translate(${crossX}, ${crossPeakY})`}>
+        <ellipse cx="0" cy="2" rx="20" ry="5" fill="var(--bible-navy)" opacity="0.35" />
+        <rect x="-4.5" y="-72" width="9" height="73" rx="1.5" fill={`url(#${uid}-cross)`} />
+        <rect x="-19" y="-56" width="38" height="9" rx="1.5" fill={`url(#${uid}-cross)`} />
       </g>
     </svg>
   );
@@ -155,11 +252,12 @@ export default function Bible() {
   const [justCopied, setJustCopied] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
-  const [heroSlides, setHeroSlides] = useState<
-    { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number }[]
-  >([]);
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [heroSharedId, setHeroSharedId] = useState<string | null>(null);
+  const [heroVerse, setHeroVerse] = useState<
+    { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
+  >(null);
+  const [heroShared, setHeroShared] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [activeModal, setActiveModal] = useState<"bookmarks" | "notes" | "favorites" | "history" | null>(null);
 
   const [showBookSearch, setShowBookSearch] = useState(false);
@@ -167,7 +265,6 @@ export default function Bible() {
   const [searchScope, setSearchScope] = useState<"chapter" | "book">("book");
   const [jumpToVerse, setJumpToVerse] = useState<number | null>(null);
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
-  const heroTouchStartX = useRef<number | null>(null);
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
@@ -251,51 +348,62 @@ export default function Bible() {
 
   useEffect(() => stopSpeaking, []);
 
-  // Home screen's hero carousel — 5 slides: today's verse (picked the same
-  // way the old single daily-verse card was, so it keys off each visitor's
-  // own device clock and rotates at their own midnight) plus the next 4
-  // upcoming picks from the curated list, so swiping forward previews what's
-  // coming rather than repeating today's verse or picking randomly.
+  // Home screen's hero — a single "verse of the day", one per local
+  // calendar day (keys off each visitor's own device clock, so it rotates
+  // at their own midnight regardless of time zone). Note this is the GLOBAL
+  // daily verse for the in-app hero; the push notification (bell button
+  // below) sends a per-user personalized pick instead — see
+  // dailyVerseIndexForUser in server/src/push.ts.
   useEffect(() => {
-    const now = new Date();
-    const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-    let hash = 0;
-    for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
-    const startIndex = hash % MORNING_VERSES.length;
-    const picks = Array.from({ length: 5 }, (_, i) => MORNING_VERSES[(startIndex + i) % MORNING_VERSES.length]);
-    const uniqueSlugs = [...new Set(picks.map((p) => p.slug))];
-
-    let cancelled = false;
-    Promise.all(
-      uniqueSlugs.map((slug) =>
-        fetch(`/bible/${slug}.json`)
-          .then((res) => (res.ok ? res.json() : Promise.reject()))
-          .then((data: BookText) => [slug, data] as const)
-          .catch(() => [slug, null] as const)
-      )
-    ).then((entries) => {
-      if (cancelled) return;
-      const bySlug = new Map(entries);
-      const slides = picks
-        .map((p) => {
-          const text = bySlug.get(p.slug)?.[String(p.chapter)]?.[p.verseIndex];
-          if (!text) return null;
-          return { id: `${p.slug}-${p.chapter}-${p.verseIndex}`, ref: p.refAm, text, slug: p.slug, chapter: p.chapter, verseIndex: p.verseIndex };
-        })
-        .filter((s): s is NonNullable<typeof s> => s !== null);
-      setHeroSlides(slides);
-    });
-    return () => {
-      cancelled = true;
-    };
+    const pick = MORNING_VERSES[dailyVerseIndexFor(new Date())];
+    fetch(`/bible/${pick.slug}.json`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data: BookText) => {
+        const text = data[String(pick.chapter)]?.[pick.verseIndex];
+        if (text) {
+          setHeroVerse({
+            id: `${pick.slug}-${pick.chapter}-${pick.verseIndex}`,
+            ref: pick.refAm,
+            text,
+            slug: pick.slug,
+            chapter: pick.chapter,
+            verseIndex: pick.verseIndex,
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  // Auto-advance the hero carousel, same cadence as Home's own HeroCarousel.
+  // Reflects whether THIS device already has an active daily-verse push
+  // subscription, so the bell shows the right on/off state after a reload.
   useEffect(() => {
-    if (heroSlides.length < 2) return;
-    const id = setInterval(() => setHeroIndex((i) => (i + 1) % heroSlides.length), 6000);
-    return () => clearInterval(id);
-  }, [heroSlides.length]);
+    if (!user || !pushSupported) return;
+    isDailyVerseSubscribed().then(setPushSubscribed);
+  }, [user]);
+
+  const handleToggleNotifications = async () => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    if (!pushSupported || pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushSubscribed) {
+        await unsubscribeFromDailyVerse();
+        setPushSubscribed(false);
+      } else {
+        await subscribeToDailyVerse();
+        setPushSubscribed(true);
+      }
+    } catch {
+      // Permission denied, browser unsupported, or a network hiccup — no
+      // toast/error surface on this page, so just leave the bell state as
+      // it was and let the user try again.
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const toggleListen = () => {
     if (!speechSupported || !verses) return;
@@ -822,8 +930,9 @@ export default function Bible() {
     setJumpToVerse(verseIndex);
   };
 
-  const handleShareHeroVerse = async (slide: (typeof heroSlides)[number]) => {
-    const text = `“${slide.text}” — ${slide.ref}`;
+  const handleShareHeroVerse = async () => {
+    if (!heroVerse) return;
+    const text = `“${heroVerse.text}” — ${heroVerse.ref}`;
     if (navigator.share) {
       try {
         await navigator.share({ text });
@@ -834,8 +943,8 @@ export default function Bible() {
     }
     try {
       await navigator.clipboard.writeText(text);
-      setHeroSharedId(slide.id);
-      setTimeout(() => setHeroSharedId(null), 1800);
+      setHeroShared(true);
+      setTimeout(() => setHeroShared(false), 1800);
     } catch {
       // clipboard unavailable — silently ignore
     }
@@ -961,30 +1070,18 @@ export default function Bible() {
             <ChevronRight size={13} style={{ color: "var(--bible-navy)" }} />
           </span>
         </div>
-        <p className="font-abyssinica text-base font-bold mb-0.5" style={{ color: "var(--bible-navy)" }}>
+        <p className="font-abyssinica text-base font-black mb-0.5" style={{ color: "var(--bible-navy)" }}>
           {theme.label}
         </p>
-        <p className="text-xs text-fg-muted mb-3">
+        <p className="text-xs font-bold text-fg-muted mb-3">
           ምዕራፍ {readCount} ከ {totalChapters}
         </p>
         <div className="h-1.5 rounded-full bg-white/60 overflow-hidden mb-1.5">
           <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
         </div>
-        <p className="text-[11px] font-semibold text-fg-muted">{percent}% ተጠናቋል</p>
+        <p className="text-[11px] font-bold text-fg-muted">{percent}% ተጠናቋል</p>
       </button>
     );
-  };
-
-  const handleHeroTouchStart = (e: React.TouchEvent) => {
-    heroTouchStartX.current = e.touches[0].clientX;
-  };
-  const handleHeroTouchEnd = (e: React.TouchEvent) => {
-    if (heroTouchStartX.current === null || heroSlides.length < 2) return;
-    const delta = e.changedTouches[0].clientX - heroTouchStartX.current;
-    if (Math.abs(delta) > 40) {
-      setHeroIndex((i) => (delta < 0 ? (i + 1) % heroSlides.length : (i - 1 + heroSlides.length) % heroSlides.length));
-    }
-    heroTouchStartX.current = null;
   };
 
   return (
@@ -1015,84 +1112,55 @@ export default function Bible() {
           </div>
         </button>
         <button
-          aria-label="Notifications"
-          className="relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
+          onClick={handleToggleNotifications}
+          disabled={pushBusy}
+          aria-label={pushSubscribed ? "Turn off daily verse notifications" : "Turn on daily verse notifications"}
+          className={`relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60 ${pushSubscribed ? "" : "text-fg-muted"}`}
+          style={pushSubscribed ? { color: "var(--bible-purple)" } : undefined}
         >
-          <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-base" style={{ background: "var(--bible-purple)" }} />
+          <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
         </button>
       </div>
 
-      {/* Hero — 5-slide "Verse of the Day" carousel (today + the next 4
-          upcoming picks), each slide backed by a small SVG scene instead
-          of a stock photo (see HeroSlideArt above). */}
-      {heroSlides.length === 0 ? (
+      {/* Hero — a single "verse of the day" card (one per local calendar
+          day, see the fetch effect above), backed by a small SVG scene
+          instead of a stock photo (see HeroSlideArt above). */}
+      {!heroVerse ? (
         <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
-        <div className="mb-3">
-          <div
-            className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
-            onTouchStart={handleHeroTouchStart}
-            onTouchEnd={handleHeroTouchEnd}
+        <div className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)] mb-3">
+          <HeroSlideArt variant={dailyVerseIndexFor(new Date())} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+          <button
+            onClick={handleShareHeroVerse}
+            aria-label="Share verse"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
           >
-            <div
-              className="flex h-full transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${heroIndex * 100}%)` }}
+            {heroShared ? (
+              <Check size={14} style={{ color: "var(--bible-purple)" }} />
+            ) : (
+              <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
+            )}
+          </button>
+          <div className="relative h-full flex flex-col justify-end p-4">
+            <span
+              className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
+              style={{ color: "var(--bible-purple)" }}
             >
-              {heroSlides.map((slide, i) => (
-                <div key={slide.id} className="relative w-full h-full shrink-0">
-                  <HeroSlideArt variant={i} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                  <button
-                    onClick={() => handleShareHeroVerse(slide)}
-                    aria-label="Share verse"
-                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
-                  >
-                    {heroSharedId === slide.id ? (
-                      <Check size={14} style={{ color: "var(--bible-purple)" }} />
-                    ) : (
-                      <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
-                    )}
-                  </button>
-                  <div className="relative h-full flex flex-col justify-end p-4">
-                    <span
-                      className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
-                      style={{ color: "var(--bible-purple)" }}
-                    >
-                      <Sun size={11} strokeWidth={2.5} />
-                      የዕለቱ ቃል
-                    </span>
-                    <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2">{slide.text}</p>
-                    <p className="text-[11px] font-semibold text-white/80 mb-2.5">{slide.ref}</p>
-                    <button
-                      onClick={() => openVerse(slide.slug, slide.chapter, slide.verseIndex)}
-                      className="w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
-                      style={{ background: "var(--bible-navy)" }}
-                    >
-                      <BookOpen size={13} />
-                      ሙሉውን ያንብቡ
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <Sun size={11} strokeWidth={2.5} />
+              የዕለቱ ቃል
+            </span>
+            <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2">{heroVerse.text}</p>
+            <p className="text-[11px] font-semibold text-white/80 mb-2.5">{heroVerse.ref}</p>
+            <button
+              onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
+              className="w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
+              style={{ background: "var(--bible-navy)" }}
+            >
+              <BookOpen size={13} />
+              ሙሉውን ያንብቡ
+            </button>
           </div>
-          {heroSlides.length > 1 && (
-            <div className="flex items-center justify-center gap-1.5 mt-2">
-              {heroSlides.map((slide, i) => (
-                <button
-                  key={slide.id}
-                  onClick={() => setHeroIndex(i)}
-                  aria-label={`Go to slide ${i + 1}`}
-                  className="h-1.5 rounded-full transition-all duration-300"
-                  style={{
-                    width: i === heroIndex ? 20 : 6,
-                    background: i === heroIndex ? "var(--bible-purple)" : "var(--color-border)",
-                  }}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -1124,22 +1192,6 @@ export default function Bible() {
           card look, rather than inventing a fictional day-count plan the
           app has no data for. */}
       <div className="mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={16} style={{ color: "var(--bible-navy)" }} />
-            <h2 className="text-sm font-bold" style={{ color: "var(--bible-navy)" }}>
-              የንባብ እቅድ
-            </h2>
-          </div>
-          <button
-            onClick={() => setExpanded({ old: true, new: true })}
-            className="flex items-center gap-0.5 text-xs font-semibold transition-colors"
-            style={{ color: "var(--bible-purple)" }}
-          >
-            ሁሉንም ይመልከቱ
-            <ChevronRight size={12} />
-          </button>
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <ReadingPlanCard id="old" />
           <ReadingPlanCard id="new" />

@@ -31,3 +31,16 @@ services:
       # cookies, same as before this var existed).
       - key: YTDLP_COOKIES_B64
         sync: false
+      # Web Push (daily Bible verse notification). Generate once locally:
+      #   node -e "console.log(require('web-push').generateVAPIDKeys())"
+      # and keep it stable — rotating it breaks every existing subscription.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: DAILY_VERSE_PUSH_HOUR_UTC
+        sync: false

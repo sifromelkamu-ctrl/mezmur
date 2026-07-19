@@ -11,12 +11,14 @@ import concertsRouter from "./routes/concerts.js";
 import featuredBannersRouter from "./routes/featuredBanners.js";
 import playlistsRouter from "./routes/playlists.js";
 import podcastsRouter from "./routes/podcasts.js";
+import pushRouter from "./routes/push.js";
 import searchRouter from "./routes/search.js";
 import sermonsRouter from "./routes/sermons.js";
 import singlesRouter from "./routes/singles.js";
 import tracksRouter from "./routes/tracks.js";
 import youtubeImportRouter from "./routes/youtubeImport.js";
 import { resumeAllInterrupted } from "./youtube/catalogWorker.js";
+import { startDailyVersePushSchedule } from "./jobs/dailyVerse.js";
 
 const app = express();
 
@@ -45,6 +47,7 @@ app.use("/api/search", searchRouter);
 app.use("/api/tracks", tracksRouter);
 app.use("/api/sermons", sermonsRouter);
 app.use("/api/podcasts", podcastsRouter);
+app.use("/api/push", pushRouter);
 app.use("/api/featured-banners", featuredBannersRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/admin/library", adminLibraryRouter);
@@ -65,3 +68,5 @@ app.listen(port, () => {
 resumeAllInterrupted().catch((err) => {
   console.error("Failed to resume interrupted YouTube catalog imports:", err);
 });
+
+startDailyVersePushSchedule();
