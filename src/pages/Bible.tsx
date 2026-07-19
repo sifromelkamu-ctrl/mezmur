@@ -1047,7 +1047,7 @@ export default function Bible() {
               <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
             )}
           </button>
-          <div className="relative h-full flex flex-col justify-end p-4">
+          <div className="relative h-full flex flex-col justify-end p-4 pointer-events-none">
             <span
               className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
               style={{ color: "var(--bible-purple)" }}
@@ -1061,7 +1061,7 @@ export default function Bible() {
             <p className="text-[11px] font-semibold text-white/90 mb-2.5 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
             <button
               onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
-              className="w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
+              className="pointer-events-auto w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
               style={{ background: "var(--bible-navy)" }}
             >
               <BookOpen size={13} />
