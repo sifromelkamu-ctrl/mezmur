@@ -196,8 +196,13 @@ export default function Bible() {
 
   const [showBookSearch, setShowBookSearch] = useState(false);
   const [bookSearchQuery, setBookSearchQuery] = useState("");
-  const [searchScope, setSearchScope] = useState<"chapter" | "book">("book");
+  const [searchScope, setSearchScope] = useState<"chapter" | "book" | "bible">("book");
   const [jumpToVerse, setJumpToVerse] = useState<number | null>(null);
+  const [wholeBibleResults, setWholeBibleResults] = useState<
+    { bookSlug: string; chapter: number; verseIndex: number; text: string }[]
+  >([]);
+  const [wholeBibleLoading, setWholeBibleLoading] = useState(false);
+  const wholeBibleCacheRef = useRef<Map<string, BookText | null>>(new Map());
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
@@ -224,11 +229,76 @@ export default function Bible() {
     return results.sort((a, b) => a.chapter - b.chapter);
   }, [bookText, bookSearchQuery, searchScope, chapter]);
 
+  // Whole-Bible search — fetches every book once per language+version into a
+  // ref cache (not re-fetched on later scope switches or searches), then
+  // searches the in-memory cache client-side, same approach as the
+  // single-book search above.
+  useEffect(() => {
+    if (searchScope !== "bible") return;
+    const cacheKey = prefs.language === "en" ? `en:${prefs.englishVersion}` : "am";
+    const cache = wholeBibleCacheRef.current;
+    const missing = BIBLE_BOOKS.filter((b) => !cache.has(`${cacheKey}:${b.slug}`));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    setWholeBibleLoading(true);
+    Promise.all(
+      missing.map((b) => {
+        const path =
+          prefs.language === "en" ? `/bible/en/${prefs.englishVersion}/${b.slug}.json` : `/bible/${b.slug}.json`;
+        return fetch(path)
+          .then((res) => (res.ok ? (res.json() as Promise<BookText>) : null))
+          .catch(() => null)
+          .then((data) => cache.set(`${cacheKey}:${b.slug}`, data));
+      })
+    ).then(() => {
+      if (!cancelled) setWholeBibleLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchScope, prefs.language, prefs.englishVersion]);
+
+  useEffect(() => {
+    const q = bookSearchQuery.trim();
+    if (searchScope !== "bible" || q.length < 2 || wholeBibleLoading) {
+      setWholeBibleResults((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    const cacheKey = prefs.language === "en" ? `en:${prefs.englishVersion}` : "am";
+    const cache = wholeBibleCacheRef.current;
+    const results: { bookSlug: string; chapter: number; verseIndex: number; text: string }[] = [];
+    outer: for (const b of BIBLE_BOOKS) {
+      const data = cache.get(`${cacheKey}:${b.slug}`);
+      if (!data) continue;
+      for (const chapterNum of Object.keys(data)) {
+        const chapterVerses = data[chapterNum];
+        if (!chapterVerses) continue;
+        for (let i = 0; i < chapterVerses.length; i++) {
+          const v = chapterVerses[i];
+          if (v && v.includes(q)) {
+            results.push({ bookSlug: b.slug, chapter: Number(chapterNum), verseIndex: i, text: v });
+            if (results.length >= 60) break outer;
+          }
+        }
+      }
+    }
+    setWholeBibleResults(results);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookSearchQuery, searchScope, wholeBibleLoading, prefs.language, prefs.englishVersion]);
+
   const jumpToSearchResult = (targetChapter: number, verseIndex: number) => {
     setShowBookSearch(false);
     setBookSearchQuery("");
     setJumpToVerse(verseIndex);
     setChapter(targetChapter);
+  };
+
+  const jumpToWholeBibleResult = (targetBookSlug: string, targetChapter: number, verseIndex: number) => {
+    setShowBookSearch(false);
+    setBookSearchQuery("");
+    setBookSlug(targetBookSlug);
+    setChapter(targetChapter);
+    setJumpToVerse(verseIndex);
   };
 
   useEffect(() => {
@@ -477,7 +547,7 @@ export default function Bible() {
               searchScope === "book" ? "bg-white text-black" : "bg-elevated text-fg-muted hover:bg-elevated-hover"
             }`}
           >
-            ጠቅላላ መጽሐፍ
+            {prefs.language === "en" ? "Whole book" : "ጠቅላላ መጽሐፍ"}
           </button>
           <button
             onClick={() => setSearchScope("chapter")}
@@ -486,11 +556,58 @@ export default function Bible() {
               searchScope === "chapter" ? "bg-white text-black" : "bg-elevated text-fg-muted hover:bg-elevated-hover"
             }`}
           >
-            {chapter ? `ምዕራፍ ${chapter} ብቻ` : "የአሁኑ ምዕራፍ"}
+            {prefs.language === "en"
+              ? chapter
+                ? `Chapter ${chapter} only`
+                : "Current chapter"
+              : chapter
+                ? `ምዕራፍ ${chapter} ብቻ`
+                : "የአሁኑ ምዕራፍ"}
+          </button>
+          <button
+            onClick={() => setSearchScope("bible")}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+              searchScope === "bible" ? "bg-white text-black" : "bg-elevated text-fg-muted hover:bg-elevated-hover"
+            }`}
+          >
+            {prefs.language === "en" ? "Whole Bible" : "ጠቅላላ መጽሐፍ ቅዱስ"}
           </button>
         </div>
 
-        {bookSearchQuery.trim().length < 2 ? (
+        {searchScope === "bible" ? (
+          bookSearchQuery.trim().length < 2 ? (
+            <p className="text-sm text-fg-muted text-center py-16">
+              {prefs.language === "en" ? "Type at least 2 characters to search the whole Bible." : "ጠቅላላ መጽሐፍ ቅዱስን ለመፈለግ ቢያንስ 2 ፊደላት ይጻፉ።"}
+            </p>
+          ) : wholeBibleLoading ? (
+            <p className="text-sm text-fg-muted text-center py-16">
+              {prefs.language === "en" ? "Loading the whole Bible…" : "ጠቅላላ መጽሐፍ ቅዱስ በመጫን ላይ…"}
+            </p>
+          ) : wholeBibleResults.length === 0 ? (
+            <p className="text-sm text-fg-muted text-center py-16">
+              {prefs.language === "en" ? "No matching verses found." : "ምንም ተመሳሳይ ጥቅስ አልተገኘም።"}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {wholeBibleResults.map((r) => {
+                const rBook = BIBLE_BOOKS.find((b) => b.slug === r.bookSlug);
+                if (!rBook) return null;
+                return (
+                  <button
+                    key={`${r.bookSlug}:${r.chapter}:${r.verseIndex}`}
+                    onClick={() => jumpToWholeBibleResult(r.bookSlug, r.chapter, r.verseIndex)}
+                    className="w-full text-left p-3 rounded-lg bg-elevated hover:bg-elevated-hover transition-colors"
+                  >
+                    <span className="text-xs font-bold text-gold uppercase tracking-wide">
+                      {bookDisplayName(rBook, prefs.language)} {r.chapter}:{r.verseIndex + 1}
+                    </span>
+                    <p className="text-sm text-fg mt-1 leading-relaxed">{r.text}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )
+        ) : bookSearchQuery.trim().length < 2 ? (
           <p className="text-sm text-fg-muted text-center py-16">
             Type at least 2 characters to search {bookDisplayName(book, prefs.language)}.
           </p>
@@ -1088,7 +1205,7 @@ export default function Bible() {
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
       >
-        <div className="relative mx-auto mb-2 w-16 h-16">
+        <div className="relative mx-auto mb-2 w-[74px] h-[74px]">
           <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
             <circle cx="32" cy="32" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="5" />
             <circle
