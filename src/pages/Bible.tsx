@@ -1188,8 +1188,8 @@ export default function Bible() {
     const subtitle =
       prefs.language === "en"
         ? id === "old"
-          ? "The Book of the Law and the Prophets"
-          : "The Teaching and Life of Jesus Christ"
+          ? "Law and Prophets"
+          : "Teaching of the Messiah"
         : id === "old"
           ? "የሕግና የነቢያት መጽሐፍት"
           : "የኢየሱስ ክርስቶስ ትምህርትና ሕይወት";
@@ -1255,7 +1255,7 @@ export default function Bible() {
           <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1.5 line-clamp-2 min-h-[2.4em]">{subtitle}</p>
+        <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1.5 line-clamp-2">{subtitle}</p>
 
         <div className="grid grid-cols-3 rounded-xl py-1.5" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
