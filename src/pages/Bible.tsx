@@ -1192,7 +1192,7 @@ export default function Bible() {
           : "Teaching of the Messiah"
         : id === "old"
           ? "ሕግና ነቢያት"
-          : "የመሲሕ ትምህርት";
+          : "የመሲሁ ትምህርት";
     const stats = [
       {
         icon: Book,
