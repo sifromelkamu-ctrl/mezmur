@@ -1330,32 +1330,11 @@ export default function Bible() {
         />
       )}
 
-      {/* Reading Plan — moved to the top of the page (above the hero) so
-          it's the first thing visible. Repurposes the real Old/New
-          Testament reading progress (see comment above oldPercent/
-          newPercent) into this card look, rather than inventing a
-          fictional day-count plan the app has no data for. */}
-      <div className="mb-3">
-        <div className="grid grid-cols-2 gap-3">
-          <ReadingPlanCard id="old" />
-          <ReadingPlanCard id="new" />
-        </div>
-        {expandedTestament === "old" && (
-          <div className="mt-3">
-            <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
-          </div>
-        )}
-        {expandedTestament === "new" && (
-          <div className="mt-3">
-            <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
-          </div>
-        )}
-      </div>
-
       {/* Hero — a single "verse of the day" card (one per local calendar
-          day, see the fetch effect above). The background photo defaults to
-          the day's pick from HERO_IMAGES but is swipeable across the whole
-          set, with dots below to show/jump to position. */}
+          day, see the fetch effect above), first thing visible on the page.
+          The background photo defaults to the day's pick from HERO_IMAGES
+          but is swipeable across the whole set, with dots below to show/
+          jump to position. */}
       {!heroVerse ? (
         <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
@@ -1439,6 +1418,27 @@ export default function Bible() {
           </div>
         </div>
       )}
+
+      {/* Reading Plan — below the hero verse. Repurposes the real Old/New
+          Testament reading progress (see comment above oldPercent/
+          newPercent) into this card look, rather than inventing a
+          fictional day-count plan the app has no data for. */}
+      <div className="mb-3">
+        <div className="grid grid-cols-2 gap-3">
+          <ReadingPlanCard id="old" />
+          <ReadingPlanCard id="new" />
+        </div>
+        {expandedTestament === "old" && (
+          <div className="mt-3">
+            <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
+          </div>
+        )}
+        {expandedTestament === "new" && (
+          <div className="mt-3">
+            <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
+          </div>
+        )}
+      </div>
 
       {/* Quick Access — Bookmarks / Notes / History / Favorites in one card. */}
       <div className="rounded-2xl mb-5 shadow-sm overflow-hidden" style={{ background: "var(--color-elevated)" }}>
