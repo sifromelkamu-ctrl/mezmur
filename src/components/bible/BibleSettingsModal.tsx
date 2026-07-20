@@ -82,6 +82,29 @@ export default function BibleSettingsModal({
         </div>
         <p className="text-xs text-fg-muted mb-5">Customize how you read and hear scripture.</p>
 
+        <Section icon={Bell} label="ማሳሰቢያ · Daily reminder">
+          <button
+            onClick={onToggleNotifications}
+            disabled={pushBusy}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors disabled:opacity-60 ${
+              pushSubscribed ? "border-transparent bg-white/10" : "border-border hover:bg-hover"
+            }`}
+          >
+            <span
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: pushSubscribed ? "var(--color-gold)" : "var(--color-elevated-hover)" }}
+            >
+              <Bell size={16} className={pushSubscribed ? "text-black" : "text-fg-muted"} fill={pushSubscribed ? "currentColor" : "none"} />
+            </span>
+            <span className="flex-1 text-left">
+              <span className="block text-sm font-semibold text-fg">Daily verse notification</span>
+              <span className="block text-xs text-fg-muted mt-0.5">
+                {pushSubscribed ? "On — you'll get a daily verse" : "Off — tap to enable"}
+              </span>
+            </span>
+          </button>
+        </Section>
+
         <Section icon={Languages} label="ቋንቋ · Language">
           <div className="flex items-center gap-2">
             <button
@@ -197,29 +220,6 @@ export default function BibleSettingsModal({
               Dark
             </button>
           </div>
-        </Section>
-
-        <Section icon={Bell} label="ማሳሰቢያ · Daily reminder">
-          <button
-            onClick={onToggleNotifications}
-            disabled={pushBusy}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors disabled:opacity-60 ${
-              pushSubscribed ? "border-transparent bg-white/10" : "border-border hover:bg-hover"
-            }`}
-          >
-            <span
-              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: pushSubscribed ? "var(--color-gold)" : "var(--color-elevated-hover)" }}
-            >
-              <Bell size={16} className={pushSubscribed ? "text-black" : "text-fg-muted"} fill={pushSubscribed ? "currentColor" : "none"} />
-            </span>
-            <span className="flex-1 text-left">
-              <span className="block text-sm font-semibold text-fg">Daily verse notification</span>
-              <span className="block text-xs text-fg-muted mt-0.5">
-                {pushSubscribed ? "On — you'll get a daily verse" : "Off — tap to enable"}
-              </span>
-            </span>
-          </button>
         </Section>
       </div>
     </>,
