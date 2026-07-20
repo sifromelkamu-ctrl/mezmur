@@ -219,6 +219,14 @@
   --font-google-sans: "Google Sans", sans-serif;
   --font-nyala: "Nyala", "Noto Sans Ethiopic", sans-serif;
   --font-playfair: "Playfair Display", serif;
+  /* English Bible reading fonts — five professional typefaces spanning
+     classic literary serif through clean modern sans, all open-license
+     Google Fonts (same redistribution basis as the fonts above). */
+  --font-merriweather: "Merriweather", serif;
+  --font-lora: "Lora", serif;
+  --font-eb-garamond: "EB Garamond", serif;
+  --font-pt-serif: "PT Serif", serif;
+  --font-inter-reading: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root.light {

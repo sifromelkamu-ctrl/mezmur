@@ -1,5 +1,6 @@
 export type FontSize = "sm" | "md" | "lg" | "xl";
 export type FontFamily = "notoSans" | "notoSerif" | "abyssinica" | "menbere" | "agbalumo" | "googleSans" | "nyala";
+export type EnglishFontFamily = "merriweather" | "lora" | "ebGaramond" | "ptSerif" | "inter" | "playfair";
 // "am" fetches public/bible/{slug}.json (Amharic); "en" fetches
 // public/bible/en/{englishVersion}/{slug}.json — four public-domain English
 // translations, no modern/copyrighted translation (e.g. NIV) is included.
@@ -18,6 +19,7 @@ export const ENGLISH_VERSION_OPTIONS: EnglishVersion[] = ["kjv", "asv", "web", "
 export interface ReadingPrefs {
   fontSize: FontSize;
   fontFamily: FontFamily;
+  englishFontFamily: EnglishFontFamily;
   language: BibleLanguage;
   englishVersion: EnglishVersion;
 }
@@ -68,7 +70,36 @@ export const FONT_FAMILY_OPTIONS: FontFamily[] = [
   "nyala",
 ];
 
-const DEFAULT_PREFS: ReadingPrefs = { fontSize: "md", fontFamily: "notoSans", language: "am", englishVersion: "kjv" };
+// Five professional English reading fonts — classic literary serif through
+// clean modern sans — all open-license Google Fonts already loaded in
+// index.html, same basis as the Amharic fonts above.
+export const ENGLISH_FONT_FAMILY_CLASSES: Record<EnglishFontFamily, string> = {
+  merriweather: "font-merriweather",
+  lora: "font-lora",
+  ebGaramond: "font-eb-garamond",
+  ptSerif: "font-pt-serif",
+  inter: "font-inter-reading",
+  playfair: "font-playfair",
+};
+
+export const ENGLISH_FONT_FAMILY_LABELS: Record<EnglishFontFamily, string> = {
+  merriweather: "Merriweather",
+  lora: "Lora",
+  ebGaramond: "EB Garamond",
+  ptSerif: "PT Serif",
+  inter: "Inter",
+  playfair: "Playfair Display",
+};
+
+export const ENGLISH_FONT_FAMILY_OPTIONS: EnglishFontFamily[] = ["merriweather", "lora", "ebGaramond", "ptSerif", "inter", "playfair"];
+
+const DEFAULT_PREFS: ReadingPrefs = {
+  fontSize: "md",
+  fontFamily: "notoSans",
+  englishFontFamily: "merriweather",
+  language: "am",
+  englishVersion: "kjv",
+};
 
 export function loadReadingPrefs(): ReadingPrefs {
   try {

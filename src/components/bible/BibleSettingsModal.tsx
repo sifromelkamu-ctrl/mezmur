@@ -2,6 +2,9 @@ import { Bell, Moon, Sun, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { ThemeMode } from "../../context/ThemeContext";
 import {
+  ENGLISH_FONT_FAMILY_CLASSES,
+  ENGLISH_FONT_FAMILY_LABELS,
+  ENGLISH_FONT_FAMILY_OPTIONS,
   ENGLISH_VERSION_LABELS,
   ENGLISH_VERSION_OPTIONS,
   FONT_FAMILY_CLASSES,
@@ -91,6 +94,22 @@ export default function BibleSettingsModal({
                 >
                   <span className="block text-xs font-bold uppercase">{v}</span>
                   <span className="block text-[10px] font-semibold opacity-80 leading-tight">{ENGLISH_VERSION_LABELS[v]}</span>
+                </button>
+              ))}
+            </div>
+
+            <SectionLabel>Font</SectionLabel>
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {ENGLISH_FONT_FAMILY_OPTIONS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => updatePrefs({ englishFontFamily: f })}
+                  className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                    prefs.englishFontFamily === f ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+                  }`}
+                >
+                  <span className={`block text-[1rem] leading-none mb-1 ${ENGLISH_FONT_FAMILY_CLASSES[f]}`}>Aa</span>
+                  <span className="block text-[10px] font-semibold opacity-80">{ENGLISH_FONT_FAMILY_LABELS[f]}</span>
                 </button>
               ))}
             </div>

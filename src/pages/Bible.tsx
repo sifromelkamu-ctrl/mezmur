@@ -45,11 +45,10 @@ import {
   type VerseAnnotation,
 } from "../utils/bibleAnnotations";
 import {
+  ENGLISH_FONT_FAMILY_CLASSES,
   ENGLISH_VERSION_LABELS,
   ENGLISH_VERSION_OPTIONS,
   FONT_FAMILY_CLASSES,
-  FONT_FAMILY_LABELS,
-  FONT_FAMILY_OPTIONS,
   FONT_SIZE_CLASSES,
   loadReadingPrefs,
   saveReadingPrefs,
@@ -662,27 +661,6 @@ export default function Bible() {
                       </button>
                     ))}
                   </div>
-                  {prefs.language === "am" && (
-                    <>
-                      <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Amharic font</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {FONT_FAMILY_OPTIONS.map((f) => (
-                          <button
-                            key={f}
-                            onClick={() => updatePrefs({ fontFamily: f })}
-                            className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                              prefs.fontFamily === f
-                                ? "bg-white text-black border-transparent"
-                                : "border-border text-fg-muted hover:text-fg"
-                            }`}
-                          >
-                            <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
-                            <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
                 </div>
               </>
             )}
@@ -722,7 +700,9 @@ export default function Bible() {
                         return next;
                       })
                     }
-                    className={`${FONT_SIZE_CLASSES[prefs.fontSize]} ${FONT_FAMILY_CLASSES[prefs.fontFamily]} text-fg leading-loose cursor-pointer rounded-lg px-2 -mx-2 py-1.5 transition-all ${
+                    className={`${FONT_SIZE_CLASSES[prefs.fontSize]} ${
+                      prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : FONT_FAMILY_CLASSES[prefs.fontFamily]
+                    } text-fg leading-loose cursor-pointer rounded-lg px-2 -mx-2 py-1.5 transition-all ${
                       highlightMeta ? highlightMeta.bg : "hover:bg-hover"
                     } ${isSelected ? "ring-2 ring-gold ring-inset" : ""}`}
                   >
@@ -1042,7 +1022,9 @@ export default function Bible() {
           </span>
           <div className="flex-1 min-w-0">
             <p
-              className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} font-medium text-[1rem] text-[var(--bible-text)] truncate`}
+              className={`${
+                prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
+              } font-medium text-[1rem] text-[var(--bible-text)] truncate`}
             >
               {bookDisplayName(b, prefs.language)}
             </p>
@@ -1071,13 +1053,29 @@ export default function Bible() {
     const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
     const medallionSrc = id === "old" ? "/bible/icons/ot-medallion.jpg" : "/bible/icons/nt-medallion.jpg";
     const subtitle =
-      id === "old"
-        ? "እግዚአብሔር የገባውን ተስፋ የሚገልጡ ቅዱሳት መጻሕፍት"
-        : "የኢየሱስ ክርስቶስ ወንጌልና የተስፋው ፍጻሜ";
+      prefs.language === "en"
+        ? id === "old"
+          ? "The Book of the Law and the Prophets"
+          : "The Teaching and Life of Jesus Christ"
+        : id === "old"
+          ? "የሕግና የነቢያት መጽሐፍት"
+          : "የኢየሱስ ክርስቶስ ትምህርትና ሕይወት";
     const stats = [
-      { icon: Book, value: (id === "old" ? oldTestament.length : newTestament.length).toLocaleString(), label: "መጻሕፍት" },
-      { icon: ScrollText, value: (id === "old" ? oldTotalChapters : newTotalChapters).toLocaleString(), label: "ምዕራፍ" },
-      { icon: Bookmark, value: (id === "old" ? oldTotalVerses : newTotalVerses).toLocaleString(), label: "ጥቅሶች" },
+      {
+        icon: Book,
+        value: (id === "old" ? oldTestament.length : newTestament.length).toLocaleString(),
+        label: prefs.language === "en" ? "Books" : "መጻሕፍት",
+      },
+      {
+        icon: ScrollText,
+        value: (id === "old" ? oldTotalChapters : newTotalChapters).toLocaleString(),
+        label: prefs.language === "en" ? "Chapters" : "ምዕራፍ",
+      },
+      {
+        icon: Bookmark,
+        value: (id === "old" ? oldTotalVerses : newTotalVerses).toLocaleString(),
+        label: prefs.language === "en" ? "Verses" : "ጥቅሶች",
+      },
     ];
     const radius = 26;
     const circumference = 2 * Math.PI * radius;
@@ -1111,17 +1109,37 @@ export default function Bible() {
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-base font-black leading-tight" style={{ color: "var(--bible-text)" }}>
+        <p
+          className={`relative font-black leading-tight ${
+            prefs.language === "en" ? "font-playfair text-lg tracking-wide" : "font-abyssinica text-base tracking-tight"
+          }`}
+          style={{
+            color: "var(--bible-text)",
+            textShadow: `0 2px 16px color-mix(in oklab, ${accentVar} 45%, transparent)`,
+          }}
+        >
           {theme.label}
         </p>
 
-        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-70">
-          <span className="h-px w-6" style={{ background: accentVar }} />
-          <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: accentVar }} />
-          <span className="h-px w-6" style={{ background: accentVar }} />
+        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-80">
+          <span
+            className="h-px w-6"
+            style={{ background: `linear-gradient(90deg, transparent, ${accentVar})` }}
+          />
+          <span className="w-1.5 h-1.5 rotate-45 shrink-0 shadow-[0_0_6px_var(--tw-shadow-color)]" style={{ background: accentVar, "--tw-shadow-color": accentVar } as CSSProperties} />
+          <span
+            className="h-px w-6"
+            style={{ background: `linear-gradient(90deg, ${accentVar}, transparent)` }}
+          />
         </div>
 
-        <p className="font-abyssinica text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1">{subtitle}</p>
+        <p
+          className={`text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1 ${
+            prefs.language === "en" ? "font-playfair italic tracking-wide" : "font-abyssinica"
+          }`}
+        >
+          {subtitle}
+        </p>
 
         <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
@@ -1337,7 +1355,7 @@ export default function Bible() {
             <div className="flex items-center gap-2">
               <BookOpen size={16} style={{ color: "var(--bible-text)" }} />
               <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
-                ንባብ ይቀጥሉ
+                {prefs.language === "en" ? "Continue Reading" : "ንባብ ይቀጥሉ"}
               </h2>
             </div>
             <button
@@ -1345,7 +1363,7 @@ export default function Bible() {
               className="flex items-center gap-0.5 text-xs font-semibold transition-colors"
               style={{ color: "var(--bible-purple)" }}
             >
-              ሁሉንም ይመልከቱ
+              {prefs.language === "en" ? "View all" : "ሁሉንም ይመልከቱ"}
               <ChevronRight size={12} />
             </button>
           </div>
@@ -1371,7 +1389,9 @@ export default function Bible() {
                     style={{ backgroundImage: tileGradient }}
                   >
                     <span
-                      className={`${prefs.language === "en" ? "font-sans" : "font-abyssinica"} text-white font-bold text-xs leading-tight line-clamp-1`}
+                      className={`${
+                        prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
+                      } text-white font-bold text-xs leading-tight line-clamp-1`}
                     >
                       {bookDisplayName(b, prefs.language)}
                     </span>
