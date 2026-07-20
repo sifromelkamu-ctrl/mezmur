@@ -1410,7 +1410,7 @@ export default function Bible() {
           </button>
           <div className="relative h-full flex flex-col items-center text-center justify-end p-4 pointer-events-none">
             <span
-              className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
+              className="self-start inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
               style={{ color: "var(--bible-purple)" }}
             >
               <Sun size={11} strokeWidth={2.5} />
