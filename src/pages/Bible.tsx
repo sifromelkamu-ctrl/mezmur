@@ -375,14 +375,18 @@ export default function Bible() {
   // dailyVerseIndexForUser in server/src/push.ts.
   useEffect(() => {
     const pick = MORNING_VERSES[dailyVerseIndexFor(new Date())];
-    fetch(`/bible/${pick.slug}.json`)
+    const path =
+      prefs.language === "en" ? `/bible/en/${prefs.englishVersion}/${pick.slug}.json` : `/bible/${pick.slug}.json`;
+    fetch(path)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data: BookText) => {
         const text = data[String(pick.chapter)]?.[pick.verseIndex];
         if (text) {
+          const book = BIBLE_BOOKS.find((b) => b.slug === pick.slug);
+          const ref = prefs.language === "en" && book ? `${book.name} ${pick.chapter}:${pick.verseIndex + 1}` : pick.refAm;
           setHeroVerse({
             id: `${pick.slug}-${pick.chapter}-${pick.verseIndex}`,
-            ref: pick.refAm,
+            ref,
             text,
             slug: pick.slug,
             chapter: pick.chapter,
@@ -391,7 +395,7 @@ export default function Bible() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [prefs.language, prefs.englishVersion]);
 
   // Reflects whether THIS device already has an active daily-verse push
   // subscription, so the bell shows the right on/off state after a reload.
@@ -1398,9 +1402,13 @@ export default function Bible() {
               style={{ color: "var(--bible-purple)" }}
             >
               <Sun size={11} strokeWidth={2.5} />
-              የዕለቱ ቃል
+              {prefs.language === "en" ? "Verse of the Day" : "የዕለቱ ቃል"}
             </span>
-            <p className="font-abyssinica text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
+            <p
+              className={`${
+                prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
+              } text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
+            >
               {heroVerse.text}
             </p>
             <p className="text-[11px] font-semibold text-white/90 mb-2.5 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
@@ -1410,7 +1418,7 @@ export default function Bible() {
               style={{ background: "var(--bible-navy)" }}
             >
               <BookOpen size={13} />
-              ሙሉውን ያንብቡ
+              {prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
             </button>
           </div>
           </div>
