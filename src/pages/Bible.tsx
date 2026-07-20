@@ -16,7 +16,6 @@ import {
   Search,
   Settings2,
   Share2,
-  Sparkles,
   StickyNote,
   Sun,
   Volume2,
@@ -1484,12 +1483,6 @@ export default function Bible() {
       )}
 
       {/* Quick Access — Bookmarks / Notes / History / Favorites in one card. */}
-      <div className="flex items-center gap-2 mb-2">
-        <Sparkles size={16} style={{ color: "var(--color-gold-dark)" }} />
-        <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
-          {prefs.language === "en" ? "Quick Access" : "ፈጣን መዳረሻ"}
-        </h2>
-      </div>
       <div
         className="relative rounded-2xl mb-5 shadow-[0_10px_28px_-16px_rgba(36,28,61,0.3)] ring-1 ring-black/[0.04] overflow-hidden"
         style={{ background: "var(--color-elevated)" }}
