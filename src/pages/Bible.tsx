@@ -171,7 +171,10 @@ export default function Bible() {
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [expanded, setExpanded] = useState<{ old: boolean; new: boolean }>({ old: false, new: false });
+  // Which testament's book list is open, if any — mutually exclusive
+  // (opening one closes the other) rather than two independent booleans,
+  // so only one book list is ever visible at a time.
+  const [expandedTestament, setExpandedTestament] = useState<"old" | "new" | null>(null);
 
   const [annotations, setAnnotations] = useState<Record<string, VerseAnnotation>>({});
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
@@ -1079,7 +1082,7 @@ export default function Bible() {
     const dashOffset = circumference * (1 - percent / 100);
     return (
       <button
-        onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
+        onClick={() => setExpandedTestament((prev) => (prev === id ? null : id))}
         className="relative overflow-hidden text-center rounded-[28px] pt-4 px-4 pb-3 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
         style={{
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
@@ -1178,12 +1181,12 @@ export default function Bible() {
           <ReadingPlanCard id="old" />
           <ReadingPlanCard id="new" />
         </div>
-        {expanded.old && (
+        {expandedTestament === "old" && (
           <div className="mt-3">
             <BookList books={oldTestament} theme={TESTAMENT_THEME.old} />
           </div>
         )}
-        {expanded.new && (
+        {expandedTestament === "new" && (
           <div className="mt-3">
             <BookList books={newTestament} theme={TESTAMENT_THEME.new} />
           </div>
