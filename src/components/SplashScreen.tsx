@@ -14,24 +14,9 @@ interface SplashScreenProps {
   onFinish: () => void;
 }
 
-// Same premium teal -> emerald -> deep-black blend as the Now Playing
-// screen's fixed background (see NOW_PLAYING_BACKGROUND in NowPlaying.tsx) —
-// duplicated rather than imported since the two screens are otherwise
-// unrelated and this is a plain visual constant.
-const SPLASH_BACKGROUND = `linear-gradient(
-  180deg,
-  #1cc4a3 0%,
-  #14b8a6 14%,
-  #0f8f7e 32%,
-  #134e4a 52%,
-  #0d2f2c 70%,
-  #0a1614 86%,
-  #050707 100%
-)`;
-
 // The app's cold-open splash — shown once per real page load (App mounts
 // exactly once per browser load/refresh; client-side route changes never
-// remount it). Mirrors the native-app splash mock: teal-to-black backdrop, a
+// remount it). Mirrors the native-app splash mock: cream backdrop, a
 // gold cross-and-note mark, serif wordmark, and a loading rail — with a
 // letter-by-letter entrance and a one-shot foil shimmer for a more
 // premium feel than a static image would give.
@@ -51,7 +36,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     <div
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5 ${exiting ? "splash-exiting" : ""}`}
       style={{
-        backgroundImage: SPLASH_BACKGROUND,
+        background: "radial-gradient(circle at 50% 38%, #fffdf8 0%, #faf5e9 55%, #f5ecd8 100%)",
       }}
     >
       <div className="relative flex items-center justify-center w-24 h-24">
@@ -73,7 +58,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       <div className="flex flex-col items-center gap-2.5">
         <h1
           className="font-playfair font-black text-4xl text-center"
-          style={{ color: "#ffffff" }}
+          style={{ color: "#141414" }}
           aria-label="Mezmur"
         >
           {WORDMARK.split("").map((letter, i) => (
@@ -92,7 +77,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
               key={word}
               className="text-xs font-semibold uppercase opacity-0"
               style={{
-                color: "#ffffff",
+                color: "#141414",
                 letterSpacing: "0.1em",
                 animation: `splash-tagline-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${
                   SHIMMER_START_MS + i * TAGLINE_STAGGER_MS
@@ -108,7 +93,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       <div
         className="w-36 h-[3px] rounded-full overflow-hidden opacity-0"
         style={{
-          background: "rgba(255,255,255,0.18)",
+          background: "rgba(169,134,43,0.18)",
           animation: `splash-tagline-in 0.4s ease-out ${LETTERS_START_MS}ms forwards`,
         }}
       >
