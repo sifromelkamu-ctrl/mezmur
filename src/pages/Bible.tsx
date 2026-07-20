@@ -1369,11 +1369,11 @@ export default function Bible() {
           the day's pick from HERO_IMAGES but is swipeable across the whole
           set, with dots below to show/jump to position. */}
       {!heroVerse ? (
-        <div className="w-full h-[190px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
+        <div className="w-full h-[175px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
         <div className="mb-3">
           <div
-            className="relative w-full h-[190px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
+            className="relative w-full h-[175px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
             onTouchStart={(e) => {
               heroTouchStartX.current = e.touches[0].clientX;
             }}
@@ -1426,11 +1426,11 @@ export default function Bible() {
             <p className="text-[11px] font-semibold text-white/90 mb-2.5 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
             <button
               onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
-              className="pointer-events-auto w-fit flex items-center gap-1.5 rounded-full text-white text-xs font-bold pl-3 pr-4 py-2 shadow-lg active:scale-95 transition-transform"
+              aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
+              className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full text-white shadow-lg active:scale-95 transition-transform"
               style={{ background: "var(--bible-navy)" }}
             >
-              <BookOpen size={13} />
-              {prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
+              <BookOpen size={15} />
             </button>
           </div>
           </div>
