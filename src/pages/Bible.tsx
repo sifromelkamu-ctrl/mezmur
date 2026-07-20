@@ -1494,16 +1494,18 @@ export default function Bible() {
                 >
                   <div
                     className="w-full h-12 rounded-lg flex items-center justify-between px-2 mb-2"
-                    style={{ backgroundImage: tileGradient }}
+                    style={{ backgroundImage: `linear-gradient(160deg, rgba(0,0,0,0.05), rgba(0,0,0,0.4)), ${tileGradient}` }}
                   >
                     <span
                       className={`${
                         prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
-                      } text-white font-bold text-xs leading-tight line-clamp-1`}
+                      } text-white font-bold text-xs leading-tight line-clamp-1 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]`}
                     >
                       {bookDisplayName(b, prefs.language)}
                     </span>
-                    <span className="text-white/80 text-[10px] font-semibold shrink-0">{entry.chapter}</span>
+                    <span className="text-white text-[10px] font-semibold shrink-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">
+                      {entry.chapter}
+                    </span>
                   </div>
                   <div className="h-1 rounded-full bg-black/[0.06] overflow-hidden mb-1">
                     <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
