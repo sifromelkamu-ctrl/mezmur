@@ -1408,7 +1408,7 @@ export default function Bible() {
               <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
             )}
           </button>
-          <div className="relative h-full flex flex-col justify-end p-4 pointer-events-none">
+          <div className="relative h-full flex flex-col items-center text-center justify-end p-4 pointer-events-none">
             <span
               className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
               style={{ color: "var(--bible-purple)" }}
@@ -1423,17 +1423,17 @@ export default function Bible() {
             >
               {heroVerse.text}
             </p>
-            <button
-              onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
-              aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
-              className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full text-white shadow-lg active:scale-95 transition-transform"
-              style={{ background: "var(--bible-navy)" }}
-            >
-              <BookOpen size={15} />
-            </button>
-            <p className="absolute bottom-4 right-4 text-[11px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">
-              {heroVerse.ref}
-            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
+                aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
+                className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full text-white shadow-lg active:scale-95 transition-transform"
+                style={{ background: "var(--bible-navy)" }}
+              >
+                <BookOpen size={15} />
+              </button>
+              <p className="text-[11px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
+            </div>
           </div>
           </div>
           <div className="flex items-center justify-center gap-1.5 mt-2">
