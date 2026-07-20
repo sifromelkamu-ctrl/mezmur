@@ -16,6 +16,7 @@ import {
   Search,
   Settings2,
   Share2,
+  Sparkles,
   StickyNote,
   Sun,
   Volume2,
@@ -1481,13 +1482,25 @@ export default function Bible() {
       )}
 
       {/* Quick Access — Bookmarks / Notes / History / Favorites in one card. */}
-      <div className="rounded-2xl mb-5 shadow-sm overflow-hidden" style={{ background: "var(--color-elevated)" }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Sparkles size={16} style={{ color: "var(--color-gold-dark)" }} />
+        <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
+          {prefs.language === "en" ? "Quick Access" : "ፈጣን መዳረሻ"}
+        </h2>
+      </div>
+      <div
+        className="relative rounded-2xl mb-5 shadow-[0_10px_28px_-16px_rgba(36,28,61,0.3)] ring-1 ring-black/[0.04] overflow-hidden"
+        style={{ background: "var(--color-elevated)" }}
+      >
+        <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
         <div className="grid grid-cols-4">
           {QUICK_ACCESS.map((item, i) => (
             <button
               key={item.id}
               onClick={item.onClick}
-              className={`flex flex-col items-center gap-2 py-4 min-w-0 ${i > 0 ? "border-l border-border" : ""}`}
+              className={`flex flex-col items-center gap-2 py-4 min-w-0 active:scale-95 transition-transform ${
+                i > 0 ? "border-l border-border" : ""
+              }`}
             >
               <span
                 className="w-11 h-11 rounded-full flex items-center justify-center"
@@ -1540,7 +1553,7 @@ export default function Bible() {
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
                   onClick={() => openVerse(entry.bookSlug, entry.chapter)}
-                  className="shrink-0 w-28 rounded-xl p-2.5 text-left shadow-sm"
+                  className="shrink-0 w-28 rounded-xl p-2.5 text-left shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform"
                   style={{ background: "var(--color-elevated)" }}
                 >
                   <div
