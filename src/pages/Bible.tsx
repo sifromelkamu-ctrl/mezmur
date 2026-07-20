@@ -1445,7 +1445,9 @@ export default function Bible() {
             </span>
             <p
               className={`${
-                prefs.language === "en" ? "font-playfair italic tracking-wide text-[1.05rem]" : "font-abyssinica text-[0.9rem]"
+                prefs.language === "en"
+                  ? `${ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily]} text-[1.05rem]`
+                  : "font-abyssinica text-[0.9rem]"
               } font-bold text-white leading-snug mb-1.5 line-clamp-3 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
             >
               {heroVerse.text}
