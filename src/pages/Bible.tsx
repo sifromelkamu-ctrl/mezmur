@@ -1236,7 +1236,7 @@ export default function Bible() {
           <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p className="font-abyssinica text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1">{subtitle}</p>
+        <p className="font-abyssinica font-bold text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1">{subtitle}</p>
 
         <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
