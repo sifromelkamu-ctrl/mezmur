@@ -1419,7 +1419,7 @@ export default function Bible() {
             <p
               className={`${
                 prefs.language === "en" ? "font-lora" : "font-abyssinica"
-              } text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-2 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
+              } text-[1rem] font-bold text-white leading-snug mb-1.5 line-clamp-3 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
             >
               {heroVerse.text}
             </p>
