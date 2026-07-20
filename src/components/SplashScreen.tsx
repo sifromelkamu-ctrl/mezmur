@@ -14,12 +14,32 @@ interface SplashScreenProps {
   onFinish: () => void;
 }
 
+// Same premium teal -> emerald -> deep-black blend as the Now Playing
+// screen's fixed background (see NOW_PLAYING_BACKGROUND in NowPlaying.tsx) —
+// duplicated rather than imported since the two screens are otherwise
+// unrelated and this is a plain visual constant. The logo glow, progress
+// rail, and fill all pull from this same teal so every animated element on
+// the screen reads as one cohesive palette instead of gold accents dropped
+// onto an unrelated background.
+const SPLASH_BACKGROUND = `linear-gradient(
+  180deg,
+  #1cc4a3 0%,
+  #14b8a6 14%,
+  #0f8f7e 32%,
+  #134e4a 52%,
+  #0d2f2c 70%,
+  #0a1614 86%,
+  #050707 100%
+)`;
+const SPLASH_TEAL = "#2dd4bf";
+const SPLASH_TEAL_LIGHT = "#99f6e4";
+
 // The app's cold-open splash — shown once per real page load (App mounts
 // exactly once per browser load/refresh; client-side route changes never
-// remount it). Mirrors the native-app splash mock: cream backdrop, a
-// gold cross-and-note mark, serif wordmark, and a loading rail — with a
-// letter-by-letter entrance and a one-shot foil shimmer for a more
-// premium feel than a static image would give.
+// remount it). Mirrors the native-app splash mock: teal-to-black backdrop
+// matching Now Playing, a glowing cross-and-note mark, serif wordmark, and
+// a loading rail — with a letter-by-letter entrance and a one-shot foil
+// shimmer for a more premium feel than a static image would give.
 export default function SplashScreen({ onFinish }: SplashScreenProps) {
   const [exiting, setExiting] = useState(false);
 
@@ -36,14 +56,14 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     <div
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5 ${exiting ? "splash-exiting" : ""}`}
       style={{
-        background: "radial-gradient(circle at 50% 38%, #fffdf8 0%, #faf5e9 55%, #f5ecd8 100%)",
+        backgroundImage: SPLASH_BACKGROUND,
       }}
     >
       <div className="relative flex items-center justify-center w-24 h-24">
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            background: "radial-gradient(circle, rgba(212,175,55,0.35) 0%, rgba(212,175,55,0) 70%)",
+            background: `radial-gradient(circle, color-mix(in oklab, ${SPLASH_TEAL_LIGHT} 55%, transparent) 0%, transparent 70%)`,
             animation: "splash-ring-pulse 1.8s ease-out 0.15s 2",
           }}
         />
@@ -58,7 +78,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       <div className="flex flex-col items-center gap-2.5">
         <h1
           className="font-playfair font-black text-4xl text-center"
-          style={{ color: "#141414" }}
+          style={{ color: "#ffffff" }}
           aria-label="Mezmur"
         >
           {WORDMARK.split("").map((letter, i) => (
@@ -77,7 +97,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
               key={word}
               className="text-xs font-semibold uppercase opacity-0"
               style={{
-                color: "#141414",
+                color: SPLASH_TEAL_LIGHT,
                 letterSpacing: "0.1em",
                 animation: `splash-tagline-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${
                   SHIMMER_START_MS + i * TAGLINE_STAGGER_MS
@@ -93,14 +113,14 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       <div
         className="w-36 h-[3px] rounded-full overflow-hidden opacity-0"
         style={{
-          background: "rgba(169,134,43,0.18)",
+          background: "rgba(255,255,255,0.18)",
           animation: `splash-tagline-in 0.4s ease-out ${LETTERS_START_MS}ms forwards`,
         }}
       >
         <div
           className="h-full rounded-full"
           style={{
-            background: "linear-gradient(90deg, #d4af37, #f7e0a0)",
+            background: `linear-gradient(90deg, ${SPLASH_TEAL}, ${SPLASH_TEAL_LIGHT})`,
             animation: `splash-progress-fill 1.4s cubic-bezier(0.4, 0, 0.2, 1) ${LETTERS_START_MS}ms forwards`,
           }}
         />
