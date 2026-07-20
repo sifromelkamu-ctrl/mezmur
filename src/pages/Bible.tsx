@@ -1423,7 +1423,7 @@ export default function Bible() {
             >
               {heroVerse.text}
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div className="w-full flex items-center justify-end gap-3">
               <button
                 onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
                 aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
