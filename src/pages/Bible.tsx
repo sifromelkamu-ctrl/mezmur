@@ -1226,37 +1226,17 @@ export default function Bible() {
           </span>
         </div>
 
-        <p
-          className={`relative font-black leading-tight ${
-            prefs.language === "en" ? "font-playfair text-lg tracking-wide" : "font-abyssinica text-base tracking-tight"
-          }`}
-          style={{
-            color: "var(--bible-text)",
-            textShadow: `0 2px 16px color-mix(in oklab, ${accentVar} 45%, transparent)`,
-          }}
-        >
+        <p className="relative font-abyssinica text-base font-black leading-tight" style={{ color: "var(--bible-text)" }}>
           {theme.label}
         </p>
 
-        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-80">
-          <span
-            className="h-px w-6"
-            style={{ background: `linear-gradient(90deg, transparent, ${accentVar})` }}
-          />
-          <span className="w-1.5 h-1.5 rotate-45 shrink-0 shadow-[0_0_6px_var(--tw-shadow-color)]" style={{ background: accentVar, "--tw-shadow-color": accentVar } as CSSProperties} />
-          <span
-            className="h-px w-6"
-            style={{ background: `linear-gradient(90deg, ${accentVar}, transparent)` }}
-          />
+        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-70">
+          <span className="h-px w-6" style={{ background: accentVar }} />
+          <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: accentVar }} />
+          <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p
-          className={`text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1 ${
-            prefs.language === "en" ? "font-playfair italic tracking-wide" : "font-abyssinica"
-          }`}
-        >
-          {subtitle}
-        </p>
+        <p className="font-abyssinica text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1">{subtitle}</p>
 
         <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
