@@ -1241,7 +1241,7 @@ export default function Bible() {
         <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
             <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
-              <s.icon size={12} style={{ color: accentVar }} />
+              <s.icon size={12} style={{ color: "var(--color-gold)" }} />
               <span className="text-xs font-black leading-none" style={{ color: "var(--bible-text)" }}>
                 {s.value}
               </span>
@@ -1281,7 +1281,8 @@ export default function Bible() {
           <button
             onClick={() => setShowBibleSettings(true)}
             aria-label="Bible settings"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border"
+            style={{ color: "var(--color-gold-dark)" }}
           >
             <Settings2 size={16} />
           </button>
@@ -1289,8 +1290,8 @@ export default function Bible() {
             onClick={handleToggleNotifications}
             disabled={pushBusy}
             aria-label={pushSubscribed ? "Turn off daily verse notifications" : "Turn on daily verse notifications"}
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60 ${pushSubscribed ? "" : "text-fg-muted"}`}
-            style={pushSubscribed ? { color: "var(--bible-purple)" } : undefined}
+            className="relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60"
+            style={{ color: "var(--color-gold-dark)" }}
           >
             <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
           </button>
@@ -1427,9 +1428,9 @@ export default function Bible() {
             >
               <span
                 className="w-11 h-11 rounded-full flex items-center justify-center"
-                style={{ background: "var(--bible-purple-soft)" }}
+                style={{ background: "color-mix(in oklab, var(--color-gold) 18%, transparent)" }}
               >
-                <item.icon size={18} style={{ color: "var(--bible-purple)" }} />
+                <item.icon size={18} style={{ color: "var(--color-gold-dark)" }} />
               </span>
               <span className="text-xs font-semibold text-center leading-tight w-full truncate" style={{ color: "var(--bible-text)" }}>
                 {item.label}
@@ -1450,7 +1451,7 @@ export default function Bible() {
         <div className="mb-2">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <BookOpen size={16} style={{ color: "var(--bible-text)" }} />
+              <BookOpen size={16} style={{ color: "var(--color-gold-dark)" }} />
               <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
                 {prefs.language === "en" ? "Continue Reading" : "ንባብ ይቀጥሉ"}
               </h2>
@@ -1469,11 +1470,11 @@ export default function Bible() {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;
               const percent = Math.round((entry.chapter / b.chapterCount) * 100);
-              const accentVar = i % 2 === 0 ? "var(--bible-purple)" : "var(--bible-green)";
+              const accentVar = "var(--color-gold-dark)";
               const tileGradient =
                 i % 2 === 0
-                  ? "linear-gradient(160deg, #6D4FEA, #3B2A85)"
-                  : "linear-gradient(160deg, #2F9E6E, #1C5A3E)";
+                  ? "linear-gradient(160deg, #E3C167, #A9862B)"
+                  : "linear-gradient(160deg, #C9A34A, #7A5C1E)";
               return (
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
