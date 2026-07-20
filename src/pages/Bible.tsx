@@ -27,6 +27,7 @@ import { BIBLE_BOOKS, type BibleBookMeta } from "../data/bibleBooks";
 import { useAuth } from "../context/useAuth";
 import { useTheme } from "../context/ThemeContext";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
+import BibleSettingsModal from "../components/bible/BibleSettingsModal";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
@@ -163,7 +164,7 @@ function dailyHeroImageIndexFor(date: Date): number {
 export default function Bible() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { mode } = useTheme();
+  const { mode, setMode } = useTheme();
   const bibleHomeTheme = mode === "light" ? BIBLE_HOME_THEME_LIGHT : BIBLE_HOME_THEME_DARK;
   const [bookSlug, setBookSlug] = useState<string | null>(null);
   const [chapter, setChapter] = useState<number | null>(null);
@@ -183,6 +184,7 @@ export default function Bible() {
   const [justCopied, setJustCopied] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
+  const [showBibleSettings, setShowBibleSettings] = useState(false);
   const [heroVerse, setHeroVerse] = useState<
     { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
   >(null);
@@ -1160,16 +1162,38 @@ export default function Bible() {
             መዝሙር
           </h1>
         </button>
-        <button
-          onClick={handleToggleNotifications}
-          disabled={pushBusy}
-          aria-label={pushSubscribed ? "Turn off daily verse notifications" : "Turn on daily verse notifications"}
-          className={`relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60 ${pushSubscribed ? "" : "text-fg-muted"}`}
-          style={pushSubscribed ? { color: "var(--bible-purple)" } : undefined}
-        >
-          <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBibleSettings(true)}
+            aria-label="Bible settings"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted"
+          >
+            <Settings2 size={16} />
+          </button>
+          <button
+            onClick={handleToggleNotifications}
+            disabled={pushBusy}
+            aria-label={pushSubscribed ? "Turn off daily verse notifications" : "Turn on daily verse notifications"}
+            className={`relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60 ${pushSubscribed ? "" : "text-fg-muted"}`}
+            style={pushSubscribed ? { color: "var(--bible-purple)" } : undefined}
+          >
+            <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
+          </button>
+        </div>
       </div>
+
+      {showBibleSettings && (
+        <BibleSettingsModal
+          prefs={prefs}
+          updatePrefs={updatePrefs}
+          mode={mode}
+          setMode={setMode}
+          pushSubscribed={pushSubscribed}
+          pushBusy={pushBusy}
+          onToggleNotifications={handleToggleNotifications}
+          onClose={() => setShowBibleSettings(false)}
+        />
+      )}
 
       {/* Reading Plan — moved to the top of the page (above the hero) so
           it's the first thing visible. Repurposes the real Old/New
