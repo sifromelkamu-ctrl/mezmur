@@ -51,9 +51,11 @@ function Section({ icon: Icon, label, children }: { icon: ComponentType<{ size?:
 // One place for everything about how a visitor reads the Bible section —
 // language, English translation, Amharic font, text size, light/dark
 // appearance, and the daily-verse reminder — instead of these being spread
-// across the chapter reader's own small popover and a lone bell icon.
-// Portaled to document.body like BibleListModal, for the same stacking-
-// context reason documented there.
+// across the chapter reader's own small popover and a lone bell icon. A
+// full-screen overlay rather than a bottom sheet, since it has enough
+// sections to be worth its own dedicated screen. Portaled to document.body
+// like BibleListModal, for the same stacking-context reason documented
+// there (nested z-50 would still paint below the bottom nav's fixed z-30).
 export default function BibleSettingsModal({
   prefs,
   updatePrefs,
@@ -65,11 +67,8 @@ export default function BibleSettingsModal({
   onClose,
 }: BibleSettingsModalProps) {
   return createPortal(
-    <>
-      <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
-      <div className="bible-scope fixed inset-x-0 bottom-0 z-50 bg-elevated rounded-t-3xl max-h-[85vh] overflow-y-auto p-5 pb-8 shadow-2xl">
-        <div className="w-9 h-1 rounded-full bg-fg-subtle/30 mx-auto mb-4" />
-
+    <div className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto p-5 pt-8 pb-10">
+      <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="font-agbalumo text-xl font-bold text-gold">Bible Settings</h2>
           <button
@@ -222,7 +221,7 @@ export default function BibleSettingsModal({
           </div>
         </Section>
       </div>
-    </>,
+    </div>,
     document.body
   );
 }
