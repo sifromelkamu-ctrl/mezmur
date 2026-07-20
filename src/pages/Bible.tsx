@@ -1245,7 +1245,7 @@ export default function Bible() {
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-base font-black leading-tight" style={{ color: "var(--bible-text)" }}>
+        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-text)" }}>
           {theme.label}
         </p>
 
