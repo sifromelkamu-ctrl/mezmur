@@ -1217,7 +1217,7 @@ export default function Bible() {
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
       >
-        <div className="relative mx-auto mb-2 w-[74px] h-[74px]">
+        <div className="relative mx-auto mb-2 w-[85px] h-[85px]">
           <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
             <circle cx="32" cy="32" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="5" />
             <circle
