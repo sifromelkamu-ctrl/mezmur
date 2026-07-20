@@ -386,27 +386,53 @@ export default function Bible() {
   // below) sends a per-user personalized pick instead — see
   // dailyVerseIndexForUser in server/src/push.ts.
   useEffect(() => {
-    const pick = MORNING_VERSES[dailyVerseIndexFor(new Date())];
-    const path =
-      prefs.language === "en" ? `/bible/en/${prefs.englishVersion}/${pick.slug}.json` : `/bible/${pick.slug}.json`;
-    fetch(path)
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data: BookText) => {
-        const text = data[String(pick.chapter)]?.[pick.verseIndex];
-        if (text) {
-          const book = BIBLE_BOOKS.find((b) => b.slug === pick.slug);
-          const ref = prefs.language === "en" && book ? `${book.name} ${pick.chapter}:${pick.verseIndex + 1}` : pick.refAm;
-          setHeroVerse({
-            id: `${pick.slug}-${pick.chapter}-${pick.verseIndex}`,
-            ref,
-            text,
-            slug: pick.slug,
-            chapter: pick.chapter,
-            verseIndex: pick.verseIndex,
-          });
-        }
-      })
-      .catch(() => {});
+    let cancelled = false;
+    // Roughly what fits in 3 lines of the hero card's text column at its
+    // current width/font (measured, not exact — the card's line-clamp-3
+    // still clips as a hard backstop if this estimate is ever off).
+    const MAX_VERSE_CHARS = 100;
+    const bookCache = new Map<string, BookText | null>();
+
+    async function fetchBook(slug: string): Promise<BookText | null> {
+      if (bookCache.has(slug)) return bookCache.get(slug)!;
+      const path =
+        prefs.language === "en" ? `/bible/en/${prefs.englishVersion}/${slug}.json` : `/bible/${slug}.json`;
+      const data = await fetch(path)
+        .then((res) => (res.ok ? (res.json() as Promise<BookText>) : null))
+        .catch(() => null);
+      bookCache.set(slug, data);
+      return data;
+    }
+
+    async function run() {
+      const startIndex = dailyVerseIndexFor(new Date());
+      // Walk forward through the curated list (same order for everyone that
+      // day) until one fits in 3 lines — MORNING_VERSES is hand-picked, so a
+      // handful of extra attempts is enough in practice.
+      for (let attempt = 0; attempt < 8 && !cancelled; attempt++) {
+        const pick = MORNING_VERSES[(startIndex + attempt) % MORNING_VERSES.length];
+        const data = await fetchBook(pick.slug);
+        const text = data?.[String(pick.chapter)]?.[pick.verseIndex];
+        if (!text || text.length > MAX_VERSE_CHARS) continue;
+        if (cancelled) return;
+        const book = BIBLE_BOOKS.find((b) => b.slug === pick.slug);
+        const ref = prefs.language === "en" && book ? `${book.name} ${pick.chapter}:${pick.verseIndex + 1}` : pick.refAm;
+        setHeroVerse({
+          id: `${pick.slug}-${pick.chapter}-${pick.verseIndex}`,
+          ref,
+          text,
+          slug: pick.slug,
+          chapter: pick.chapter,
+          verseIndex: pick.verseIndex,
+        });
+        return;
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [prefs.language, prefs.englishVersion]);
 
   // Reflects whether THIS device already has an active daily-verse push
