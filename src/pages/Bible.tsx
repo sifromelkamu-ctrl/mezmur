@@ -72,6 +72,18 @@ function bookDisplayName(book: BibleBookMeta, language: "am" | "en"): string {
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
 
+// A distinct premium tone per Continue Reading tile (cycled by index) —
+// all within the gold/bronze/copper family so the row reads as one
+// cohesive, premium palette rather than random colors.
+const TILE_GOLD_PALETTE = [
+  { gradient: "linear-gradient(160deg, #E3C167, #A9862B)", accent: "#C9A34A" },
+  { gradient: "linear-gradient(160deg, #D98850, #8B4A24)", accent: "#C97A46" },
+  { gradient: "linear-gradient(160deg, #E8D6A0, #B89B5E)", accent: "#CBAE72" },
+  { gradient: "linear-gradient(160deg, #E0A94E, #9C6B1C)", accent: "#D0922E" },
+  { gradient: "linear-gradient(160deg, #C2A66B, #6E5A32)", accent: "#A88C52" },
+  { gradient: "linear-gradient(160deg, #C9A34A, #7A5C1E)", accent: "#A9862B" },
+];
+
 // The Bible *home* screen (only) renders in its own purple/green palette,
 // independent of the app's global dark/gold theme — set as inline CSS
 // custom properties (rather than a stylesheet rule) so it always wins
@@ -1470,11 +1482,9 @@ export default function Bible() {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;
               const percent = Math.round((entry.chapter / b.chapterCount) * 100);
-              const accentVar = "var(--color-gold-dark)";
-              const tileGradient =
-                i % 2 === 0
-                  ? "linear-gradient(160deg, #E3C167, #A9862B)"
-                  : "linear-gradient(160deg, #C9A34A, #7A5C1E)";
+              const palette = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length];
+              const accentVar = palette.accent;
+              const tileGradient = palette.gradient;
               return (
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
