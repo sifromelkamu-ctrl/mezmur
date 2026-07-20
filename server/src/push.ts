@@ -29,14 +29,30 @@ export function getVapidPublicKey(): string | null {
   return vapidPublicKey ?? null;
 }
 
-// Same hash shape as the frontend's dailyVerseIndexFor (src/pages/Bible.tsx)
-// but salted with the user's id, so each subscriber gets a different but
+// Well-mixed 32-bit integer hash (Murmur3-style finalizer), same approach as
+// the frontend's dailyVerseIndexFor (src/pages/Bible.tsx) — a plain
+// `hash*31+char` string hash leaves consecutive days walking through nearly
+// adjacent indices instead of shuffling, which read as "not really random."
+function mix32(n: number): number {
+  let x = n;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// Salted with the user's id (mixed with the well-shuffled day number, not
+// just concatenated into a string) so each subscriber gets a different but
 // stable verse each day instead of everyone receiving an identical push.
 export function dailyVerseIndexForUser(userId: string, date: Date): number {
-  const dayKey = `${userId}:${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
-  let hash = 0;
-  for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
-  return hash % MORNING_VERSES.length;
+  const dayNumber = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86400000;
+  const seed = (hashString(userId) ^ mix32(dayNumber)) >>> 0;
+  return mix32(seed) % MORNING_VERSES.length;
 }
 
 export interface WebPushSubscription {

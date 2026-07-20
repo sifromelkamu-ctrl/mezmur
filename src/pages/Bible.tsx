@@ -138,17 +138,29 @@ const BIBLE_HOME_THEME_DARK = {
   "--bible-green-soft": "#182A20",
 } as CSSProperties;
 
+// Well-mixed 32-bit integer hash (Murmur3-style finalizer) — unlike a plain
+// polynomial string hash, this scrambles even sequential inputs thoroughly,
+// so consecutive calendar days don't land on adjacent MORNING_VERSES indices
+// (a plain `hash*31+char` string hash was verified to do exactly that: 9
+// days in a row picking indices 74,75,76...82 before jumping at the month
+// boundary — visibly "walking" instead of shuffling).
+function mix32(n: number): number {
+  let x = n;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
 // Picks a single index into MORNING_VERSES (0..364) for a given date, keyed
-// off the LOCAL calendar day so it rotates at each visitor's own midnight
-// with no server-side scheduling. Exported in spirit only — the server-side
-// daily push job (see server/src/jobs/dailyVerse.ts) must replicate this
-// exact same hash so the push notification always matches what the in-app
-// hero card shows that day.
+// off the LOCAL calendar day (via Date.UTC on the local y/m/d fields, purely
+// to get a clean integer that changes exactly at each visitor's own
+// midnight) so it rotates with no server-side scheduling. This is the
+// GLOBAL daily verse shown on the in-app hero card — the push notification
+// uses a separate, per-user-salted pick instead (see dailyVerseIndexForUser
+// in server/src/push.ts, which shares this same mixing approach).
 function dailyVerseIndexFor(date: Date): number {
-  const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-  let hash = 0;
-  for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
-  return hash % MORNING_VERSES.length;
+  const dayNumber = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+  return mix32(dayNumber) % MORNING_VERSES.length;
 }
 
 // The hero photo rotates daily too, independently of which verse is shown —
