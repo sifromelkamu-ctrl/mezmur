@@ -51,10 +51,6 @@ export function isPasswordValid(password: string): boolean {
   return Object.values(rules).every(Boolean);
 }
 
-export function validatePassword(password: string): string | null {
-  return isPasswordValid(password) ? null : "Password doesn't meet all requirements";
-}
-
 export function validateConfirmPassword(password: string, confirm: string): string | null {
   if (!confirm) return "Confirm your password";
   if (password !== confirm) return "Passwords don't match";

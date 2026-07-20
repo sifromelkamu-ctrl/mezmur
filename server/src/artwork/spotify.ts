@@ -79,20 +79,16 @@ async function spotifyFetch(url: string, attempt = 1): Promise<Response> {
     throw new SpotifyNetworkError(err);
   }
 
-  console.log(`HTTP Status: ${res.status}`);
-
   if (res.status === 401 && attempt === 1) {
     return spotifyFetch(url, attempt + 1);
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.log(`Spotify error body: ${body}`);
     let retryAfterSeconds: number | undefined;
     if (res.status === 429) {
       const header = res.headers.get("retry-after");
       const parsed = header ? Number(header) : NaN;
       retryAfterSeconds = Number.isFinite(parsed) ? parsed : undefined;
-      console.log(`Retry-After value: ${header ?? "(none)"}`);
     }
     throw new SpotifyApiError(res.status, body, retryAfterSeconds);
   }
@@ -197,10 +193,7 @@ function toArtistMatch(a: RawSpotifyArtist): SpotifyArtistMatch {
 // failed", so they never show a misleading "not found" for a real error.
 export async function searchSpotifyArtist(name: string): Promise<SpotifyArtistMatch[]> {
   const trimmed = name.trim();
-  console.log("Searching Spotify:");
-  console.log(`Query: ${trimmed}`);
   const encodedQuery = encodeURIComponent(trimmed);
-  console.log(`Encoded Query: ${encodedQuery}`);
 
   if (trimmed.length < 2) return [];
 
@@ -208,7 +201,6 @@ export async function searchSpotifyArtist(name: string): Promise<SpotifyArtistMa
   const res = await spotifyFetch(url);
   const data = (await res.json()) as { artists?: { items: RawSpotifyArtist[] } };
   const results = (data.artists?.items ?? []).map(toArtistMatch);
-  console.log(`Returned artists: ${results.length}`);
   return results;
 }
 

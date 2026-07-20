@@ -11,7 +11,7 @@
 // This is a real, working technique (the same "energy map" idea behind
 // classic seam-carving/smart-crop tools) — it is intentionally NOT framed
 // as literal face/logo/text detection, which would require a real model.
-import { coverZoom } from "./artworkTransform";
+import { clampFocal, coverZoom } from "./artworkTransform";
 
 export interface SmartFrame {
   x: number; // focal point, 0-1 fraction of natural image width
@@ -22,17 +22,6 @@ export interface SmartFrame {
 const SAMPLE_SIZE = 64;
 
 const cache = new Map<string, Promise<SmartFrame | null>>();
-
-// The focal point can't sit just anywhere once the image is cropped to
-// fully cover the square — the crop window has to stay inside the image's
-// actual bounds. `visibleFraction` is how much of that axis remains
-// visible at the given zoom (1 = the whole axis, i.e. no slack at all, so
-// the center is pinned; smaller = more room to move it off-center).
-function clampFocal(value: number, visibleFraction: number): number {
-  const half = visibleFraction / 2;
-  if (half >= 0.5) return 0.5;
-  return Math.min(1 - half, Math.max(half, value));
-}
 
 function analyze(img: HTMLImageElement): SmartFrame {
   const w = img.naturalWidth || 1;
