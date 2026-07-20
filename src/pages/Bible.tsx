@@ -1194,16 +1194,19 @@ export default function Bible() {
         icon: Book,
         value: (id === "old" ? oldTestament.length : newTestament.length).toLocaleString(),
         label: prefs.language === "en" ? "Books" : "መጻሕፍት",
+        color: "var(--color-gold)",
       },
       {
         icon: ScrollText,
         value: (id === "old" ? oldTotalChapters : newTotalChapters).toLocaleString(),
         label: prefs.language === "en" ? "Chapters" : "ምዕራፍ",
+        color: "#C97A46",
       },
       {
         icon: Bookmark,
         value: (id === "old" ? oldTotalVerses : newTotalVerses).toLocaleString(),
         label: prefs.language === "en" ? "Verses" : "ጥቅሶች",
+        color: "#CBAE72",
       },
     ];
     const radius = 26;
@@ -1253,7 +1256,7 @@ export default function Bible() {
         <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
             <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
-              <s.icon size={12} style={{ color: "var(--color-gold)" }} />
+              <s.icon size={12} style={{ color: s.color }} />
               <span className="text-xs font-black leading-none" style={{ color: "var(--bible-text)" }}>
                 {s.value}
               </span>
