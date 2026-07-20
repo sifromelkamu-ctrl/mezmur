@@ -1,5 +1,6 @@
 import {
   Bell,
+  Book,
   Bookmark,
   BookOpen,
   Check,
@@ -11,6 +12,7 @@ import {
   Leaf,
   Loader2,
   Pause,
+  ScrollText,
   Search,
   Settings2,
   Share2,
@@ -915,6 +917,10 @@ export default function Bible() {
   const newTotalChapters = newTestament.reduce((s, b) => s + b.chapterCount, 0);
   const oldPercent = oldTotalChapters ? Math.round((oldReadCount / oldTotalChapters) * 100) : 0;
   const newPercent = newTotalChapters ? Math.round((newReadCount / newTotalChapters) * 100) : 0;
+  // Standard verse counts (structural facts about the Bible, not per-app
+  // data) — the same figures the reference design's stat footer used.
+  const oldTotalVerses = 23145;
+  const newTotalVerses = 7959;
 
   const recentHistory = getRecentHistory(8);
 
@@ -1046,56 +1052,83 @@ export default function Bible() {
   );
 
   // Reading Plan card — repurposes the real Old/New Testament reading
-  // progress above into a centered "badge" card. The badge itself is a
-  // circular progress ring around the icon (Apple-Watch-style) rather than
-  // a flat medallion + separate bar — progress lives in one place instead
-  // of two, with no percent/chapter-count text (kept deliberately spare).
-  // Still toggles the book list below it open/closed on click.
+  // progress into a stat card (medallion + progress ring, title, a short
+  // description, and a Books/Chapters/Verses footer) matching the layout
+  // of a reference design the user supplied. Books/chapters come from the
+  // app's own data; verse counts are the standard, well-known structural
+  // totals for each testament (not per-app data). Still toggles the book
+  // list below it open/closed on click.
   const ReadingPlanCard = ({ id }: { id: "old" | "new" }) => {
     const theme = TESTAMENT_THEME[id];
-    const Icon = theme.icon;
     const percent = id === "old" ? oldPercent : newPercent;
     const accentVar = id === "old" ? "var(--bible-purple)" : "var(--bible-green)";
     const accentDeepVar = id === "old" ? "#3F2AAE" : "#1E6E4C";
     const softVar = id === "old" ? "var(--bible-purple-soft)" : "var(--bible-green-soft)";
     const medallionSrc = id === "old" ? "/bible/icons/ot-medallion.jpg" : "/bible/icons/nt-medallion.jpg";
-    const radius = 34;
+    const subtitle =
+      id === "old"
+        ? "እግዚአብሔር የገባውን ተስፋ የሚገልጡ ቅዱሳት መጻሕፍት"
+        : "የኢየሱስ ክርስቶስ ወንጌልና የተስፋው ፍጻሜ";
+    const stats = [
+      { icon: Book, value: (id === "old" ? oldTestament.length : newTestament.length).toLocaleString(), label: "መጻሕፍት" },
+      { icon: ScrollText, value: (id === "old" ? oldTotalChapters : newTotalChapters).toLocaleString(), label: "ምዕራፍ" },
+      { icon: Bookmark, value: (id === "old" ? oldTotalVerses : newTotalVerses).toLocaleString(), label: "ጥቅሶች" },
+    ];
+    const radius = 26;
     const circumference = 2 * Math.PI * radius;
     const dashOffset = circumference * (1 - percent / 100);
     return (
       <button
         onClick={() => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))}
-        className="relative overflow-hidden text-center rounded-[28px] pt-7 pb-6 px-4 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
-        style={{ backgroundImage: `linear-gradient(165deg, ${softVar} 0%, var(--color-elevated) 115%)` }}
+        className="relative overflow-hidden text-center rounded-[28px] pt-4 px-4 pb-3 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
+        style={{
+          backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
+        }}
       >
-        {/* Oversized, near-invisible icon watermark — a soft texture behind
-            the centered ring+title composition below. */}
-        <Icon size={116} strokeWidth={1.1} className="absolute -right-6 -bottom-8 opacity-[0.07] pointer-events-none" style={{ color: accentDeepVar }} />
-
-        <div className="relative mx-auto mb-4 w-20 h-20">
-          <svg viewBox="0 0 80 80" className="absolute inset-0 w-full h-full -rotate-90">
-            <circle cx="40" cy="40" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="6" />
+        <div className="relative mx-auto mb-2 w-16 h-16">
+          <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
+            <circle cx="32" cy="32" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="5" />
             <circle
-              cx="40"
-              cy="40"
+              cx="32"
+              cy="32"
               r={radius}
               fill="none"
               stroke={accentVar}
-              strokeWidth="6"
+              strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={dashOffset}
               style={{ transition: "stroke-dashoffset 0.6s ease" }}
             />
           </svg>
-          <span className="absolute inset-[10px] rounded-full overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]">
+          <span className="absolute inset-2 rounded-full overflow-hidden shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]">
             <img src={medallionSrc} alt="" className="w-full h-full object-cover" />
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-text)" }}>
+        <p className="relative font-abyssinica text-base font-black leading-tight" style={{ color: "var(--bible-text)" }}>
           {theme.label}
         </p>
+
+        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-70">
+          <span className="h-px w-6" style={{ background: accentVar }} />
+          <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: accentVar }} />
+          <span className="h-px w-6" style={{ background: accentVar }} />
+        </div>
+
+        <p className="font-abyssinica text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-1">{subtitle}</p>
+
+        <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
+          {stats.map((s, i) => (
+            <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
+              <s.icon size={12} style={{ color: accentVar }} />
+              <span className="text-xs font-black leading-none" style={{ color: "var(--bible-text)" }}>
+                {s.value}
+              </span>
+              <span className="text-[7px] font-bold uppercase tracking-wide text-fg-subtle">{s.label}</span>
+            </div>
+          ))}
+        </div>
       </button>
     );
   };
@@ -1140,7 +1173,7 @@ export default function Bible() {
           Testament reading progress (see comment above oldPercent/
           newPercent) into this card look, rather than inventing a
           fictional day-count plan the app has no data for. */}
-      <div className="mb-5">
+      <div className="mb-3">
         <div className="grid grid-cols-2 gap-3">
           <ReadingPlanCard id="old" />
           <ReadingPlanCard id="new" />
