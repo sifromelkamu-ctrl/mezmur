@@ -1191,8 +1191,8 @@ export default function Bible() {
           ? "Law and Prophets"
           : "Teaching of the Messiah"
         : id === "old"
-          ? "የሕግና የነቢያት መጽሐፍት"
-          : "የኢየሱስ ክርስቶስ ትምህርትና ሕይወት";
+          ? "ሕግና ነቢያት"
+          : "የመሲሕ ትምህርት";
     const stats = [
       {
         icon: Book,
