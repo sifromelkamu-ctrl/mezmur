@@ -1219,12 +1219,12 @@ export default function Bible() {
     return (
       <button
         onClick={() => setExpandedTestament((prev) => (prev === id ? null : id))}
-        className="relative overflow-hidden text-center rounded-[28px] pt-4 px-4 pb-3 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
+        className="relative overflow-hidden text-center rounded-[28px] pt-3 px-4 pb-2 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
         style={{
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
       >
-        <div className="relative mx-auto mb-2 w-[85px] h-[85px]">
+        <div className="relative mx-auto mb-1.5 w-[77px] h-[77px]">
           <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
             <circle cx="32" cy="32" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="5" />
             <circle
@@ -1249,15 +1249,15 @@ export default function Bible() {
           {theme.label}
         </p>
 
-        <div className="flex items-center justify-center gap-1.5 my-1.5 opacity-70">
+        <div className="flex items-center justify-center gap-1.5 my-1 opacity-70">
           <span className="h-px w-6" style={{ background: accentVar }} />
           <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: accentVar }} />
           <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p className="font-abyssinica font-bold text-[10px] leading-snug text-fg-muted px-1 mb-2 line-clamp-2 min-h-[2.4em]">{subtitle}</p>
+        <p className="font-abyssinica font-bold text-[10px] leading-snug text-fg-muted px-1 mb-1.5 line-clamp-2 min-h-[2.4em]">{subtitle}</p>
 
-        <div className="grid grid-cols-3 rounded-xl py-2" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
+        <div className="grid grid-cols-3 rounded-xl py-1.5" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
             <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
               <s.icon size={12} style={{ color: s.color }} />
