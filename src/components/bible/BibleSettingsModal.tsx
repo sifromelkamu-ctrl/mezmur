@@ -65,7 +65,7 @@ export default function BibleSettingsModal({
           <button
             onClick={() => updatePrefs({ language: "am" })}
             className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-              prefs.language === "am" ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+              prefs.language === "am" ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
             }`}
           >
             አማርኛ
@@ -73,7 +73,7 @@ export default function BibleSettingsModal({
           <button
             onClick={() => updatePrefs({ language: "en" })}
             className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-              prefs.language === "en" ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+              prefs.language === "en" ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
             }`}
           >
             English
@@ -89,7 +89,7 @@ export default function BibleSettingsModal({
                   key={v}
                   onClick={() => updatePrefs({ englishVersion: v })}
                   className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.englishVersion === v ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+                    prefs.englishVersion === v ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
                   }`}
                 >
                   <span className="block text-xs font-bold uppercase">{v}</span>
@@ -105,7 +105,7 @@ export default function BibleSettingsModal({
                   key={f}
                   onClick={() => updatePrefs({ englishFontFamily: f })}
                   className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.englishFontFamily === f ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+                    prefs.englishFontFamily === f ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
                   }`}
                 >
                   <span className={`block text-[1rem] leading-none mb-1 ${ENGLISH_FONT_FAMILY_CLASSES[f]}`}>Aa</span>
@@ -125,7 +125,7 @@ export default function BibleSettingsModal({
                   key={f}
                   onClick={() => updatePrefs({ fontFamily: f })}
                   className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.fontFamily === f ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+                    prefs.fontFamily === f ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
                   }`}
                 >
                   <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
@@ -144,7 +144,7 @@ export default function BibleSettingsModal({
               onClick={() => updatePrefs({ fontSize: s })}
               className={`flex-1 py-2 rounded-md font-semibold border transition-colors ${
                 s === "sm" ? "text-xs" : s === "md" ? "text-sm" : s === "lg" ? "text-[1rem]" : "text-lg"
-              } ${prefs.fontSize === s ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"}`}
+              } ${prefs.fontSize === s ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"}`}
             >
               Aa
             </button>
@@ -156,7 +156,7 @@ export default function BibleSettingsModal({
           <button
             onClick={() => setMode("light")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-              mode === "light" ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+              mode === "light" ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
             }`}
           >
             <Sun size={14} />
@@ -165,7 +165,7 @@ export default function BibleSettingsModal({
           <button
             onClick={() => setMode("dark")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-              mode === "dark" ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
+              mode === "dark" ? "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]" : "border-border text-fg-muted hover:text-fg"
             }`}
           >
             <Moon size={14} />
