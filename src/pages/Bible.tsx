@@ -1423,7 +1423,6 @@ export default function Bible() {
             >
               {heroVerse.text}
             </p>
-            <p className="text-[11px] font-semibold text-white/90 mb-2.5 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
             <button
               onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
               aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
@@ -1432,6 +1431,9 @@ export default function Bible() {
             >
               <BookOpen size={15} />
             </button>
+            <p className="absolute bottom-4 right-4 text-[11px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">
+              {heroVerse.ref}
+            </p>
           </div>
           </div>
           <div className="flex items-center justify-center gap-1.5 mt-2">
