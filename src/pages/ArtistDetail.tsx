@@ -136,12 +136,10 @@ function SongRow({
   track,
   index,
   queue,
-  isLight,
 }: {
   track: ApiTrack;
   index: number;
   queue: ApiTrack[];
-  isLight: boolean;
 }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
   const isCurrent = currentTrack?.id === track.id;
@@ -154,11 +152,8 @@ function SongRow({
   return (
     <div
       onClick={handleClick}
-      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0 bg-elevated border border-border"
-      style={{
-        boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.05)" : "none",
-        paddingBlock: "10px",
-      }}
+      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0 bg-panel border border-border"
+      style={{ paddingBlock: "10px" }}
     >
       <div className="flex items-center justify-center text-sm w-6 text-fg-subtle">
         <span className="group-hover:hidden">{isCurrent && isPlaying ? <EqualizerBars /> : index}</span>
@@ -637,7 +632,7 @@ export default function ArtistDetail() {
               )}
             </div>
             {visibleTopTracks.map((track, i) => (
-              <SongRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} isLight={isLight} />
+              <SongRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} />
             ))}
           </section>
         )}
