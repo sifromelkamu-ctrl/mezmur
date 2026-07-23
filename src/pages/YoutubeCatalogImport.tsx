@@ -12,7 +12,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
@@ -63,6 +63,80 @@ function statusIcon(status: YoutubeCatalogItem["status"]) {
       return <Loader2 size={16} className="animate-spin text-brand shrink-0" />;
   }
 }
+
+interface ImportItemRowProps {
+  id: string;
+  title: string;
+  status: YoutubeCatalogItem["status"];
+  message: string | null;
+  error: string | null;
+  thumbnailUrl: string | null;
+  duration: number | null;
+  selected: boolean;
+  phase: "form" | "enumerating" | "selecting" | "importing" | "done" | "error";
+  onToggleSelect: (id: string) => void;
+  onCancel: (id: string) => void;
+}
+
+// Split out and memoized so a poll tick's fresh batch object (a new item
+// array/reference every ~1.5s during an active import, see POLL_INTERVAL_MS)
+// only actually re-renders the handful of rows whose real fields changed —
+// not all 100+ rows a big channel import can have. Un-memoized, every row
+// re-rendering on every tick (images included) was heavy enough, combined
+// with the concurrent yt-dlp/ffmpeg work, to make the page's scroll feel
+// stuck/janky. onToggleSelect/onCancel must be stable function references
+// (see toggleSelectItem/cancelSingleItem below) — an inline closure recreated
+// every parent render would defeat this memoization entirely.
+const ImportItemRow = memo(function ImportItemRow({
+  id,
+  title,
+  status,
+  message,
+  error,
+  thumbnailUrl,
+  duration,
+  selected,
+  phase,
+  onToggleSelect,
+  onCancel,
+}: ImportItemRowProps) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5">
+      {phase === "selecting" ? (
+        status === "skipped_duplicate" ? (
+          <span className="w-4 h-4 shrink-0" />
+        ) : (
+          <input type="checkbox" checked={selected} onChange={() => onToggleSelect(id)} className="shrink-0" />
+        )
+      ) : (
+        statusIcon(status)
+      )}
+      {thumbnailUrl && <img src={thumbnailUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0 bg-panel" />}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm truncate">{title}</p>
+        {phase !== "selecting" && message && (
+          // Not truncated (unlike the title above) — an error here is the
+          // full backend reason (see server/src/youtube/safeError.ts) and
+          // getting cut off with "..." is exactly what made the last
+          // reported failure unreadable/undiagnosable from the UI alone.
+          <p className="text-xs text-fg-muted break-words">{error ?? message}</p>
+        )}
+        {status === "skipped_duplicate" && <p className="text-xs text-fg-subtle">Already in catalog</p>}
+      </div>
+      {duration != null && <span className="text-xs text-fg-muted shrink-0">{formatDuration(duration)}</span>}
+      {phase === "importing" && ACTIVE_ITEM_STATUSES.has(status) && (
+        <button
+          onClick={() => onCancel(id)}
+          className="w-6 h-6 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-hover transition-colors shrink-0"
+          aria-label="Cancel this song"
+          title="Cancel this song"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+});
 
 export default function YoutubeCatalogImport() {
   const navigate = useNavigate();
@@ -120,6 +194,13 @@ export default function YoutubeCatalogImport() {
   const [historyStatus, setHistoryStatus] = useState("");
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
   const [batch, setBatch] = useState<YoutubeCatalogBatch | null>(null);
+  // Lets toggleSelectItem/cancelSingleItem read the current batch without
+  // being recreated every time `batch` itself changes (every poll tick) —
+  // see ImportItemRow above for why keeping their identity stable matters.
+  const batchRef = useRef(batch);
+  useEffect(() => {
+    batchRef.current = batch;
+  }, [batch]);
   const [showingSelection, setShowingSelection] = useState(false);
   const [collapsedAlbums, setCollapsedAlbums] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -356,15 +437,22 @@ export default function YoutubeCatalogImport() {
     await refreshBatch();
   };
 
-  const selectItem = async (item: YoutubeCatalogItem) => {
-    if (!batch) return;
+  // Stable identity (empty dep array, reads batchRef instead of closing over
+  // `batch` directly) so ImportItemRow's memoization actually holds across
+  // poll ticks — see that component's comment for why.
+  const toggleSelectItem = useCallback(async (itemId: string) => {
+    const current = batchRef.current;
+    if (!current) return;
+    const item = current.items.find((i) => i.id === itemId);
+    if (!item) return;
     const nextSelected = !item.selected;
     setBatch((b) =>
-      b ? { ...b, items: b.items.map((i) => (i.id === item.id ? { ...i, selected: nextSelected } : i)) } : b
+      b ? { ...b, items: b.items.map((i) => (i.id === itemId ? { ...i, selected: nextSelected } : i)) } : b
     );
-    await adminApi.selectYoutubeCatalogItems(batch.id, { selected: nextSelected, itemIds: [item.id] });
-    await refreshBatch();
-  };
+    await adminApi.selectYoutubeCatalogItems(current.id, { selected: nextSelected, itemIds: [itemId] });
+    const latest = await adminApi.getYoutubeCatalogBatch(current.id);
+    setBatch(latest);
+  }, []);
 
   const startImport = async () => {
     if (!batch) return;
@@ -385,12 +473,13 @@ export default function YoutubeCatalogImport() {
     openBatch(batch.id);
   };
 
-  const cancelSingleItem = async (itemId: string) => {
-    if (!batch) return;
+  const cancelSingleItem = useCallback(async (itemId: string) => {
+    const current = batchRef.current;
+    if (!current) return;
     // Optimistic: flip it to "cancelled" (hiding the X button and showing
     // the cancelled label) the instant it's clicked, rather than waiting on
     // the round trip — the actual kill signal is already sent by the time
-    // this call resolves, refreshBatch() below just confirms the true state.
+    // this call resolves, the fetch below just confirms the true state.
     setBatch((b) =>
       b
         ? {
@@ -401,9 +490,10 @@ export default function YoutubeCatalogImport() {
           }
         : b
     );
-    await adminApi.cancelYoutubeCatalogItem(batch.id, itemId);
-    await refreshBatch();
-  };
+    await adminApi.cancelYoutubeCatalogItem(current.id, itemId);
+    const latest = await adminApi.getYoutubeCatalogBatch(current.id);
+    setBatch(latest);
+  }, []);
 
   const startFresh = () => {
     stopPolling();
@@ -918,55 +1008,20 @@ export default function YoutubeCatalogImport() {
                   {!collapsed && (
                     <div className="divide-y divide-border">
                       {items.map((item) => (
-                        <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
-                          {phase === "selecting" ? (
-                            item.status === "skipped_duplicate" ? (
-                              <span className="w-4 h-4 shrink-0" />
-                            ) : (
-                              <input
-                                type="checkbox"
-                                checked={item.selected}
-                                onChange={() => selectItem(item)}
-                                className="shrink-0"
-                              />
-                            )
-                          ) : (
-                            statusIcon(item.status)
-                          )}
-                          {item.thumbnailUrl && (
-                            <img
-                              src={item.thumbnailUrl}
-                              alt=""
-                              className="w-10 h-10 rounded object-cover shrink-0 bg-panel"
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm truncate">{item.title}</p>
-                            {phase !== "selecting" && item.message && (
-                              // Not truncated (unlike the title above) — an error here is the
-                              // full backend reason (see server/src/youtube/safeError.ts) and
-                              // getting cut off with "..." is exactly what made the last
-                              // reported failure unreadable/undiagnosable from the UI alone.
-                              <p className="text-xs text-fg-muted break-words">{item.error ?? item.message}</p>
-                            )}
-                            {item.status === "skipped_duplicate" && (
-                              <p className="text-xs text-fg-subtle">Already in catalog</p>
-                            )}
-                          </div>
-                          {item.duration != null && (
-                            <span className="text-xs text-fg-muted shrink-0">{formatDuration(item.duration)}</span>
-                          )}
-                          {phase === "importing" && ACTIVE_ITEM_STATUSES.has(item.status) && (
-                            <button
-                              onClick={() => cancelSingleItem(item.id)}
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-hover transition-colors shrink-0"
-                              aria-label="Cancel this song"
-                              title="Cancel this song"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
+                        <ImportItemRow
+                          key={item.id}
+                          id={item.id}
+                          title={item.title}
+                          status={item.status}
+                          message={item.message}
+                          error={item.error}
+                          thumbnailUrl={item.thumbnailUrl}
+                          duration={item.duration}
+                          selected={item.selected}
+                          phase={phase}
+                          onToggleSelect={toggleSelectItem}
+                          onCancel={cancelSingleItem}
+                        />
                       ))}
                     </div>
                   )}

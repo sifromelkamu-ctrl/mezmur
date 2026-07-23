@@ -30,18 +30,14 @@ import { formatDuration } from "../utils/format";
 const TEAL = "#14b8a6";
 const TEAL_DEEP = "#134e4a";
 
-// The bright content surface's own palette — split by the real light/dark
-// mode, unlike the hero above. Values as specified: white/#121212 surface,
-// #ECECEC/#1A1A1A cards, #111111/#6B7280/#9CA3AF text in light mode (dark
-// mode isn't specified, so those three mirror the app's own existing
-// dark-theme text tones for sensible contrast against the #1A1A1A cards).
-const SURFACE = { light: "#ffffff", dark: "#121212" };
-const CARD_BG = { light: "#ffffff", dark: "#1A1A1A" };
-const CARD_BORDER = { light: "#ECECEC", dark: "rgba(255,255,255,0.08)" };
-const SONG_CARD_BORDER = { light: "#F2F2F2", dark: "rgba(255,255,255,0.06)" };
-const TEXT_TITLE = { light: "#111111", dark: "#ffffff" };
-const TEXT_SUBTLE = { light: "#6B7280", dark: "#9ba6b5" };
-const TEXT_FAINT = { light: "#9CA3AF", dark: "#6b7482" };
+// The content surface below the hero used to carry its own bespoke
+// white/#121212 palette here, independent of the app's real theme (a past
+// "split-theme redesign"). That made this page read jarringly bright
+// compared to everywhere else — the app's actual light theme is a warm
+// cream (see index.css's --color-elevated etc.), never stark white. Now
+// uses the same shared bg-elevated/bg-panel/text-fg/border-border tokens as
+// every other page, so this section matches Home and the rest of the app
+// exactly, in both light and dark mode.
 
 // "live" (Concert Albums) is deliberately excluded — concerts are a
 // completely separate content type and must never appear in an artist's
@@ -96,12 +92,8 @@ function AlbumCard({
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150 rounded-[20px] p-2.5"
-      style={{
-        backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
-        border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
-        boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
-      }}
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150 rounded-[20px] p-2.5 bg-elevated border border-border"
+      style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none" }}
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
         <CoverArt
@@ -128,15 +120,8 @@ function AlbumCard({
         </button>
       </div>
       <div className="mt-2 px-0.5">
-        <p
-          className="text-sm font-semibold leading-snug line-clamp-2"
-          style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}
-        >
-          {album.title}
-        </p>
-        <p className="text-xs truncate mt-1" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
-          {albumSubtitle(album)}
-        </p>
+        <p className="text-sm font-semibold leading-snug line-clamp-2 text-fg">{album.title}</p>
+        <p className="text-xs truncate mt-1 text-fg-muted">{albumSubtitle(album)}</p>
       </div>
     </div>
   );
@@ -169,15 +154,13 @@ function SongRow({
   return (
     <div
       onClick={handleClick}
-      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0"
+      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0 bg-elevated border border-border"
       style={{
-        backgroundColor: isLight ? CARD_BG.light : "#1A1A1A",
-        border: `1px solid ${isLight ? SONG_CARD_BORDER.light : SONG_CARD_BORDER.dark}`,
         boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.05)" : "none",
         paddingBlock: "10px",
       }}
     >
-      <div className="flex items-center justify-center text-sm w-6" style={{ color: TEXT_FAINT[isLight ? "light" : "dark"] }}>
+      <div className="flex items-center justify-center text-sm w-6 text-fg-subtle">
         <span className="group-hover:hidden">{isCurrent && isPlaying ? <EqualizerBars /> : index}</span>
         <span className="hidden group-hover:flex">
           {isCurrent && isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
@@ -194,19 +177,14 @@ function SongRow({
           artworkFrame={track.artworkFrame}
         />
         <p
-          className="text-sm font-medium truncate"
-          style={{ color: isCurrent ? TEAL : isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}
+          className={`text-sm font-medium truncate ${isCurrent ? "" : "text-fg"}`}
+          style={isCurrent ? { color: TEAL } : undefined}
         >
           {track.title}
         </p>
       </div>
 
-      <span
-        className="text-sm tabular-nums text-right"
-        style={{ color: isLight ? TEXT_FAINT.light : TEXT_FAINT.dark }}
-      >
-        {formatDuration(track.duration)}
-      </span>
+      <span className="text-sm tabular-nums text-right text-fg-subtle">{formatDuration(track.duration)}</span>
     </div>
   );
 }
@@ -535,12 +513,8 @@ export default function ArtistDetail() {
           the gradient still shows through the rounded corners themselves
           (it extends behind this whole container). */}
       <div
-        className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10"
-        style={{
-          marginTop: "-24px",
-          backgroundColor: isLight ? SURFACE.light : SURFACE.dark,
-          boxShadow: "0 -12px 32px rgba(0,0,0,0.28)",
-        }}
+        className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10 bg-panel"
+        style={{ marginTop: "-24px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
       >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
@@ -582,53 +556,32 @@ export default function ArtistDetail() {
           </div>
         ) : (
           artist.bio && (
-            <p className="text-sm max-w-2xl mb-6" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
-              {artist.bio}
-            </p>
+            <p className="text-sm max-w-2xl mb-6 text-fg-muted">{artist.bio}</p>
           )
         )}
 
         <div
-          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8"
-          style={{
-            backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
-            border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
-            boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none",
-          }}
+          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8 bg-elevated border border-border"
+          style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none" }}
         >
           <div className="flex flex-col items-center gap-1 text-center">
             <div className="flex items-center gap-1.5">
               <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
-                {artist.albums.length}
-              </span>
+              <span className="text-lg font-bold text-fg">{artist.albums.length}</span>
             </div>
-            <span className="text-xs" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
-              Albums
-            </span>
+            <span className="text-xs text-fg-muted">Albums</span>
           </div>
           <div className="flex flex-col items-center gap-1 text-center">
             <div className="flex items-center gap-1.5">
               <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
-                {totalSongCount}
-              </span>
+              <span className="text-lg font-bold text-fg">{totalSongCount}</span>
             </div>
-            <span className="text-xs" style={{ color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark }}>
-              Songs
-            </span>
+            <span className="text-xs text-fg-muted">Songs</span>
           </div>
         </div>
 
         {artist.albums.length === 0 && (
-          <div
-            className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10"
-            style={{
-              color: isLight ? TEXT_SUBTLE.light : TEXT_SUBTLE.dark,
-              backgroundColor: isLight ? CARD_BG.light : CARD_BG.dark,
-              border: `1px solid ${isLight ? CARD_BORDER.light : CARD_BORDER.dark}`,
-            }}
-          >
+          <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
             <Music2 size={18} />
             No albums yet — check back soon.
           </div>
@@ -638,7 +591,7 @@ export default function ArtistDetail() {
           <section key={type} className="mb-8">
             <div className="flex items-center gap-2.5 mb-3">
               <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
-              <h2 className="text-xl font-bold tracking-tight" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+              <h2 className="text-xl font-bold tracking-tight text-fg">
                 {ALBUM_TYPE_SECTION_LABEL[type]}
               </h2>
             </div>
@@ -670,7 +623,7 @@ export default function ArtistDetail() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                <h2 className="text-xl font-bold tracking-tight" style={{ color: isLight ? TEXT_TITLE.light : TEXT_TITLE.dark }}>
+                <h2 className="text-xl font-bold tracking-tight text-fg">
                   Popular Songs
                 </h2>
               </div>
