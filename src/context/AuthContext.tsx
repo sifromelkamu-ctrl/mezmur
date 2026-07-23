@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { authApi, type ApiUser, type UpdateProfileInput } from "../lib/api";
+import { ApiError, authApi, type ApiUser, type UpdateProfileInput } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { AuthContext } from "./auth-context-value";
 
@@ -18,11 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { user: profile } = await authApi.me();
         setUser(profile);
       }
-    } catch {
-      // Profile row not created yet (trigger racing the client) or token
-      // invalid — sign out rather than leave a half-authenticated state.
-      await supabase.auth.signOut();
-      setUser(null);
+    } catch (err) {
+      // Only a genuine 401 (token actually rejected, or the profile row
+      // isn't there yet) means the session itself is bad — sign out rather
+      // than leave a half-authenticated state. A network blip or a 5xx from
+      // our own backend hiccuping (e.g. a local dev server restart) is not
+      // proof the session is invalid, and forcing a sign-out on those just
+      // strands anything relying on that session (e.g. a running catalog
+      // import poll) with no way back in except a fresh login.
+      if (err instanceof ApiError && err.status === 401) {
+        await supabase.auth.signOut();
+        setUser(null);
+      }
     }
   }, []);
 

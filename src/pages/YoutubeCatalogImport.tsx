@@ -8,6 +8,8 @@ import {
   Circle,
   Loader2,
   RefreshCw,
+  Square,
+  X,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -53,6 +55,8 @@ function statusIcon(status: YoutubeCatalogItem["status"]) {
       return <XCircle size={16} className="text-accent-red shrink-0" />;
     case "skipped_duplicate":
       return <Circle size={16} className="text-fg-subtle shrink-0" />;
+    case "cancelled":
+      return <X size={16} className="text-fg-subtle shrink-0" />;
     case "pending":
       return null;
     default:
@@ -300,7 +304,7 @@ export default function YoutubeCatalogImport() {
       b
         ? {
             ...b,
-            items: b.items.map((i) => (i.status === "pending" || i.status === "error" ? { ...i, selected } : i)),
+            items: b.items.map((i) => (i.status === "pending" || i.status === "error" || i.status === "cancelled" ? { ...i, selected } : i)),
           }
         : b
     );
@@ -320,7 +324,7 @@ export default function YoutubeCatalogImport() {
         ? {
             ...b,
             items: b.items.map((i) =>
-              i.status === "pending" || i.status === "error"
+              i.status === "pending" || i.status === "error" || i.status === "cancelled"
                 ? { ...i, selected: i.albumTitle !== null ? wantAlbums : wantSingles }
                 : i
             ),
@@ -341,7 +345,7 @@ export default function YoutubeCatalogImport() {
         ? {
             ...b,
             items: b.items.map((i) =>
-              i.albumTitle === albumTitle && (i.status === "pending" || i.status === "error")
+              i.albumTitle === albumTitle && (i.status === "pending" || i.status === "error" || i.status === "cancelled")
                 ? { ...i, selected }
                 : i
             ),
@@ -375,6 +379,32 @@ export default function YoutubeCatalogImport() {
     poll(batch.id);
   };
 
+  const stopImport = async () => {
+    if (!batch) return;
+    await adminApi.stopYoutubeCatalogImport(batch.id);
+    openBatch(batch.id);
+  };
+
+  const cancelSingleItem = async (itemId: string) => {
+    if (!batch) return;
+    // Optimistic: flip it to "cancelled" (hiding the X button and showing
+    // the cancelled label) the instant it's clicked, rather than waiting on
+    // the round trip — the actual kill signal is already sent by the time
+    // this call resolves, refreshBatch() below just confirms the true state.
+    setBatch((b) =>
+      b
+        ? {
+            ...b,
+            items: b.items.map((i) =>
+              i.id === itemId ? { ...i, status: "cancelled", message: "Cancelled", selected: false } : i
+            ),
+          }
+        : b
+    );
+    await adminApi.cancelYoutubeCatalogItem(batch.id, itemId);
+    await refreshBatch();
+  };
+
   const startFresh = () => {
     stopPolling();
     setBatch(null);
@@ -394,8 +424,8 @@ export default function YoutubeCatalogImport() {
     return ungrouped.length > 0 ? [...albums, [null, ungrouped] as [null, YoutubeCatalogItem[]]] : albums;
   }, [batch]);
 
-  const selectableCount = batch?.items.filter((i) => i.status === "pending" || i.status === "error").length ?? 0;
-  const selectedCount = batch?.items.filter((i) => i.selected && (i.status === "pending" || i.status === "error")).length ?? 0;
+  const selectableCount = batch?.items.filter((i) => i.status === "pending" || i.status === "error" || i.status === "cancelled").length ?? 0;
+  const selectedCount = batch?.items.filter((i) => i.selected && (i.status === "pending" || i.status === "error" || i.status === "cancelled")).length ?? 0;
   const doneCount = batch?.items.filter((i) => i.status === "done").length ?? 0;
   const errorCount = batch?.items.filter((i) => i.status === "error").length ?? 0;
   const skippedCount = batch?.items.filter((i) => i.status === "skipped_duplicate").length ?? 0;
@@ -438,7 +468,7 @@ export default function YoutubeCatalogImport() {
         ? "error"
         : batch.status === "importing"
           ? "importing"
-          : batch.status === "ready" || showingSelection
+          : batch.status === "ready" || batch.status === "stopped" || showingSelection
             ? "selecting"
             : "done";
 
@@ -713,6 +743,14 @@ export default function YoutubeCatalogImport() {
             </p>
           )}
 
+          {batch.status === "stopped" && (
+            <p className="flex items-center gap-2 text-xs text-fg-muted">
+              <Square size={12} />
+              Stopped — {doneCount} imported so far. Review your selection below and start again whenever you're
+              ready.
+            </p>
+          )}
+
           {phase === "selecting" && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 flex-wrap">
@@ -761,13 +799,22 @@ export default function YoutubeCatalogImport() {
                 <span className="font-semibold">
                   Importing… {doneCount + errorCount} of {importTotal || selectedCount}
                 </span>
-                <button
-                  onClick={resumeStalled}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1 rounded-md hover:bg-hover transition-colors"
-                >
-                  <RefreshCw size={12} />
-                  Resume stalled items
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={resumeStalled}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1 rounded-md hover:bg-hover transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Resume stalled items
+                  </button>
+                  <button
+                    onClick={stopImport}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-accent-red px-2 py-1 rounded-md hover:bg-hover transition-colors"
+                  >
+                    <Square size={12} />
+                    Stop
+                  </button>
+                </div>
               </div>
               <div className="h-2 rounded-full bg-panel overflow-hidden">
                 <div
@@ -812,7 +859,7 @@ export default function YoutubeCatalogImport() {
                 >
                   Go to Home
                 </button>
-                {batch.items.some((i) => i.status === "pending") && (
+                {batch.items.some((i) => i.status === "pending" || i.status === "cancelled") && (
                   <button
                     onClick={() => setShowingSelection(true)}
                     className="text-sm font-semibold text-fg-muted hover:text-fg px-4 py-2 rounded-full hover:bg-hover transition-colors"
@@ -842,7 +889,7 @@ export default function YoutubeCatalogImport() {
             {groups.map(([albumTitle, items]) => {
               const key = albumTitle ?? "__ungrouped__";
               const collapsed = collapsedAlbums.has(key);
-              const selectableInAlbum = items.filter((i) => i.status === "pending" || i.status === "error");
+              const selectableInAlbum = items.filter((i) => i.status === "pending" || i.status === "error" || i.status === "cancelled");
               const allSelected = selectableInAlbum.length > 0 && selectableInAlbum.every((i) => i.selected);
               return (
                 <div key={key} className="bg-elevated rounded-lg overflow-hidden">
@@ -908,6 +955,16 @@ export default function YoutubeCatalogImport() {
                           </div>
                           {item.duration != null && (
                             <span className="text-xs text-fg-muted shrink-0">{formatDuration(item.duration)}</span>
+                          )}
+                          {phase === "importing" && ACTIVE_ITEM_STATUSES.has(item.status) && (
+                            <button
+                              onClick={() => cancelSingleItem(item.id)}
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-hover transition-colors shrink-0"
+                              aria-label="Cancel this song"
+                              title="Cancel this song"
+                            >
+                              <X size={14} />
+                            </button>
                           )}
                         </div>
                       ))}

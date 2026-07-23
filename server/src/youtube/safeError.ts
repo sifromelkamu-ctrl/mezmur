@@ -28,6 +28,18 @@ export function isInternalErrorMessage(message: string): boolean {
 
 export const GENERIC_IMPORT_ERROR = "The import service is temporarily unavailable. Please try again in a few minutes.";
 
+// Thrown when an admin manually cancels a single item (the catalog import
+// screen's per-item X button) while it's queued or actively
+// downloading/processing. Lives here (not pipeline.ts, which already has
+// DuplicateImportError) so ytdlp.ts can throw it directly on an aborted
+// spawn without an import cycle back into pipeline.ts.
+export class CancelledImportError extends Error {
+  constructor() {
+    super("Cancelled");
+    this.name = "CancelledImportError";
+  }
+}
+
 // Converts any thrown value into a message safe to store on a job row or
 // send in an API response — the real error is always logged server-side
 // first (via console.error, picked up by the Render logs) so it's still

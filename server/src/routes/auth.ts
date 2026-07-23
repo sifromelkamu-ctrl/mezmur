@@ -131,12 +131,16 @@ router.get("/username-availability", publicAuthLimiter, async (req, res) => {
 });
 
 router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
-  const profile = await prisma.profile.findUnique({ where: { id: req.userId! } });
-  if (!profile) {
-    res.status(404).json({ error: "User not found" });
-    return;
+  try {
+    const profile = await prisma.profile.findUnique({ where: { id: req.userId! } });
+    if (!profile) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    res.json({ user: toPublicUser(profile) });
+  } catch {
+    res.status(500).json({ error: "Could not load profile" });
   }
-  res.json({ user: toPublicUser(profile) });
 });
 
 // Called once, right after a signup's email/phone verification succeeds (or
@@ -168,11 +172,15 @@ router.patch("/me", requireAuth, async (req: AuthedRequest, res) => {
 // from PATCH /me so the client can call it unconditionally right after every
 // successful sign-in without needing to send/validate any body.
 router.post("/touch-login", requireAuth, async (req: AuthedRequest, res) => {
-  const profile = await prisma.profile.update({
-    where: { id: req.userId! },
-    data: { lastLoginAt: new Date() },
-  });
-  res.json({ user: toPublicUser(profile) });
+  try {
+    const profile = await prisma.profile.update({
+      where: { id: req.userId! },
+      data: { lastLoginAt: new Date() },
+    });
+    res.json({ user: toPublicUser(profile) });
+  } catch {
+    res.status(500).json({ error: "Could not update login timestamp" });
+  }
 });
 
 export default router;

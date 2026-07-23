@@ -273,6 +273,11 @@ enum YoutubeImportBatchStatus {
   enumerating
   ready
   importing
+  // Admin manually stopped an in-progress batch (see catalogWorker.ts's
+  // stopBatch). Items that hadn't started yet are reset to "pending" so the
+  // batch behaves exactly like a freshly-enumerated one on the selection
+  // screen — the admin can review/reselect and hit "Start Import" again.
+  stopped
   completed
   completed_with_errors
   error
@@ -288,6 +293,11 @@ enum YoutubeImportItemStatus {
   done
   error
   skipped_duplicate
+  // Admin manually cancelled this one item (the per-item X button) — either
+  // pulled out of the queue before it started, or its in-flight
+  // yt-dlp/ffmpeg process was killed mid-download. Distinct from "pending"
+  // so the UI can show it was a deliberate action, not "never touched".
+  cancelled
 }
 
 // One "Import artist catalog" run against a single channel/artist URL. Items

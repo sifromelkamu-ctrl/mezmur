@@ -4,7 +4,7 @@ import { readdir } from "node:fs/promises";
 import { existsSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
+import { CancelledImportError, GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
 
 // Optional: a real YouTube account's cookies (Netscape cookies.txt format,
 // base64-encoded into this env var), so every yt-dlp request carries an
@@ -50,8 +50,19 @@ const cookiesArgs: string[] = (() => {
     return ["--cookies", fileCookiePath];
   }
 
+  // Local-dev convenience only: pull cookies straight from an already
+  // logged-in browser on this machine (e.g. YTDLP_COOKIES_FROM_BROWSER=chrome),
+  // no manual export/base64 step needed. Never applies in production — the
+  // Render process has no browser profile to read from, so nothing sets
+  // this env var there; YTDLP_COOKIES_B64 remains the production path.
+  const browser = process.env.YTDLP_COOKIES_FROM_BROWSER?.trim();
+  if (browser) {
+    console.log(`[yt-dlp] using cookies from local browser profile: ${browser}`);
+    return ["--cookies-from-browser", browser];
+  }
+
   console.log(
-    "[yt-dlp] no cookies found (YTDLP_COOKIES_B64 unset, no cookies.txt on disk) — running without cookies (anonymous requests, likely to hit YouTube's bot-check on datacenter IPs)."
+    "[yt-dlp] no cookies found (YTDLP_COOKIES_B64 unset, no cookies.txt on disk, YTDLP_COOKIES_FROM_BROWSER unset) — running without cookies (anonymous requests, likely to hit YouTube's bot-check on datacenter IPs)."
   );
   return [];
 })();
@@ -170,12 +181,29 @@ function ytDlpSpawnError(err: NodeJS.ErrnoException, context: string): YtDlpErro
 // toYtDlpError/ytDlpSpawnError's existing classification.
 function spawnOnce(
   fullArgs: string[],
-  onLine?: (line: string, stream: "stdout" | "stderr") => void
+  onLine?: (line: string, stream: "stdout" | "stderr") => void,
+  signal?: AbortSignal
 ): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new CancelledImportError());
+      return;
+    }
     const child = spawn("yt-dlp", fullArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let cancelled = false;
+
+    const onAbort = () => {
+      cancelled = true;
+      // SIGKILL, not SIGTERM: the admin clicked cancel wanting it stopped
+      // now, not "stopped once yt-dlp/ffmpeg finish their own graceful
+      // shutdown". Safe to skip their cleanup — pipeline.ts force-removes
+      // the whole tmp dir itself in a finally block regardless of how this
+      // process ends. child.kill() is a no-op if it already exited.
+      child.kill("SIGKILL");
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     createInterface({ input: child.stdout }).on("line", (line) => {
       stdout += line + "\n";
@@ -186,8 +214,16 @@ function spawnOnce(
       onLine?.(line, "stderr");
     });
 
-    child.on("error", (err) => reject(err));
+    child.on("error", (err) => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(err);
+    });
     child.on("close", (code) => {
+      signal?.removeEventListener("abort", onAbort);
+      if (cancelled) {
+        reject(new CancelledImportError());
+        return;
+      }
       console.log(`[yt-dlp] yt-dlp ${fullArgs.join(" ")} -> exit ${code}`);
       resolve({ stdout, stderr, code });
     });
@@ -198,12 +234,14 @@ function spawnOnce(
 async function execYtDlp(
   args: string[],
   context: string,
-  onLine?: (line: string, stream: "stdout" | "stderr") => void
+  onLine?: (line: string, stream: "stdout" | "stderr") => void,
+  signal?: AbortSignal
 ): Promise<string> {
   let attempt: { stdout: string; stderr: string; code: number | null };
   try {
-    attempt = await spawnOnce([...BASE_ARGS, ...args], onLine);
+    attempt = await spawnOnce([...BASE_ARGS, ...args], onLine, signal);
   } catch (err) {
+    if (err instanceof CancelledImportError) throw err;
     throw ytDlpSpawnError(err as NodeJS.ErrnoException, context);
   }
 
@@ -212,15 +250,23 @@ async function execYtDlp(
   throw toYtDlpError(attempt.stderr, attempt.stdout, attempt.code, context, args);
 }
 
-function runYtDlp(args: string[], onLine?: (line: string, stream: "stdout" | "stderr") => void): Promise<string> {
-  return execYtDlp(args, "runYtDlp", onLine);
+function runYtDlp(
+  args: string[],
+  onLine?: (line: string, stream: "stdout" | "stderr") => void,
+  signal?: AbortSignal
+): Promise<string> {
+  return execYtDlp(args, "runYtDlp", onLine, signal);
 }
 
 // Fetches video metadata without downloading anything. --no-playlist ensures
 // that a URL containing a `list=` param only ever resolves to the single
 // video, never an entire playlist.
-export async function fetchYoutubeMetadata(url: string): Promise<YoutubeMetadata> {
-  const stdout = await runYtDlp(["--dump-json", "--no-playlist", "--no-warnings", "--retries", "3", "--socket-timeout", "15", url]);
+export async function fetchYoutubeMetadata(url: string, signal?: AbortSignal): Promise<YoutubeMetadata> {
+  const stdout = await runYtDlp(
+    ["--dump-json", "--no-playlist", "--no-warnings", "--retries", "3", "--socket-timeout", "15", url],
+    undefined,
+    signal
+  );
   const lastLine = stdout.trim().split("\n").pop();
   if (!lastLine) throw new YtDlpError("yt-dlp returned no metadata");
 
@@ -380,7 +426,8 @@ export async function searchChannelsByName(query: string, limit = 5): Promise<Ch
 export async function downloadYoutubeAudio(
   url: string,
   outDir: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   const outputTemplate = path.join(outDir, "audio.%(ext)s");
   const progressRe = /\[download\]\s+([\d.]+)%/;
@@ -420,7 +467,8 @@ export async function downloadYoutubeAudio(
     (line) => {
       const match = line.match(progressRe);
       if (match) onProgress?.(Math.min(100, parseFloat(match[1])));
-    }
+    },
+    signal
   );
 
   const files = await readdir(outDir);

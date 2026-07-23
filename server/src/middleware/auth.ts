@@ -26,7 +26,15 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
     req.userId = data.user.id;
     next();
   } catch {
-    res.status(401).json({ error: "Invalid or expired token" });
+    // Supabase's own `error` field above means it actually checked the token
+    // and rejected it — a real 401. Landing here instead means the request
+    // to Supabase itself failed (network blip, an HTTP/2 stream error, etc.)
+    // — we never got an answer either way, so this is NOT proof the token is
+    // bad. Conflating the two used to make transient Supabase connectivity
+    // issues look identical to "your login is invalid" (the client can't
+    // tell 401s apart), which is exactly what was intermittently blocking
+    // real logins. 503 signals "try again", not "you're signed out".
+    res.status(503).json({ error: "Could not verify your session right now — please try again" });
   }
 }
 
@@ -65,6 +73,9 @@ export async function isAdmin(req: AuthedRequest, res: Response, next: NextFunct
     req.userId = data.user.id;
     next();
   } catch {
-    res.status(401).json({ error: "Invalid or expired token" });
+    // Same distinction as requireAuth above: this is "couldn't verify",
+    // not "verified and rejected" — see that comment for why this must not
+    // be a 401.
+    res.status(503).json({ error: "Could not verify your session right now — please try again" });
   }
 }

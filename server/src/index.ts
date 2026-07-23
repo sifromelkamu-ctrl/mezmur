@@ -21,6 +21,24 @@ import youtubeImportRouter from "./routes/youtubeImport.js";
 import { resumeAllInterrupted } from "./youtube/catalogWorker.js";
 import { startDailyVersePushSchedule } from "./jobs/dailyVerse.js";
 
+// Backstop for the whole process. Without this, any unhandled promise
+// rejection anywhere — including in fire-and-forget background work like
+// the YouTube catalog worker or the daily verse scheduler — crashes the
+// entire server (Node's default since v15), taking down every route,
+// login included, until something restarts it. That's exactly what
+// happened when a transient DB connectivity blip inside catalogWorker.ts
+// went unhandled: the whole API died along with the one background job
+// that hit it. Individual call sites should still handle their own errors
+// properly (see catalogWorker.ts's worker() try/catch) — this is only the
+// last line of defense so a future oversight like that one degrades a
+// single background task instead of the whole site.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection (server staying up):", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception (server staying up):", err);
+});
+
 const app = express();
 
 app.use(cors());

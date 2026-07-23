@@ -7,7 +7,7 @@ import {
   enumerateYoutubePlaylist,
   enumerateYoutubeVideoUrls,
 } from "../youtube/catalogEnumerate.js";
-import { resumeBatch, startBatchImport } from "../youtube/catalogWorker.js";
+import { cancelItem, resumeBatch, startBatchImport, stopBatch } from "../youtube/catalogWorker.js";
 import { extractYoutubePlaylistId, normalizeYoutubeChannelUrl } from "../youtube/validate.js";
 import { normalizeForMatch } from "../artwork/matching.js";
 import { toSafeErrorMessage } from "../youtube/safeError.js";
@@ -378,6 +378,39 @@ router.post("/:batchId/resume", async (req, res) => {
   }
   const count = await resumeBatch(batch.id);
   res.status(202).json({ resumed: count });
+});
+
+// POST /api/admin/youtube-import/catalog/:batchId/stop — admin-triggered
+// manual stop. Anything not already actively downloading is reset to
+// "pending" and the batch drops back to the selection screen; see
+// catalogWorker.ts's stopBatch for why a genuinely in-flight item is left
+// to finish on its own rather than force-killed.
+router.post("/:batchId/stop", async (req, res) => {
+  const batch = await prisma.youtubeImportBatch.findUnique({ where: { id: String(req.params.batchId) } });
+  if (!batch) {
+    res.status(404).json({ error: "Import batch not found" });
+    return;
+  }
+  const count = await stopBatch(batch.id);
+  res.status(202).json({ stopped: count });
+});
+
+// POST /api/admin/youtube-import/catalog/:batchId/items/:itemId/cancel —
+// admin-triggered cancel for exactly one item (the per-item X button).
+// Unlike /stop, this DOES kill a genuinely in-flight yt-dlp/ffmpeg process
+// for this specific item — see catalogWorker.ts's cancelItem.
+router.post("/:batchId/items/:itemId/cancel", async (req, res) => {
+  const item = await prisma.youtubeImportItem.findUnique({ where: { id: String(req.params.itemId) } });
+  if (!item || item.batchId !== String(req.params.batchId)) {
+    res.status(404).json({ error: "Import item not found" });
+    return;
+  }
+  const result = await cancelItem(item.id);
+  if (result === "not_active") {
+    res.status(400).json({ error: "This item isn't queued or in progress" });
+    return;
+  }
+  res.status(202).json({ result });
 });
 
 // ---- Import History management ----

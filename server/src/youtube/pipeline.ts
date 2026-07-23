@@ -18,7 +18,10 @@ import {
   YtDlpError,
 } from "./ytdlp.js";
 import { generateWaveform } from "./waveform.js";
+import { CancelledImportError } from "./safeError.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
+
+export { CancelledImportError };
 
 // Not every channel exposes a "Videos" tab — YouTube Music-style Official
 // Artist Channels in particular often only have Releases/Playlists — so a
@@ -151,6 +154,13 @@ export interface ImportVideoParams {
   // findOrCreateAlbum below.
   batchId?: string;
   onProgress?: (status: string, progress: number, message: string) => void;
+  // Set by the catalog worker so a manually-cancelled item (the import
+  // screen's per-item X button) actually kills the in-flight yt-dlp/ffmpeg
+  // process instead of running to completion in the background. Checked at
+  // a few cheap checkpoints too (see below) so a cancel requested during a
+  // DB call rather than a yt-dlp call still takes effect promptly rather
+  // than only being caught next time a spawn happens.
+  signal?: AbortSignal;
 }
 
 // Same bar used elsewhere (artwork/matching.ts, spotifySync/sync.ts) for
@@ -349,11 +359,12 @@ export async function importYoutubeVideo({
   concertDescription,
   standaloneConcertSong,
   onProgress,
+  signal,
 }: ImportVideoParams) {
   let tmpDir: string | undefined;
   try {
     onProgress?.("pending", 0, "Fetching video info…");
-    const metadata = await fetchYoutubeMetadata(url);
+    const metadata = await fetchYoutubeMetadata(url, signal);
 
     if (metadata.isLive) throw new Error("Live streams can't be imported");
     if (metadata.availability && !["public", "unlisted"].includes(metadata.availability)) {
@@ -412,14 +423,25 @@ export async function importYoutubeVideo({
       if (!album) throw new Error("Album not found");
     }
 
+    if (signal?.aborted) throw new CancelledImportError();
+
     onProgress?.("downloading", 8, "Downloading audio…");
     tmpDir = await mkdtemp(path.join(tmpdir(), "mezmur-yt-"));
-    const audioPath = await downloadYoutubeAudio(url, tmpDir, (percent) => {
-      onProgress?.("downloading", 8 + Math.round(percent * 0.6), `Downloading audio… ${Math.round(percent)}%`);
-    });
+    const audioPath = await downloadYoutubeAudio(
+      url,
+      tmpDir,
+      (percent) => {
+        onProgress?.("downloading", 8 + Math.round(percent * 0.6), `Downloading audio… ${Math.round(percent)}%`);
+      },
+      signal
+    );
+
+    if (signal?.aborted) throw new CancelledImportError();
 
     onProgress?.("processing", 70, "Generating waveform…");
     const waveform = await generateWaveform(audioPath);
+
+    if (signal?.aborted) throw new CancelledImportError();
 
     onProgress?.("uploading", 80, "Uploading audio to storage…");
     const audioBuffer = await readFile(audioPath);

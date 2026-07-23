@@ -1,17 +1,27 @@
 import { prisma } from "../prisma.js";
 import { DuplicateImportError, importYoutubeVideo } from "./pipeline.js";
 import { normalizeForMatch } from "../artwork/matching.js";
-import { toSafeErrorMessage } from "./safeError.js";
+import { CancelledImportError, toSafeErrorMessage } from "./safeError.js";
 import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 
-// A single global FIFO of item ids. Serial on purpose (one item at a time,
-// with a real pause between each — see worker() below): 3 concurrent
+// A single global FIFO of item ids, drained by up to CONCURRENCY parallel
+// worker() loops — each one still serial-with-a-pause internally (see
+// ITEM_DELAY_MS below). This used to be hardcoded to 1: 3 concurrent
 // fetches plus only a 1.5s gap made a batch look exactly like a scraping
 // burst to YouTube and got every single item bot-check-blocked in
-// production, even though a lone one-off import from the same box
-// succeeded moments earlier. Serial+spaced-out is the only thing that's
-// actually reliable against a bare IP.
-const CONCURRENCY = 1;
+// production, even from a bare (cookie-less) IP. Bumped back up now that
+// yt-dlp carries real browser cookies (see ytdlp.ts's YTDLP_COOKIES_B64 /
+// YTDLP_COOKIES_FROM_BROWSER) — an authenticated session reads as normal
+// account activity rather than anonymous datacenter traffic, which is what
+// the bot-check actually keys off. If imports start getting bot-blocked
+// again, drop this back down first before touching anything else.
+// Explicitly set for max throughput over stability — 5 concurrent already
+// measurably strained this machine's network enough to intermittently break
+// concurrent Supabase auth checks (login flakiness), and this is pushed
+// well past that point on purpose. If login/other requests become
+// unreliable during a big import, that's this tradeoff, not a new bug —
+// drop this back down (2 was the last known-stable value) first.
+const CONCURRENCY = 10;
 const queue: string[] = [];
 let activeWorkers = 0;
 
@@ -22,6 +32,13 @@ let activeWorkers = 0;
 // resume (manually or at boot) is always safe: it only ever re-queues items
 // that aren't genuinely in flight, never one this process is mid-pipeline on.
 const inFlight = new Set<string>();
+
+// One AbortController per item actually being worked on right now, so the
+// admin's per-item "cancel" (X button) can kill the exact yt-dlp/ffmpeg
+// process backing it — see cancelItem below. Populated/cleared in the same
+// place as `inFlight`, just carrying the means to actually stop the work
+// rather than only tracking that it's happening.
+const inFlightControllers = new Map<string, AbortController>();
 
 const ACTIVE_STATUSES: YoutubeImportItemStatus[] = ["selected", "downloading", "processing", "uploading", "saving"];
 
@@ -43,6 +60,13 @@ async function finalizeBatchIfDone(batchId: string) {
     where: { batchId, status: { in: ACTIVE_STATUSES } },
   });
   if (remaining > 0) return;
+
+  // A batch the admin just stopped (see stopBatch below) also reaches zero
+  // ACTIVE_STATUSES items once its last in-flight item finishes — but that's
+  // not the same as finishing the batch, so only ever promote to a
+  // completed/error terminal status from "importing".
+  const batch = await prisma.youtubeImportBatch.findUnique({ where: { id: batchId }, select: { status: true } });
+  if (batch?.status !== "importing") return;
 
   const hasErrors = await prisma.youtubeImportItem.count({ where: { batchId, status: "error" } });
   await prisma.youtubeImportBatch.update({
@@ -68,6 +92,8 @@ async function processItem(itemId: string) {
   if (!item || item.status !== "selected") return; // stale queue entry — already handled elsewhere
 
   inFlight.add(itemId);
+  const controller = new AbortController();
+  inFlightControllers.set(itemId, controller);
   try {
     // yt-dlp reports download progress many times per second — writing one
     // of these to Postgres on every single tick puts far more load on the
@@ -77,6 +103,7 @@ async function processItem(itemId: string) {
     let lastProgressWrite = 0;
     let lastStatus = "";
     const { dto } = await importYoutubeVideo({
+      signal: controller.signal,
       url: buildWatchUrl(item.videoId),
       adminId: item.batch.createdBy,
       // targetArtistId is what every batch created going forward always
@@ -130,6 +157,14 @@ async function processItem(itemId: string) {
           albumWasNew: computeAlbumWasNew(item, item.batch),
         },
       });
+    } else if (err instanceof CancelledImportError) {
+      // Admin-cancelled via the per-item X button — deselected, and marked
+      // "cancelled" (not "pending") so the UI can show this was a
+      // deliberate action rather than "never attempted".
+      await prisma.youtubeImportItem.update({
+        where: { id: itemId },
+        data: { status: "cancelled", progress: 0, message: "Cancelled", error: null, selected: false },
+      });
     } else {
       const message = toSafeErrorMessage(err, "Import failed", "youtube-catalog-import");
       await prisma.youtubeImportItem.update({
@@ -139,6 +174,7 @@ async function processItem(itemId: string) {
     }
   } finally {
     inFlight.delete(itemId);
+    inFlightControllers.delete(itemId);
     await finalizeBatchIfDone(item.batchId);
   }
 }
@@ -151,12 +187,23 @@ function sleep(ms: number) {
 // every item — long enough that a multi-item batch reads as ordinary,
 // spaced-out usage rather than a scraping burst (see CONCURRENCY above for
 // why this matters).
-const ITEM_DELAY_MS = 6000;
+const ITEM_DELAY_MS = 500;
 
 async function worker() {
   let itemId: string | undefined;
   while ((itemId = queue.shift()) !== undefined) {
-    await processItem(itemId);
+    try {
+      await processItem(itemId);
+    } catch (err) {
+      // processItem already catches everything from the actual import
+      // itself (see its own try/catch around importYoutubeVideo) — this is
+      // the backstop for anything before/after that, e.g. a transient DB
+      // connectivity blip on the initial findUnique. Without this, that
+      // rejection would go unhandled here (kick() only attaches .finally,
+      // never .catch) and crash the whole Node process — taking down every
+      // other route (including login) along with it, not just this import.
+      console.error(`[catalogWorker] unexpected error processing item ${itemId}`, err);
+    }
     if (queue.length > 0) await sleep(ITEM_DELAY_MS);
   }
 }
@@ -217,6 +264,70 @@ export async function resumeBatch(batchId: string) {
   await prisma.youtubeImportBatch.update({ where: { id: batchId }, data: { status: "importing" } });
   enqueueItems(toResume.map((i) => i.id));
   return toResume.length;
+}
+
+// Admin-triggered manual stop. Anything not yet actually running (still
+// sitting in the in-memory queue) is pulled out and reset to "pending" —
+// same state as freshly enumerated, never-selected items — so the batch
+// drops back to the selection screen and the admin can review/reselect and
+// hit "Start Import" again whenever they want. Whatever's genuinely
+// mid-download right now (inFlight) is left alone to finish naturally:
+// killing a running yt-dlp child process mid-fetch isn't safe to do here.
+// With CONCURRENCY > 1 that can be a few items (up to CONCURRENCY, across
+// any batch) rather than just one, but the logic doesn't assume a count —
+// it just leaves whatever's actually in the inFlight set untouched.
+export async function stopBatch(batchId: string) {
+  const active = await prisma.youtubeImportItem.findMany({
+    where: { batchId, status: { in: ACTIVE_STATUSES } },
+    select: { id: true },
+  });
+  const toStop = active.filter((i) => !inFlight.has(i.id));
+
+  for (const { id } of toStop) {
+    const idx = queue.indexOf(id);
+    if (idx !== -1) queue.splice(idx, 1);
+  }
+
+  if (toStop.length > 0) {
+    await prisma.youtubeImportItem.updateMany({
+      where: { id: { in: toStop.map((i) => i.id) } },
+      data: { status: "pending", progress: 0, message: null },
+    });
+  }
+  await prisma.youtubeImportBatch.update({ where: { id: batchId }, data: { status: "stopped" } });
+  return toStop.length;
+}
+
+export type CancelItemResult = "removed_from_queue" | "aborted" | "not_active";
+
+// Admin-triggered cancel for exactly one item (the import screen's per-item
+// X button) — unlike stopBatch, this DOES kill a genuinely in-flight
+// download: cancelItem targets one specific yt-dlp/ffmpeg process by id
+// rather than "whatever happens to be running", so there's no ambiguity
+// about collateral damage to a different item. If it hasn't started yet,
+// it's just pulled out of the queue instead. Either way it lands at
+// "cancelled" and deselected — via processItem's own CancelledImportError
+// handling once the abort takes effect (for the in-flight case) or directly
+// here (for the queued case).
+export async function cancelItem(itemId: string): Promise<CancelItemResult> {
+  const idx = queue.indexOf(itemId);
+  if (idx !== -1 && !inFlight.has(itemId)) {
+    queue.splice(idx, 1);
+    const item = await prisma.youtubeImportItem.update({
+      where: { id: itemId },
+      data: { status: "cancelled", progress: 0, message: "Cancelled", error: null, selected: false },
+    });
+    await finalizeBatchIfDone(item.batchId);
+    return "removed_from_queue";
+  }
+
+  const controller = inFlightControllers.get(itemId);
+  if (controller) {
+    controller.abort();
+    return "aborted";
+  }
+
+  return "not_active";
 }
 
 // Called once at server startup: any batch left "importing" when the

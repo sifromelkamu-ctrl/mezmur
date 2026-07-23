@@ -458,7 +458,8 @@ type YoutubeCatalogItemStatus =
   | "saving"
   | "done"
   | "error"
-  | "skipped_duplicate";
+  | "skipped_duplicate"
+  | "cancelled";
 
 export interface YoutubeCatalogItem {
   id: string;
@@ -483,7 +484,14 @@ export interface YoutubeCatalogItem {
   albumWasNew: boolean | null;
 }
 
-type YoutubeCatalogBatchStatus = "enumerating" | "ready" | "importing" | "completed" | "completed_with_errors" | "error";
+type YoutubeCatalogBatchStatus =
+  | "enumerating"
+  | "ready"
+  | "importing"
+  | "stopped"
+  | "completed"
+  | "completed_with_errors"
+  | "error";
 
 export interface YoutubeCatalogBatch {
   id: string;
@@ -672,6 +680,16 @@ export const adminApi = {
     request<{ queued: number }>(`/admin/youtube-import/catalog/${batchId}/start`, { method: "POST" }),
   resumeYoutubeCatalogImport: (batchId: string) =>
     request<{ resumed: number }>(`/admin/youtube-import/catalog/${batchId}/resume`, { method: "POST" }),
+  stopYoutubeCatalogImport: (batchId: string) =>
+    request<{ stopped: number }>(`/admin/youtube-import/catalog/${batchId}/stop`, { method: "POST" }),
+  // Cancels exactly one item — if it's actively downloading, this kills the
+  // underlying yt-dlp/ffmpeg process for it specifically (unlike stop, which
+  // only ever affects not-yet-started items).
+  cancelYoutubeCatalogItem: (batchId: string, itemId: string) =>
+    request<{ result: "removed_from_queue" | "aborted" }>(
+      `/admin/youtube-import/catalog/${batchId}/items/${itemId}/cancel`,
+      { method: "POST" }
+    ),
 };
 
 // Extends ApiTrack with the extra fields the admin "Edit Song" form needs
