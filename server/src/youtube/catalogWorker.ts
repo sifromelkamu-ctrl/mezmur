@@ -113,6 +113,22 @@ async function processItem(itemId: string) {
       targetArtistId: item.batch.targetArtistId ?? undefined,
       artistNameOverride: item.batch.targetArtistId ? undefined : (item.batch.channelName ?? undefined),
       albumTitle: item.albumTitle ?? undefined,
+      // An item with no albumTitle is exactly what the selection screen
+      // itself already labels "Single" (see catalogEnumerate.ts's `kind`) —
+      // without one of these two flags, it lands with albumId: null,
+      // isSingle: false, AND isConcertSong: false, which is invisible
+      // everywhere: no album to live in, not on the Singles page (that route
+      // deliberately requires isSingle: true, never infers it from a null
+      // albumId — see routes/singles.ts), and not in the Concerts feed
+      // either (requires isConcertSong: true — see routes/concerts.ts).
+      // Routed to whichever one matches this batch's own destination choice,
+      // same as the single-video import's "Single" vs "Concert" destinations
+      // already do. targetArtistId is already set by this point (the
+      // admin's explicit artist choice), so isSingle here has no effect on
+      // pipeline.ts's artist-resolution branch, which only consults it when
+      // targetArtistId is absent.
+      isSingle: item.batch.albumType !== "live" && !item.albumTitle,
+      standaloneConcertSong: item.batch.albumType === "live" && !item.albumTitle,
       // The admin's "Regular Album" vs "Concert Album" destination choice
       // for this whole batch (see routes/youtubeCatalogImport.ts) — only
       // matters when albumTitle is set, and only actually applied to an
