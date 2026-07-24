@@ -56,6 +56,7 @@ import {
   type ReadingPrefs,
 } from "../utils/bibleReadingPrefs";
 import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../utils/bibleReadingHistory";
+import { bibleAudioUrl } from "../lib/bibleAudio";
 
 const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -195,6 +196,12 @@ export default function Bible() {
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  // Flips true if the real chapter recording 404s (a handful of chapters
+  // aren't recorded yet, e.g. 1 Kings 8-22) — falls back to browser
+  // text-to-speech below rather than leaving the Listen button dead.
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
   // Which testament's book list is open, if any — mutually exclusive
   // (opening one closes the other) rather than two independent booleans,
   // so only one book list is ever visible at a time.
@@ -341,6 +348,15 @@ export default function Bible() {
     setSpeaking(false);
   };
 
+  const stopAudio = () => {
+    const el = audioRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setAudioPlaying(false);
+  };
+
   // Fetch the whole book once per selection+language (public/bible/<slug>.json
   // for Amharic, public/bible/en/<slug>.json for the King James Version), not
   // bundled into the app — a full Bible translation is several MB, too large
@@ -348,6 +364,7 @@ export default function Bible() {
   // it's opened (and again if the reader switches language mid-chapter).
   useEffect(() => {
     stopSpeaking();
+    stopAudio();
     setBookText(null);
     setLoadError(false);
     if (!bookSlug) return;
@@ -366,6 +383,8 @@ export default function Bible() {
 
   useEffect(() => {
     stopSpeaking();
+    stopAudio();
+    setAudioUnavailable(false);
     setSelectedVerses(new Set());
     setEditingNoteVerse(null);
     setAnnotations(bookSlug && chapter ? loadChapterAnnotations(bookSlug, chapter) : {});
@@ -377,7 +396,10 @@ export default function Bible() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter]);
 
-  useEffect(() => stopSpeaking, []);
+  useEffect(() => () => {
+    stopSpeaking();
+    stopAudio();
+  }, []);
 
   // Home screen's hero — a single "verse of the day", one per local
   // calendar day (keys off each visitor's own device clock, so it rotates
@@ -466,12 +488,14 @@ export default function Bible() {
     }
   };
 
-  const toggleListen = () => {
+  // Real chapter recordings only exist for Amharic (the app's default
+  // reading language) — English mode keeps the browser text-to-speech
+  // fallback below, same as chapters whose recording hasn't been made yet.
+  const hasRealAudio = prefs.language === "am" && !audioUnavailable;
+  const listening = hasRealAudio ? audioPlaying : speaking;
+
+  const startSpeaking = () => {
     if (!speechSupported || !verses) return;
-    if (speaking) {
-      stopSpeaking();
-      return;
-    }
     const utterance = new SpeechSynthesisUtterance(verses.filter(Boolean).join(" "));
     utterance.lang = "am-ET";
     utterance.rate = 0.9;
@@ -479,6 +503,36 @@ export default function Bible() {
     utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);
     setSpeaking(true);
+  };
+
+  // Fires only as a direct result of the user pressing Listen (the <audio>
+  // element uses preload="none", so nothing else ever triggers a load) —
+  // safe to fall straight into text-to-speech here so a chapter missing its
+  // recording still plays something on the very first tap, not the second.
+  const handleAudioError = () => {
+    setAudioUnavailable(true);
+    startSpeaking();
+  };
+
+  const toggleListen = () => {
+    if (hasRealAudio) {
+      const el = audioRef.current;
+      if (!el) return;
+      if (audioPlaying) {
+        el.pause();
+        setAudioPlaying(false);
+      } else {
+        el.play()
+          .then(() => setAudioPlaying(true))
+          .catch(handleAudioError);
+      }
+      return;
+    }
+    if (speaking) {
+      stopSpeaking();
+      return;
+    }
+    startSpeaking();
   };
 
   const applyAnnotationUpdate = (key: string, updated: VerseAnnotation | undefined) => {
@@ -726,16 +780,27 @@ export default function Bible() {
           >
             <ChevronLeft size={16} />
           </button>
-          {speechSupported && verses && (
+          {(hasRealAudio || (speechSupported && verses)) && (
             <button
               onClick={toggleListen}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                speaking ? "bg-gold text-black" : "bg-elevated hover:bg-elevated-hover"
+                listening ? "bg-gold text-black" : "bg-elevated hover:bg-elevated-hover"
               }`}
             >
-              {speaking ? <Pause size={16} /> : <Volume2 size={16} />}
-              {speaking ? "Stop listening" : "Listen"}
+              {listening ? <Pause size={16} /> : <Volume2 size={16} />}
+              {listening ? "Stop listening" : "Listen"}
             </button>
+          )}
+          {prefs.language === "am" && (
+            <audio
+              key={`${bookSlug}-${chapter}`}
+              ref={audioRef}
+              src={bookSlug ? bibleAudioUrl(bookSlug, chapter) : undefined}
+              preload="none"
+              onEnded={() => setAudioPlaying(false)}
+              onError={handleAudioError}
+              className="hidden"
+            />
           )}
           <button
             onClick={() => setChapter((c) => Math.min(book.chapterCount, (c ?? 1) + 1))}
