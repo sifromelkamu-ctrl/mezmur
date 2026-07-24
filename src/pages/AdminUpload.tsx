@@ -313,9 +313,11 @@ export default function AdminUpload() {
 
   const uploadAll = async () => {
     setUploadingAll(true);
-    for (const row of rows) {
-      if (row.status !== "done") await uploadRow(row);
-    }
+    // Concurrent, not sequential — each row is an independent signed-URL +
+    // direct-to-Supabase-Storage upload (see uploadRow), so there's no
+    // shared resource one row waiting on another would protect; a whole
+    // album's worth of tracks uploads in parallel instead of one at a time.
+    await Promise.all(rows.map((row) => (row.status !== "done" ? uploadRow(row) : Promise.resolve())));
     setUploadingAll(false);
   };
 
@@ -356,10 +358,18 @@ export default function AdminUpload() {
         Upload Album Folder
       </button>
       <input
-        ref={folderInputRef}
+        ref={(el) => {
+          folderInputRef.current = el;
+          // webkitdirectory isn't in React's DOM typings, and setting it as
+          // a plain JSX attribute is unreliable across browsers — this is
+          // the DOM property directly, which every browser that supports
+          // directory selection actually reads. Without this, the picker
+          // falls back to a normal multi-file dialog that requires manually
+          // selecting every file inside the folder instead of just picking
+          // the folder itself.
+          if (el) (el as unknown as { webkitdirectory: boolean }).webkitdirectory = true;
+        }}
         type="file"
-        // webkitdirectory isn't in React's DOM typings — set as a raw prop.
-        {...{ webkitdirectory: "true" }}
         multiple
         accept="audio/*"
         onChange={(e) => {
