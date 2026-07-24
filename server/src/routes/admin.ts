@@ -18,11 +18,7 @@ import {
 import { runArtistSpotifySync } from "../spotifySync/sync.js";
 import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../spotifySync/types.js";
 import { Prisma } from "../generated/prisma/client.js";
-import { normalizeForMatch, similarity } from "../artwork/matching.js";
-
-// Same bar the YouTube import pipeline uses (pipeline.ts, spotifySync/sync.ts)
-// for "is this close enough to count as the same name" fuzzy matching.
-const IDENTITY_MIN = 0.55;
+import { normalizeForMatch } from "../artwork/matching.js";
 
 const router = Router();
 
@@ -111,12 +107,19 @@ router.post("/artists/:id/albums", async (req: AuthedRequest, res) => {
     res.status(404).json({ error: "Artist not found" });
     return;
   }
-  // Same exact + fuzzy duplicate-title guard as the YouTube import
-  // pipeline's findOrCreateAlbum (pipeline.ts) — scoped to this one artist,
-  // since the same album title under two different artists is normal
-  // (e.g. two different artists both releasing something called "Live").
+  // Exact normalized-title match only — deliberately NOT fuzzy. Fuzzy
+  // similarity (as used by the YouTube import pipeline's findOrCreateAlbum,
+  // which is matching auto-derived titles against each other at scale) is
+  // exactly wrong here: real album titles very often differ by nothing but
+  // a number ("Vol 1" vs "Vol 2", "Part 1" vs "Part 2"), which scores as a
+  // near-duplicate under edit-distance + token-overlap similarity (e.g.
+  // "vol 1"/"vol 2" = 0.65, above the 0.55 bar those other call sites use)
+  // even though they're obviously different releases. An admin manually
+  // creating one album at a time needs the narrow "did I mistype/retype the
+  // exact same title" check, not "does this look similar to something else."
   const existingAlbums = await prisma.album.findMany({ where: { artistId: artist.id }, select: { id: true, title: true } });
-  const duplicate = existingAlbums.find((a) => similarity(a.title, parsed.data.title) >= IDENTITY_MIN);
+  const normalizedInputTitle = normalizeForMatch(parsed.data.title);
+  const duplicate = existingAlbums.find((a) => normalizeForMatch(a.title) === normalizedInputTitle);
   if (duplicate) {
     res.status(409).json({
       error: `${artist.name} already has an album called "${duplicate.title}" — choose it from the list instead, or use a different title.`,

@@ -1,5 +1,5 @@
 import { AlertCircle, Check, ChevronLeft, FolderUp, Loader2, Music2, Plus, Trash2, UploadCloud } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import SelectField from "../components/form/SelectField";
@@ -330,6 +330,36 @@ export default function AdminUpload() {
     setUploadingAll(false);
   };
 
+  const removeGroup = (ids: string[]) => {
+    setRows((prev) => {
+      const next = prev.filter((r) => !ids.includes(r.id));
+      return next.length > 0 ? next : [newRow()];
+    });
+  };
+
+  // You can click "Upload Album Folder" as many times as you want — each
+  // confirmed folder appends its rows rather than replacing what's already
+  // there (see addTracksFromFolder). Grouping by album here is what makes
+  // that actually usable once you've queued up more than one: without it,
+  // several albums' worth of tracks would just be one undifferentiated wall
+  // of rows with no way to tell which track belongs to which album, or to
+  // remove/review one album at a time. A row with no album (a manually
+  // added single) gets its own key so it renders standalone, ungrouped,
+  // exactly as before — only real multi-track album batches get a header.
+  const rowGroups = useMemo(() => {
+    const byKey = new Map<string, UploadRow[]>();
+    const order: string[] = [];
+    for (const row of rows) {
+      const key = row.albumId ? `album:${row.albumId}` : `standalone:${row.id}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, []);
+        order.push(key);
+      }
+      byKey.get(key)!.push(row);
+    }
+    return order.map((key) => ({ key, rows: byKey.get(key)! }));
+  }, [rows]);
+
   if (user?.role !== "admin") {
     return (
       <div className="relative px-6 py-10 max-w-lg">
@@ -543,8 +573,26 @@ export default function AdminUpload() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
-        {rows.map((row, idx) => (
+      <div className="flex flex-col gap-6">
+        {rowGroups.map((group) => (
+          <div key={group.key} className="flex flex-col gap-4">
+            {group.rows.length > 1 && (
+              <div className="flex items-center justify-between px-1">
+                <p className="text-sm font-semibold">
+                  {artists.find((a) => a.id === group.rows[0].artistId)?.name ?? "Unknown artist"}
+                  <span className="text-fg-muted font-normal"> — </span>
+                  {albums.find((al) => al.id === group.rows[0].albumId)?.title ?? "Album"}
+                  <span className="ml-2 text-xs font-normal text-fg-muted">({group.rows.length} tracks)</span>
+                </p>
+                <button
+                  onClick={() => removeGroup(group.rows.map((r) => r.id))}
+                  className="text-xs font-semibold text-fg-subtle hover:text-accent-red transition-colors"
+                >
+                  Remove album
+                </button>
+              </div>
+            )}
+            {group.rows.map((row, idx) => (
           <div key={row.id} className="bg-elevated rounded-lg p-4 relative">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-fg-muted uppercase tracking-wide">Track {idx + 1}</span>
@@ -702,6 +750,8 @@ export default function AdminUpload() {
             </div>
 
             {row.error && <p className="text-xs text-accent-red mt-2">{row.error}</p>}
+          </div>
+            ))}
           </div>
         ))}
       </div>
