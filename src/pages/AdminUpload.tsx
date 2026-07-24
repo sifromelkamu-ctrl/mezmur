@@ -111,6 +111,15 @@ export default function AdminUpload() {
   const [rows, setRows] = useState<UploadRow[]>([newRow()]);
   const [uploadingAll, setUploadingAll] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // webkitdirectory isn't in React's DOM typings, and — critically — it
+    // must be set as an actual DOM property, not a JSX/HTML attribute, or
+    // some browsers silently ignore it and fall back to a normal (single- or
+    // multi-file) picker instead of directory mode. Set once on mount via a
+    // stable ref (an inline callback ref would get a new identity every
+    // render, causing React to detach/reattach it repeatedly).
+    if (folderInputRef.current) (folderInputRef.current as unknown as { webkitdirectory: boolean }).webkitdirectory = true;
+  }, []);
 
   // "Upload Album Folder" — a whole folder of audio files, resolved to one
   // shared artist+album, becomes N pre-filled rows in one action instead of
@@ -358,20 +367,14 @@ export default function AdminUpload() {
         Upload Album Folder
       </button>
       <input
-        ref={(el) => {
-          folderInputRef.current = el;
-          // webkitdirectory isn't in React's DOM typings, and setting it as
-          // a plain JSX attribute is unreliable across browsers — this is
-          // the DOM property directly, which every browser that supports
-          // directory selection actually reads. Without this, the picker
-          // falls back to a normal multi-file dialog that requires manually
-          // selecting every file inside the folder instead of just picking
-          // the folder itself.
-          if (el) (el as unknown as { webkitdirectory: boolean }).webkitdirectory = true;
-        }}
+        ref={folderInputRef}
         type="file"
         multiple
-        accept="audio/*"
+        // No accept="audio/*" here on purpose — combined with webkitdirectory
+        // that's a known conflict in some browsers (the file-type filter
+        // fights the "pick a whole directory" mode, and can make it fall
+        // back to single-file selection). Non-audio files in the picked
+        // folder are filtered out in JS instead, by handleFolderPick.
         onChange={(e) => {
           handleFolderPick(e.target.files);
           e.target.value = "";
