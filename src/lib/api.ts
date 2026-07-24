@@ -538,6 +538,7 @@ export const adminApi = {
     genre?: string;
     duration: number;
     fileExt?: string;
+    trackNumber?: number;
   }) => request<AdminUploadTrackResult>("/admin/upload-track", { method: "POST", body: JSON.stringify(input) }),
 
   // The track row + signed URL come from uploadTrack(); this sends the

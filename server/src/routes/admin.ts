@@ -18,6 +18,11 @@ import {
 import { runArtistSpotifySync } from "../spotifySync/sync.js";
 import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../spotifySync/types.js";
 import { Prisma } from "../generated/prisma/client.js";
+import { normalizeForMatch, similarity } from "../artwork/matching.js";
+
+// Same bar the YouTube import pipeline uses (pipeline.ts, spotifySync/sync.ts)
+// for "is this close enough to count as the same name" fuzzy matching.
+const IDENTITY_MIN = 0.55;
 
 const router = Router();
 
@@ -61,6 +66,21 @@ router.post("/artists", async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
+  // Same duplicate-name guard the YouTube catalog import uses (see
+  // routes/youtubeCatalogImport.ts's resolveTargetArtist) — hard-blocked
+  // rather than silently creating a near-duplicate catalog artist, since
+  // unlike YouTube import there's no channel URL here to disambiguate two
+  // genuinely different people who happen to share a name.
+  const catalogArtists = await prisma.artist.findMany({ where: { ownerId: null }, select: { id: true, name: true } });
+  const normalizedInput = normalizeForMatch(parsed.data.name);
+  const existing = catalogArtists.find((a) => normalizeForMatch(a.name) === normalizedInput);
+  if (existing) {
+    res.status(409).json({
+      error: `An artist named "${existing.name}" already exists — choose it from the list instead, or use a different name.`,
+      suggestedArtist: existing,
+    });
+    return;
+  }
   const [gradientFrom, gradientTo] = gradientForSeed(parsed.data.name);
   const artist = await prisma.artist.create({
     data: { name: parsed.data.name, gradientFrom, gradientTo },
@@ -91,6 +111,19 @@ router.post("/artists/:id/albums", async (req: AuthedRequest, res) => {
     res.status(404).json({ error: "Artist not found" });
     return;
   }
+  // Same exact + fuzzy duplicate-title guard as the YouTube import
+  // pipeline's findOrCreateAlbum (pipeline.ts) — scoped to this one artist,
+  // since the same album title under two different artists is normal
+  // (e.g. two different artists both releasing something called "Live").
+  const existingAlbums = await prisma.album.findMany({ where: { artistId: artist.id }, select: { id: true, title: true } });
+  const duplicate = existingAlbums.find((a) => similarity(a.title, parsed.data.title) >= IDENTITY_MIN);
+  if (duplicate) {
+    res.status(409).json({
+      error: `${artist.name} already has an album called "${duplicate.title}" — choose it from the list instead, or use a different title.`,
+      suggestedAlbum: duplicate,
+    });
+    return;
+  }
   const album = await prisma.album.create({
     data: {
       title: parsed.data.title,
@@ -115,6 +148,11 @@ const uploadTrackSchema = z.object({
     .trim()
     .regex(/^\.?[a-zA-Z0-9]{1,5}$/, "Invalid file extension")
     .optional(),
+  // Only meaningful alongside albumId — lets a whole-album-folder bulk
+  // upload preserve track order without a separate reorder step afterward
+  // (see AdminUpload.tsx's folder picker, which parses this from each
+  // filename's leading number).
+  trackNumber: z.number().int().positive().max(999).optional(),
 });
 
 // POST /api/admin/upload-track
@@ -131,7 +169,7 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const { title, artistId, albumId, genre, duration, fileExt } = parsed.data;
+  const { title, artistId, albumId, genre, duration, fileExt, trackNumber } = parsed.data;
 
   try {
     const artist = await prisma.artist.findUnique({ where: { id: artistId } });
@@ -168,6 +206,7 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
         genre,
         duration,
         audioUrl: publicUrlData.publicUrl,
+        trackNumber: albumId ? trackNumber : undefined,
       },
       include: { artist: true, album: true },
     });

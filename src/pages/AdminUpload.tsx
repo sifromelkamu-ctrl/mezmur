@@ -1,11 +1,11 @@
-import { AlertCircle, Check, ChevronLeft, Loader2, Music2, Plus, Trash2, UploadCloud } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertCircle, Check, ChevronLeft, FolderUp, Loader2, Music2, Plus, Trash2, UploadCloud } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import SelectField from "../components/form/SelectField";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
-import { adminApi, albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtist } from "../lib/api";
+import { ApiError, adminApi, albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtist } from "../lib/api";
 
 type RowStatus = "idle" | "reading" | "uploading" | "done" | "error";
 
@@ -27,6 +27,11 @@ interface UploadRow {
   newAlbumType: ApiAlbumType;
   creatingArtist: boolean;
   creatingAlbum: boolean;
+  // Only meaningful alongside albumId — set by the "Upload Album Folder"
+  // picker from each file's leading track-number prefix (see
+  // parseAlbumFolderFile below) so order survives without a manual reorder
+  // pass. Manually-added rows just leave this unset.
+  trackNumber: number | null;
 }
 
 const NEW_OPTION = "__new__";
@@ -57,7 +62,29 @@ function newRow(): UploadRow {
     newAlbumType: "album",
     creatingArtist: false,
     creatingAlbum: false,
+    trackNumber: null,
   };
+}
+
+// Strips a leading track-number prefix ("01 - ", "01.", "3_", "track 4 ")
+// and the file extension, so "03 - Amazing Grace.mp3" becomes track number
+// 3 and title "Amazing Grace". Falls back to the bare filename (still
+// extension-stripped) as the title when no track number pattern matches,
+// and to null (not "unknown") when there's genuinely no leading number, so
+// callers can tell "no number found" apart from "found number 0".
+function parseAlbumFolderFilename(filename: string): { trackNumber: number | null; title: string } {
+  const withoutExt = filename.replace(/\.[a-zA-Z0-9]{1,5}$/, "");
+  const match = withoutExt.match(/^\s*(?:track\s*)?(\d{1,3})\s*[-._)]*\s+(.+)$/i);
+  if (match) {
+    return { trackNumber: Number(match[1]), title: match[2].trim() };
+  }
+  return { trackNumber: null, title: withoutExt.trim() };
+}
+
+// Natural sort so "2 - ..." sorts before "10 - ..." — a plain string sort
+// would put track 10 right after track 1.
+function naturalFileNameCompare(a: File, b: File): number {
+  return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
 }
 
 function readAudioDuration(file: File): Promise<number> {
@@ -83,6 +110,23 @@ export default function AdminUpload() {
   const [albums, setAlbums] = useState<ApiAlbum[]>([]);
   const [rows, setRows] = useState<UploadRow[]>([newRow()]);
   const [uploadingAll, setUploadingAll] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  // "Upload Album Folder" — a whole folder of audio files, resolved to one
+  // shared artist+album, becomes N pre-filled rows in one action instead of
+  // adding each track by hand. This state exists only between picking the
+  // folder and confirming the artist/album target; once confirmed it's
+  // cleared and everything downstream is just normal rows.
+  const [folderFiles, setFolderFiles] = useState<File[] | null>(null);
+  const [folderArtistId, setFolderArtistId] = useState("");
+  const [folderCreatingArtist, setFolderCreatingArtist] = useState(false);
+  const [folderNewArtistName, setFolderNewArtistName] = useState("");
+  const [folderAlbumId, setFolderAlbumId] = useState("");
+  const [folderCreatingAlbum, setFolderCreatingAlbum] = useState(false);
+  const [folderNewAlbumTitle, setFolderNewAlbumTitle] = useState("");
+  const [folderNewAlbumType, setFolderNewAlbumType] = useState<ApiAlbumType>("album");
+  const [folderError, setFolderError] = useState<string | null>(null);
+  const [folderBusy, setFolderBusy] = useState(false);
 
   useEffect(() => {
     artistsApi.list().then(setArtists);
@@ -104,9 +148,16 @@ export default function AdminUpload() {
   const confirmNewArtist = async (row: UploadRow) => {
     const name = row.newArtistName.trim();
     if (!name) return;
-    const artist = await adminApi.createArtist(name);
-    setArtists((prev) => [...prev, artist].sort((a, b) => a.name.localeCompare(b.name)));
-    updateRow(row.id, { artistId: artist.id, creatingArtist: false, newArtistName: "" });
+    try {
+      const artist = await adminApi.createArtist(name);
+      setArtists((prev) => [...prev, artist].sort((a, b) => a.name.localeCompare(b.name)));
+      updateRow(row.id, { artistId: artist.id, creatingArtist: false, newArtistName: "" });
+    } catch (err) {
+      // The server hard-blocks an exact-normalized-name duplicate (see
+      // admin.ts's POST /artists) — surface its message so the admin can
+      // pick the existing artist from the list instead of retrying blindly.
+      updateRow(row.id, { error: err instanceof ApiError ? err.message : "Could not create artist" });
+    }
   };
 
   const handleAlbumSelect = (rowId: string, value: string) => {
@@ -120,9 +171,15 @@ export default function AdminUpload() {
   const confirmNewAlbum = async (row: UploadRow) => {
     const title = row.newAlbumTitle.trim();
     if (!title || !row.artistId) return;
-    const album = await adminApi.addAlbum(row.artistId, title, row.newAlbumType);
-    setAlbums((prev) => [...prev, album]);
-    updateRow(row.id, { albumId: album.id, creatingAlbum: false, newAlbumTitle: "", newAlbumType: "album" });
+    try {
+      const album = await adminApi.addAlbum(row.artistId, title, row.newAlbumType);
+      setAlbums((prev) => [...prev, album]);
+      updateRow(row.id, { albumId: album.id, creatingAlbum: false, newAlbumTitle: "", newAlbumType: "album" });
+    } catch (err) {
+      // See confirmNewArtist above — same exact+fuzzy duplicate-title guard,
+      // scoped to this one artist (admin.ts's POST /artists/:id/albums).
+      updateRow(row.id, { error: err instanceof ApiError ? err.message : "Could not create album" });
+    }
   };
 
   const handleFilePick = async (id: string, file: File | null) => {
@@ -142,6 +199,94 @@ export default function AdminUpload() {
   const addRow = () => setRows((prev) => [...prev, newRow()]);
   const removeRow = (id: string) => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
 
+  const handleFolderPick = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const audioFiles = Array.from(fileList)
+      .filter((f) => f.type.startsWith("audio/") || /\.(mp3|m4a|wav|flac|aac|ogg)$/i.test(f.name))
+      .sort(naturalFileNameCompare);
+    if (audioFiles.length === 0) {
+      setFolderError("That folder didn't have any audio files in it.");
+      return;
+    }
+    setFolderFiles(audioFiles);
+    setFolderError(null);
+    // Reset any previous in-progress target so a second folder pick starts
+    // clean rather than inheriting the last folder's artist/album choice.
+    setFolderArtistId("");
+    setFolderCreatingArtist(false);
+    setFolderNewArtistName("");
+    setFolderAlbumId("");
+    setFolderCreatingAlbum(false);
+    setFolderNewAlbumTitle("");
+    setFolderNewAlbumType("album");
+  };
+
+  const confirmFolderNewArtist = async () => {
+    const name = folderNewArtistName.trim();
+    if (!name) return;
+    setFolderBusy(true);
+    setFolderError(null);
+    try {
+      const artist = await adminApi.createArtist(name);
+      setArtists((prev) => [...prev, artist].sort((a, b) => a.name.localeCompare(b.name)));
+      setFolderArtistId(artist.id);
+      setFolderCreatingArtist(false);
+      setFolderNewArtistName("");
+    } catch (err) {
+      setFolderError(err instanceof ApiError ? err.message : "Could not create artist");
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const confirmFolderNewAlbum = async () => {
+    const title = folderNewAlbumTitle.trim();
+    if (!title || !folderArtistId) return;
+    setFolderBusy(true);
+    setFolderError(null);
+    try {
+      const album = await adminApi.addAlbum(folderArtistId, title, folderNewAlbumType);
+      setAlbums((prev) => [...prev, album]);
+      setFolderAlbumId(album.id);
+      setFolderCreatingAlbum(false);
+      setFolderNewAlbumTitle("");
+    } catch (err) {
+      setFolderError(err instanceof ApiError ? err.message : "Could not create album");
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  // Turns the picked folder into N pre-filled rows once the admin has
+  // confirmed (or created) a single shared artist+album for all of them —
+  // reads each file's duration up front too, same as picking a file by hand
+  // does one at a time, just batched here.
+  const addTracksFromFolder = async () => {
+    if (!folderFiles || !folderArtistId || !folderAlbumId) return;
+    setFolderBusy(true);
+    const built = await Promise.all(
+      folderFiles.map(async (file) => {
+        const { trackNumber, title } = parseAlbumFolderFilename(file.name);
+        const row = newRow();
+        row.title = title;
+        row.artistId = folderArtistId;
+        row.albumId = folderAlbumId;
+        row.trackNumber = trackNumber;
+        row.file = file;
+        try {
+          row.duration = await readAudioDuration(file);
+        } catch {
+          row.status = "error";
+          row.error = "Could not read audio duration";
+        }
+        return row;
+      })
+    );
+    setRows((prev) => (prev.length === 1 && !prev[0].title && !prev[0].file && !prev[0].artistId ? built : [...prev, ...built]));
+    setFolderFiles(null);
+    setFolderBusy(false);
+  };
+
   const uploadRow = async (row: UploadRow) => {
     if (!row.title.trim() || !row.artistId || !row.file || !row.duration) {
       updateRow(row.id, { status: "error", error: "Title, artist, and audio file are required" });
@@ -157,6 +302,7 @@ export default function AdminUpload() {
         genre: row.genre.trim() || undefined,
         duration: row.duration,
         fileExt: ext,
+        trackNumber: row.albumId && row.trackNumber ? row.trackNumber : undefined,
       });
       await adminApi.putAudioFile(upload.signedUrl, row.file);
       updateRow(row.id, { status: "done" });
@@ -201,6 +347,188 @@ export default function AdminUpload() {
           </p>
         </div>
       </div>
+
+      <button
+        onClick={() => folderInputRef.current?.click()}
+        className="flex items-center gap-2 text-sm font-semibold text-fg-muted hover:text-fg px-4 py-2.5 mb-4 rounded-lg bg-elevated hover:bg-elevated-hover transition-colors w-full justify-center"
+      >
+        <FolderUp size={16} />
+        Upload Album Folder
+      </button>
+      <input
+        ref={folderInputRef}
+        type="file"
+        // webkitdirectory isn't in React's DOM typings — set as a raw prop.
+        {...{ webkitdirectory: "true" }}
+        multiple
+        accept="audio/*"
+        onChange={(e) => {
+          handleFolderPick(e.target.files);
+          e.target.value = "";
+        }}
+        className="hidden"
+      />
+
+      {folderFiles && (
+        <div className="bg-elevated rounded-lg p-4 mb-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">
+              {folderFiles.length} audio file{folderFiles.length === 1 ? "" : "s"} found — choose where they go
+            </p>
+            <button
+              onClick={() => setFolderFiles(null)}
+              className="text-fg-subtle hover:text-accent-red transition-colors"
+              aria-label="Cancel folder upload"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+
+          {folderCreatingArtist ? (
+            <div className="flex items-center gap-2">
+              <TextField
+                autoFocus
+                type="text"
+                value={folderNewArtistName}
+                onChange={(e) => setFolderNewArtistName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && confirmFolderNewArtist()}
+                placeholder="New artist name"
+                variant="panel"
+                className="px-3 py-2 text-base flex-1"
+              />
+              <button
+                onClick={confirmFolderNewArtist}
+                disabled={!folderNewArtistName.trim() || folderBusy}
+                className="w-9 h-9 shrink-0 rounded-md bg-brand text-black flex items-center justify-center disabled:opacity-50"
+                aria-label="Create artist"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  setFolderCreatingArtist(false);
+                  setFolderNewArtistName("");
+                }}
+                className="w-9 h-9 shrink-0 rounded-md text-fg-muted hover:text-fg flex items-center justify-center"
+                aria-label="Cancel"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ) : (
+            <SelectField
+              value={folderArtistId}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === NEW_OPTION) {
+                  setFolderCreatingArtist(true);
+                  setFolderArtistId("");
+                  setFolderAlbumId("");
+                } else {
+                  setFolderArtistId(value);
+                  setFolderAlbumId("");
+                }
+              }}
+              variant="panel"
+              className="px-3 py-2 text-base"
+            >
+              <option value="">Select artist...</option>
+              {artists.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+              <option value={NEW_OPTION}>+ New artist...</option>
+            </SelectField>
+          )}
+
+          {folderCreatingAlbum ? (
+            <div className="flex flex-col gap-2">
+              <SelectField
+                value={folderNewAlbumType}
+                onChange={(e) => setFolderNewAlbumType(e.target.value as ApiAlbumType)}
+                variant="panel"
+                className="px-3 py-2 text-base"
+                aria-label="Release type"
+              >
+                {NEW_ALBUM_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </SelectField>
+              <div className="flex items-center gap-2">
+                <TextField
+                  autoFocus
+                  type="text"
+                  value={folderNewAlbumTitle}
+                  onChange={(e) => setFolderNewAlbumTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmFolderNewAlbum()}
+                  placeholder="New album title"
+                  variant="panel"
+                  className="px-3 py-2 text-base flex-1"
+                />
+                <button
+                  onClick={confirmFolderNewAlbum}
+                  disabled={!folderNewAlbumTitle.trim() || folderBusy}
+                  className="w-9 h-9 shrink-0 rounded-md bg-brand text-black flex items-center justify-center disabled:opacity-50"
+                  aria-label="Create album"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  onClick={() => {
+                    setFolderCreatingAlbum(false);
+                    setFolderNewAlbumTitle("");
+                    setFolderNewAlbumType("album");
+                  }}
+                  className="w-9 h-9 shrink-0 rounded-md text-fg-muted hover:text-fg flex items-center justify-center"
+                  aria-label="Cancel"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <SelectField
+              value={folderAlbumId}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === NEW_OPTION) {
+                  setFolderCreatingAlbum(true);
+                  setFolderAlbumId("");
+                } else {
+                  setFolderAlbumId(value);
+                }
+              }}
+              disabled={!folderArtistId}
+              variant="panel"
+              className="px-3 py-2 text-base"
+            >
+              <option value="">Select album...</option>
+              {albums
+                .filter((al) => al.artistId === folderArtistId)
+                .map((al) => (
+                  <option key={al.id} value={al.id}>
+                    {al.title}
+                  </option>
+                ))}
+              {folderArtistId && <option value={NEW_OPTION}>+ New album...</option>}
+            </SelectField>
+          )}
+
+          {folderError && <p className="text-xs text-accent-red">{folderError}</p>}
+
+          <button
+            onClick={addTracksFromFolder}
+            disabled={!folderArtistId || !folderAlbumId || folderBusy}
+            className="flex items-center justify-center gap-2 bg-brand text-black text-sm font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
+          >
+            {folderBusy ? <Loader2 size={16} className="animate-spin" /> : <FolderUp size={16} />}
+            Add {folderFiles.length} track{folderFiles.length === 1 ? "" : "s"} to this album
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {rows.map((row, idx) => (
