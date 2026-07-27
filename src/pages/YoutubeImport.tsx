@@ -555,7 +555,7 @@ export default function YoutubeImport() {
               />
             </label>
             {showArtistSuggestions && artistSuggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-panel rounded-md shadow-2xl py-1 z-10 max-h-48 overflow-y-auto">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-panel rounded-md shadow-2xl py-1 z-10 max-h-48 overflow-y-auto overscroll-y-contain">
                 {artistSuggestions.map((a) => (
                   <button
                     key={a.id}

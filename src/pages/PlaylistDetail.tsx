@@ -160,7 +160,7 @@ export default function PlaylistDetail() {
                 className="pl-9 pr-4 py-2 text-base w-full"
               />
             </div>
-            <div className="max-h-72 overflow-y-auto no-scrollbar">
+            <div className="max-h-72 overflow-y-auto overscroll-y-contain no-scrollbar">
               {results.map((track) => {
                 const alreadyAdded = existingTrackIds.has(track.id);
                 return (

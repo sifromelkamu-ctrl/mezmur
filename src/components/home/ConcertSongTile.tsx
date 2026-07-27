@@ -1,4 +1,5 @@
 import { Play, Ticket } from "lucide-react";
+import { memo } from "react";
 import CoverArt from "../CoverArt";
 import EqualizerBars from "../EqualizerBars";
 import type { ArtworkFrame } from "../../lib/api";
@@ -21,7 +22,7 @@ interface ConcertSongTileProps {
 // glance. Tapping always plays immediately — a standalone song has no
 // tracklist/detail page to open (see ConcertDetail.tsx, which only ever
 // switches between Concert Albums).
-export default function ConcertSongTile({
+function ConcertSongTile({
   title,
   subtitle,
   gradient,
@@ -41,7 +42,7 @@ export default function ConcertSongTile({
           entityType="track"
           entityId={entityId}
           artworkFrame={artworkFrame}
-          className={`w-full transition-transform duration-300 group-active:scale-95 group-hover:-translate-y-1 ${
+          className={`w-full transition-transform duration-100 group-active:scale-95 group-hover:-translate-y-1 ${
             playing ? "ring-2 ring-brand/60 shadow-[0_0_18px_rgba(124,92,255,0.5)]" : ""
           }`}
         />
@@ -73,3 +74,5 @@ export default function ConcertSongTile({
     </div>
   );
 }
+
+export default memo(ConcertSongTile);

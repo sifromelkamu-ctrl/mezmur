@@ -1,13 +1,14 @@
 import { Heart, Pause, Play, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFavorites } from "../context/FavoritesContext";
-import { usePlayer } from "../context/PlayerContext";
+import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
 import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
 import NowPlaying from "./NowPlaying";
 
 export default function PlayerBar() {
-  const { currentTrack, isPlaying, progress, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, togglePlay } = usePlayer();
+  const progress = usePlayerProgress();
   const [showNowPlaying, setShowNowPlaying] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -30,7 +31,7 @@ export default function PlayerBar() {
 
   return (
     <footer
-      className={`w-full rounded-[26px] bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.55)] transition-all duration-300 ease-out overflow-hidden ${
+      className={`w-full rounded-[26px] bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.55)] transition-all duration-200 ease-out overflow-hidden ${
         dismissed ? "translate-y-[140%] opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
       }`}
       aria-hidden={dismissed}

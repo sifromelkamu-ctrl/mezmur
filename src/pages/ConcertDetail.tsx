@@ -161,7 +161,7 @@ export default function ConcertDetail() {
       </div>
 
       {concerts.length > 1 && (
-        <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth px-6 pb-2 mb-4">
+        <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth px-6 pb-2 mb-4">
           {concerts.map((c) => {
             const active = c.id === id;
             return (

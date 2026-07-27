@@ -1,5 +1,6 @@
 import { Music2, Play } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
+import { prefetchRoute } from "../lib/prefetchRoute";
 import { useNavigate } from "react-router-dom";
 import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
@@ -51,7 +52,7 @@ interface CardProps {
   titleClassName?: string;
 }
 
-export default function Card({
+function Card({
   title,
   subtitle,
   gradient,
@@ -85,6 +86,8 @@ export default function Card({
     return (
       <div
         onClick={() => navigate(to)}
+        onPointerDown={() => prefetchRoute(to)}
+        onMouseEnter={() => prefetchRoute(to)}
         className={`card-hover group cursor-pointer relative rounded-2xl overflow-hidden aspect-[3/4] ${
           fullWidth ? "w-full" : "w-36"
         }`}
@@ -161,6 +164,8 @@ export default function Card({
   return (
     <div
       onClick={() => (onCardClick ? onCardClick() : navigate(to))}
+      onPointerDown={() => prefetchRoute(to)}
+      onMouseEnter={() => prefetchRoute(to)}
       className={`card-hover group bg-elevated hover:bg-elevated-hover transition-colors rounded-xl cursor-pointer relative border border-transparent hover:border-brand/20 ${
         large ? "p-3" : dense ? "p-2" : "p-4"
       }`}
@@ -181,7 +186,7 @@ export default function Card({
           artworkFrame={artworkFrame}
           onFrameSaved={onFrameSaved}
           readOnlyArtwork={readOnlyArtwork}
-          className={`transition-transform duration-300 group-hover:scale-105 active:scale-95 ${
+          className={`transition-transform duration-100 group-hover:scale-105 active:scale-95 ${
             playing ? "ring-2 ring-brand/60 shadow-[0_0_14px_rgba(242,183,5,0.55)]" : ""
           }`}
         />
@@ -212,3 +217,5 @@ export default function Card({
     </div>
   );
 }
+
+export default memo(Card);

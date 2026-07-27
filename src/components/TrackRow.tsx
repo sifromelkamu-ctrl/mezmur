@@ -1,5 +1,5 @@
 import { Download, Heart, ListPlus, MoreVertical, Pause, Play, PlusCircle, X } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { usePlayer } from "../context/PlayerContext";
 import { useFavorites } from "../context/FavoritesContext";
 import type { ApiTrack } from "../lib/api";
@@ -30,7 +30,11 @@ interface TrackRowProps {
   showActions?: boolean;
 }
 
-export default function TrackRow({
+// Memoized — every list of tracks (Songs, playlists, albums, search
+// results...) renders one of these per row, so without this, any re-render
+// of the parent list (e.g. sort order or query changing) re-mounts every
+// visible row's DOM instead of only the rows whose own props changed.
+function TrackRow({
   track,
   index,
   queue,
@@ -198,3 +202,5 @@ export default function TrackRow({
     </div>
   );
 }
+
+export default memo(TrackRow);

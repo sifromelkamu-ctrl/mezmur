@@ -29,7 +29,7 @@ export default function QueuePanel({ currentTrack, queue, onSelect, onClose }: Q
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-6">
+      <div className="flex-1 overflow-y-auto overscroll-y-contain no-scrollbar px-4 pb-6">
         <p className="text-xs font-bold text-white/50 uppercase tracking-wide mb-2 px-2">Now Playing</p>
         <div className="flex items-center gap-3 px-2 py-2 mb-4 rounded-md bg-white/5">
           <CoverArt

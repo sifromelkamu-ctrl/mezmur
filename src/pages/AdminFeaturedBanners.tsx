@@ -25,14 +25,14 @@ import { adminFeaturedBannersApi, albumsApi, type ApiAlbum, type ApiFeaturedBann
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto overscroll-y-contain p-4"
       style={{
         paddingTop: "max(1rem, env(safe-area-inset-top))",
         paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
       }}
     >
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto max-h-[85vh] overflow-y-auto shadow-2xl">
+      <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto max-h-[85vh] overflow-y-auto overscroll-y-contain shadow-2xl">
         {children}
       </div>
     </div>,
@@ -108,7 +108,7 @@ function AddBannerModal({ onClose, onAdded }: { onClose: () => void; onAdded: (b
       ) : filtered.length === 0 ? (
         <p className="text-sm text-fg-muted text-center py-10">No albums found.</p>
       ) : (
-        <div className="flex flex-col gap-1 max-h-80 overflow-y-auto -mx-1 px-1">
+        <div className="flex flex-col gap-1 max-h-80 overflow-y-auto overscroll-y-contain -mx-1 px-1">
           {filtered.map((album) => (
             <button
               key={album.id}

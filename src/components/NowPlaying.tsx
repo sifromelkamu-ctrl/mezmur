@@ -21,7 +21,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
-import { usePlayer } from "../context/PlayerContext";
+import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
 import { useSleepTimer } from "../context/SleepTimerContext";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { adminApi, type ArtworkFrame } from "../lib/api";
@@ -133,7 +133,6 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
     currentTrack,
     queue,
     isPlaying,
-    progress,
     shuffle,
     repeat,
     togglePlay,
@@ -144,6 +143,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
     toggleRepeat,
     playTrack,
   } = usePlayer();
+  const progress = usePlayerProgress();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -309,7 +309,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
   return createPortal(
     <>
     <div
-      className="fixed inset-0 z-50 flex flex-col overflow-y-auto backdrop-blur-2xl"
+      className="fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-y-contain backdrop-blur-2xl"
       onTouchStart={handleSheetTouchStart}
       onTouchEnd={handleSheetTouchEnd}
     >

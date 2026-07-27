@@ -1,10 +1,16 @@
 import { ArrowLeft, Check, MoreVertical, Music2, Search as SearchIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TextField from "../components/form/TextField";
-import TrackRow from "../components/TrackRow";
+import VirtualTrackList from "../components/VirtualTrackList";
 import { useLanguage } from "../context/LanguageContext";
 import { tracksApi, type ApiTrack } from "../lib/api";
+
+// Matches `<main>`'s own bottom scroll padding (App.tsx's `pb-48`, 192px) —
+// the fixed PlayerBar/MobileNav overlay reserves that much space regardless
+// of whether a track is currently playing, so the measured list height
+// stays stable rather than jumping when playback starts/stops.
+const BOTTOM_RESERVE_PX = 192;
 
 type SortMode = "title" | "artist" | "duration" | "plays";
 
@@ -69,58 +75,81 @@ export default function AllSongs() {
     }
   }, [filteredTracks, sort]);
 
-  return (
-    <div className="px-6 py-6 pb-24">
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => navigate("/")}
-          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors -ml-1.5"
-          aria-label="Back to Home"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg font-bold">{t("songs")}</h1>
-        <div className="relative">
-          <button
-            onClick={() => setShowSort((v) => !v)}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors"
-            aria-label="Sort options"
-          >
-            <MoreVertical size={20} />
-          </button>
-          {showSort && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowSort(false)} />
-              <div className="absolute right-0 top-full mt-2 w-52 bg-elevated rounded-lg shadow-2xl py-1 z-20">
-                {sortOptions.map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => {
-                      setSort(opt.id);
-                      setShowSort(false);
-                    }}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-elevated-hover transition-colors text-left"
-                  >
-                    {opt.label}
-                    {sort === opt.id && <Check size={14} className="text-brand" />}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+  const headerRef = useRef<HTMLDivElement>(null);
+  // The virtualized list below needs an explicit pixel height (it manages
+  // its own internal scroll rather than growing with the page), so this
+  // measures how much viewport is actually left beneath the header/search
+  // block. Recomputed on resize; BOTTOM_RESERVE_PX keeps it clear of the
+  // fixed PlayerBar/MobileNav regardless of whether a track is playing.
+  const [listHeight, setListHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight - BOTTOM_RESERVE_PX - 160 : 400
+  );
 
-      <div className="relative mb-4">
-        <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-        <TextField
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search songs, artists, albums..."
-          pill
-          className="pl-9 pr-4 py-2 text-sm w-full"
-        />
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!headerRef.current) return;
+      const top = headerRef.current.getBoundingClientRect().bottom;
+      setListHeight(Math.max(200, window.innerHeight - top - BOTTOM_RESERVE_PX));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  return (
+    <div className="px-6 py-6">
+      <div ref={headerRef}>
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => navigate("/")}
+            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors -ml-1.5"
+            aria-label="Back to Home"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-lg font-bold">{t("songs")}</h1>
+          <div className="relative">
+            <button
+              onClick={() => setShowSort((v) => !v)}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors"
+              aria-label="Sort options"
+            >
+              <MoreVertical size={20} />
+            </button>
+            {showSort && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowSort(false)} />
+                <div className="absolute right-0 top-full mt-2 w-52 bg-elevated rounded-lg shadow-2xl py-1 z-20">
+                  {sortOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSort(opt.id);
+                        setShowSort(false);
+                      }}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-elevated-hover transition-colors text-left"
+                    >
+                      {opt.label}
+                      {sort === opt.id && <Check size={14} className="text-brand" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="relative mb-4">
+          <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+          <TextField
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search songs, artists, albums..."
+            pill
+            className="pl-9 pr-4 py-2 text-sm w-full"
+          />
+        </div>
       </div>
 
       {error ? (
@@ -146,18 +175,13 @@ export default function AllSongs() {
           {query ? `No songs found for "${query}"` : "No songs yet."}
         </div>
       ) : (
-        <div className="flex flex-col gap-1">
-          {sortedTracks.map((track, i) => (
-            <TrackRow
-              key={track.id}
-              track={track}
-              index={i + 1}
-              queue={sortedTracks}
-              showAlbumTitle
-              showActions
-            />
-          ))}
-        </div>
+        <VirtualTrackList
+          tracks={sortedTracks}
+          queue={sortedTracks}
+          height={listHeight}
+          showAlbumTitle
+          showActions
+        />
       )}
     </div>
   );

@@ -1,8 +1,10 @@
 import { Play } from "lucide-react";
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import CoverArt from "../CoverArt";
 import EqualizerBars from "../EqualizerBars";
 import type { ArtworkEntityType, ArtworkFrame } from "../../lib/api";
+import { prefetchRoute } from "../../lib/prefetchRoute";
 
 interface ArtTileProps {
   title: string;
@@ -29,7 +31,7 @@ interface ArtTileProps {
 // A bare, borderless artwork tile — cover art plus title/artist beneath it,
 // no elevated box background. Used across Home's "no boxed cards" sections
 // (Continue Listening, New Releases, Albums) per the premium redesign.
-export default function ArtTile({
+function ArtTile({
   title,
   subtitle,
   gradient,
@@ -49,6 +51,8 @@ export default function ArtTile({
   return (
     <div
       onClick={() => (onCardClick ? onCardClick() : to && navigate(to))}
+      onPointerDown={() => prefetchRoute(to)}
+      onMouseEnter={() => prefetchRoute(to)}
       className="group cursor-pointer w-full shrink-0"
     >
       <div className="relative">
@@ -60,7 +64,7 @@ export default function ArtTile({
           entityId={entityId}
           artworkFrame={artworkFrame}
           readOnlyArtwork={readOnlyArtwork}
-          className={`w-full transition-transform duration-300 group-active:scale-95 group-hover:-translate-y-1 ${
+          className={`w-full transition-transform duration-100 group-active:scale-95 group-hover:-translate-y-1 ${
             playing ? "ring-2 ring-brand/60 shadow-[0_0_18px_rgba(124,92,255,0.5)]" : ""
           }`}
         />
@@ -89,3 +93,5 @@ export default function ArtTile({
     </div>
   );
 }
+
+export default memo(ArtTile);

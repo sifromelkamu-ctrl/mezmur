@@ -60,7 +60,7 @@ export default function CountryPicker({ value, onChange }: CountryPickerProps) {
                 </div>
               </div>
 
-              <div className="overflow-y-auto flex-1 pb-[calc(env(safe-area-inset-bottom)+8px)]">
+              <div className="overflow-y-auto overscroll-y-contain flex-1 pb-[calc(env(safe-area-inset-bottom)+8px)]">
                 {filtered.map((c) => (
                   <button
                     key={c.code}

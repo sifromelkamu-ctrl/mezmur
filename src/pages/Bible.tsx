@@ -1480,7 +1480,7 @@ export default function Bible() {
             }}
           >
             <div
-              className="absolute inset-0 flex h-full transition-transform duration-400 ease-out"
+              className="absolute inset-0 flex h-full transition-transform duration-200 ease-out"
               style={{ transform: `translateX(-${heroImageIndex * 100}%)` }}
             >
               {HERO_IMAGES.map((src) => (
@@ -1601,7 +1601,7 @@ export default function Bible() {
               <ChevronRight size={12} />
             </button>
           </div>
-          <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain no-scrollbar">
             {recentHistory.slice(0, 6).map((entry, i) => {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;

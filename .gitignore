@@ -30,3 +30,17 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+
+# Capacitor native projects (ios/ and android/ themselves are committed —
+# only their generated build output and installed pod/gradle artifacts
+# aren't, same as node_modules for the web side).
+ios/App/Pods
+ios/App/output
+ios/App/build
+ios/DerivedData
+android/.gradle
+android/local.properties
+android/app/build
+android/build
+android/capacitor-cordova-android-plugins
+

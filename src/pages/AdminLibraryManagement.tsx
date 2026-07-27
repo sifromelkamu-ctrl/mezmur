@@ -63,14 +63,14 @@ import {
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto overscroll-y-contain p-4"
       style={{
         paddingTop: "max(1rem, env(safe-area-inset-top))",
         paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
       }}
     >
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto max-h-[85vh] overflow-y-auto shadow-2xl">
+      <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto max-h-[85vh] overflow-y-auto overscroll-y-contain shadow-2xl">
         {children}
       </div>
     </div>,
@@ -583,7 +583,7 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
               className="pl-9 pr-3 py-2 text-base w-full"
             />
           </div>
-          <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+          <div className="flex flex-col gap-1 max-h-72 overflow-y-auto overscroll-y-contain">
             {filteredArtists.map((a) => (
               <button
                 key={a.id}
@@ -622,7 +622,7 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
             <Plus size={16} />
             Create new album...
           </button>
-          <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
+          <div className="flex flex-col gap-1 max-h-56 overflow-y-auto overscroll-y-contain">
             {artistAlbums.map((al) => (
               <button
                 key={al.id}
@@ -768,7 +768,7 @@ function MergeAlbumsModal({ sourceAlbum, albums, onClose, onMerged }: MergeAlbum
           className="pl-9 pr-3 py-2 text-base w-full"
         />
       </div>
-      <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+      <div className="flex flex-col gap-1 max-h-64 overflow-y-auto overscroll-y-contain">
         {filtered.map((al) => (
           <button
             key={al.id}

@@ -653,7 +653,7 @@ export default function YoutubeCatalogImport() {
                   variant="panel"
                   className="px-3 py-2 text-base"
                 />
-                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
+                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto overscroll-y-contain">
                   {filteredArtists.map((a) => (
                     <button
                       key={a.id}

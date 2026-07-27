@@ -2,6 +2,7 @@ import { BookOpen, Home, Library, Search } from "lucide-react";
 import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
+import { prefetchRoute } from "../lib/prefetchRoute";
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
   `relative flex items-center justify-center flex-1 py-1.5 transition-colors ${
@@ -24,7 +25,7 @@ function NavIcon({
   return (
     <span className="flex flex-col items-center justify-center gap-0.5">
       <span
-        className={`tile-glow flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
+        className={`tile-glow flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 ${
           isActive ? "ring-1 ring-white/25" : ""
         }`}
         style={
@@ -61,13 +62,13 @@ export default function MobileNav() {
       <NavLink to="/" end className={itemClass}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Home} label={t("home")} />}
       </NavLink>
-      <NavLink to="/search" className={itemClass}>
+      <NavLink to="/search" className={itemClass} onPointerDown={() => prefetchRoute("/search")} onMouseEnter={() => prefetchRoute("/search")}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Search} label={t("search")} />}
       </NavLink>
-      <NavLink to="/library" className={itemClass}>
+      <NavLink to="/library" className={itemClass} onPointerDown={() => prefetchRoute("/library")} onMouseEnter={() => prefetchRoute("/library")}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Library} label={t("yourLibrary")} />}
       </NavLink>
-      <NavLink to="/bible" className={itemClass}>
+      <NavLink to="/bible" className={itemClass} onPointerDown={() => prefetchRoute("/bible")} onMouseEnter={() => prefetchRoute("/bible")}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={BookOpen} label="Bible" />}
       </NavLink>
     </nav>

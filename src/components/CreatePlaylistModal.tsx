@@ -35,11 +35,11 @@ export default function CreatePlaylistModal({ onClose }: CreatePlaylistModalProp
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 overflow-y-auto overscroll-y-contain"
       onClick={onClose}
     >
       <div
-        className="bg-panel rounded-xl w-full max-w-sm p-6 relative shadow-2xl my-8 max-h-[calc(100vh-4rem)] overflow-y-auto"
+        className="bg-panel rounded-xl w-full max-w-sm p-6 relative shadow-2xl my-8 max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-y-contain"
         onClick={(e) => e.stopPropagation()}
       >
         <button

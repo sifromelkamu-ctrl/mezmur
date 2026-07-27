@@ -150,7 +150,7 @@ export default function AddToPlaylistModal({ track, onClose }: AddToPlaylistModa
           )}
         </form>
 
-        <div className="overflow-y-auto no-scrollbar -mx-2 px-2">
+        <div className="overflow-y-auto overscroll-y-contain no-scrollbar -mx-2 px-2">
           {loading ? (
             <p className="text-sm text-fg-muted py-4">Loading your playlists...</p>
           ) : (

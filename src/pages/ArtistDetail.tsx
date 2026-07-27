@@ -92,7 +92,7 @@ function AlbumCard({
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-150 rounded-[20px] p-2.5 bg-elevated border border-border"
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-100 rounded-[20px] p-2.5 bg-elevated border border-border"
       style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none" }}
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">

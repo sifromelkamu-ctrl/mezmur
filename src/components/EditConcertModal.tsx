@@ -190,7 +190,7 @@ export default function EditConcertModal({ concert, onClose, onSaved, onDeleted,
           </button>
         </div>
 
-        <div className="overflow-y-auto no-scrollbar flex-1 flex flex-col gap-4">
+        <div className="overflow-y-auto overscroll-y-contain no-scrollbar flex-1 flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <div className="relative group w-20 h-20 shrink-0">
               <CoverArt

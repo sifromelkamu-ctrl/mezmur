@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import EqualizerBars from "../EqualizerBars";
 import { getPosition } from "../../lib/recentlyPlayed";
@@ -23,7 +24,7 @@ interface ContinueListeningCardProps {
 // recentlyPlayed.ts's recordPosition, written throttled during playback
 // and on pause). A track never played past its first save just shows an
 // empty bar rather than fabricating a number.
-export default function ContinueListeningCard({
+function ContinueListeningCard({
   track,
   playing,
   onPlay,
@@ -39,7 +40,7 @@ export default function ContinueListeningCard({
   return (
     <div
       onClick={() => (onCardClick ? onCardClick() : to && navigate(to))}
-      className="group relative w-40 shrink-0 cursor-pointer active:scale-[0.97] transition-transform duration-200"
+      className="group relative w-40 shrink-0 cursor-pointer active:scale-[0.97] transition-transform duration-100"
     >
       <div className="relative aspect-[4/5] rounded-2xl overflow-hidden">
         <div
@@ -87,3 +88,5 @@ export default function ContinueListeningCard({
     </div>
   );
 }
+
+export default memo(ContinueListeningCard);

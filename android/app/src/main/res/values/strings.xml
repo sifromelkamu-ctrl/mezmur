@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mezmur</string>
+    <string name="title_activity_main">Mezmur</string>
+    <string name="package_name">com.mezmur.app</string>
+    <string name="custom_url_scheme">com.mezmur.app</string>
+</resources>

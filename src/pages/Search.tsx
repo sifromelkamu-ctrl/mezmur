@@ -263,7 +263,7 @@ export default function Search() {
           <p className="text-fg-muted">{t("searching")}</p>
         ) : hasResults ? (
           <div>
-            <div className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
+            <div className="flex items-center gap-2 mb-6 overflow-x-auto overscroll-x-contain no-scrollbar pb-1">
               {filters
                 .filter((f) => f.id === "all" || f.count > 0)
                 .map((f) => (
@@ -291,7 +291,7 @@ export default function Search() {
               {results.artists.length > 0 && (resultFilter === "all" || resultFilter === "artists") && (
                 <section>
                   <h2 className="text-xl font-bold mb-4">{t("artists")}</h2>
-                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6">
+                  <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar pb-1 -mx-6 px-6">
                     {results.artists.map((artist) => (
                       <Card
                         key={artist.id}
@@ -311,7 +311,7 @@ export default function Search() {
               {results.albums.length > 0 && (resultFilter === "all" || resultFilter === "albums") && (
                 <section>
                   <h2 className="text-xl font-bold mb-4">{t("albums")}</h2>
-                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6">
+                  <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar pb-1 -mx-6 px-6">
                     {results.albums.map((album) => (
                       <Card
                         key={album.id}
@@ -334,7 +334,7 @@ export default function Search() {
               {results.playlists.length > 0 && (resultFilter === "all" || resultFilter === "playlists") && (
                 <section>
                   <h2 className="text-xl font-bold mb-4">{t("playlists")}</h2>
-                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6">
+                  <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar pb-1 -mx-6 px-6">
                     {results.playlists.map((pl) => (
                       <Card
                         key={pl.id}

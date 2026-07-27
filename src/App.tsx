@@ -12,36 +12,39 @@ import { LyricsProvider } from "./context/LyricsContext";
 import { PlayerProvider } from "./context/PlayerContext";
 import { SleepTimerProvider } from "./context/SleepTimerContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { routeLoaders } from "./lib/routeLoaders";
 // Home is the initial route on every fresh load, so it stays a static
 // import — lazy-loading it would only add an extra async hop with no
 // benefit. Every other route is code-split into its own chunk so the first
 // paint only ships the JS the landing page actually needs.
 import Home from "./pages/Home";
 
-const AlbumDetail = lazy(() => import("./pages/AlbumDetail"));
-const AdminFeaturedBanners = lazy(() => import("./pages/AdminFeaturedBanners"));
-const AdminLibraryManagement = lazy(() => import("./pages/AdminLibraryManagement"));
-const AdminUpload = lazy(() => import("./pages/AdminUpload"));
-const AllConcerts = lazy(() => import("./pages/AllConcerts"));
-const AllPodcasts = lazy(() => import("./pages/AllPodcasts"));
-const AllSermons = lazy(() => import("./pages/AllSermons"));
-const AllSingles = lazy(() => import("./pages/AllSingles"));
-const AllSongs = lazy(() => import("./pages/AllSongs"));
-const ArtistDetail = lazy(() => import("./pages/ArtistDetail"));
-const ConcertDetail = lazy(() => import("./pages/ConcertDetail"));
-const Artists = lazy(() => import("./pages/Artists"));
-const Auth = lazy(() => import("./pages/Auth"));
-const Bible = lazy(() => import("./pages/Bible"));
-const CustomArtistDetail = lazy(() => import("./pages/CustomArtistDetail"));
-const Library = lazy(() => import("./pages/Library"));
-const PlaylistDetail = lazy(() => import("./pages/PlaylistDetail"));
-const PodcastDetail = lazy(() => import("./pages/PodcastDetail"));
-const Recommended = lazy(() => import("./pages/Recommended"));
-const Search = lazy(() => import("./pages/Search"));
-const SermonDetail = lazy(() => import("./pages/SermonDetail"));
-const Settings = lazy(() => import("./pages/Settings"));
-const YoutubeCatalogImport = lazy(() => import("./pages/YoutubeCatalogImport"));
-const YoutubeImport = lazy(() => import("./pages/YoutubeImport"));
+// Each loader is shared with prefetchRoute.ts (see routeLoaders.ts) so a
+// touch/hover against a nav target requests the exact same dynamic import.
+const AlbumDetail = lazy(routeLoaders.albumDetail);
+const AdminFeaturedBanners = lazy(routeLoaders.adminFeaturedBanners);
+const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
+const AdminUpload = lazy(routeLoaders.adminUpload);
+const AllConcerts = lazy(routeLoaders.allConcerts);
+const AllPodcasts = lazy(routeLoaders.allPodcasts);
+const AllSermons = lazy(routeLoaders.allSermons);
+const AllSingles = lazy(routeLoaders.allSingles);
+const AllSongs = lazy(routeLoaders.allSongs);
+const ArtistDetail = lazy(routeLoaders.artistDetail);
+const ConcertDetail = lazy(routeLoaders.concertDetail);
+const Artists = lazy(routeLoaders.artists);
+const Auth = lazy(routeLoaders.auth);
+const Bible = lazy(routeLoaders.bible);
+const CustomArtistDetail = lazy(routeLoaders.customArtistDetail);
+const Library = lazy(routeLoaders.library);
+const PlaylistDetail = lazy(routeLoaders.playlistDetail);
+const PodcastDetail = lazy(routeLoaders.podcastDetail);
+const Recommended = lazy(routeLoaders.recommended);
+const Search = lazy(routeLoaders.search);
+const SermonDetail = lazy(routeLoaders.sermonDetail);
+const Settings = lazy(routeLoaders.settings);
+const YoutubeCatalogImport = lazy(routeLoaders.youtubeCatalogImport);
+const YoutubeImport = lazy(routeLoaders.youtubeImport);
 
 // /auth is a full-screen, immersive flow (like Spotify/Apple Music's own
 // sign-in) — it deliberately renders without the persistent Topbar/
@@ -91,7 +94,7 @@ function AppShell() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-base overflow-hidden">
+    <div className="h-dvh w-screen flex flex-col bg-base overflow-hidden">
       <main className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48">
         <div className="aurora-bg" />
         <div className="relative z-10">

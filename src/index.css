@@ -357,6 +357,15 @@ html, body, #root {
   margin: 0;
 }
 
+/* Removes the double-tap-to-zoom gesture (redundant anyway — the viewport
+   meta tag already disables pinch/zoom) and any residual tap-recognition
+   delay some mobile browsers still apply without this. Elements that need
+   their own pinch/pan handling (e.g. ArtworkEditor's crop surface) already
+   set their own more specific touch-action and are unaffected. */
+html {
+  touch-action: manipulation;
+}
+
 body {
   background-color: var(--color-base);
   color: var(--color-fg);

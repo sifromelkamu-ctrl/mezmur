@@ -34,7 +34,7 @@ export default function BibleListModal({
   return createPortal(
     <>
       <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
-      <div className="bible-scope fixed inset-x-0 bottom-0 z-50 bg-elevated rounded-t-3xl max-h-[75vh] overflow-y-auto p-5 pb-8 shadow-2xl">
+      <div className="bible-scope fixed inset-x-0 bottom-0 z-50 bg-elevated rounded-t-3xl max-h-[75vh] overflow-y-auto overscroll-y-contain p-5 pb-8 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-agbalumo text-xl font-bold text-gold">{title}</h2>
           <button

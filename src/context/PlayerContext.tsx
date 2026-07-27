@@ -17,7 +17,6 @@ interface PlayerContextValue {
   currentTrack: ApiTrack | null;
   queue: ApiTrack[];
   isPlaying: boolean;
-  progress: number; // seconds
   volume: number; // 0-1
   shuffle: boolean;
   repeat: boolean;
@@ -33,6 +32,15 @@ interface PlayerContextValue {
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
+// Split out from PlayerContextValue on purpose: `progress` changes every
+// ~1s (or several times/sec for real audio via `timeupdate`), while every
+// other field changes rarely. Every screen/list reads currentTrack/queue/
+// isPlaying/controls but never progress — only the mini player and the
+// full-screen Now Playing sheet need live progress — so keeping it in the
+// same context as everything else re-rendered every TrackRow on screen on
+// every tick. This context exists purely so those two consumers can
+// subscribe to progress without dragging the rest of the app along.
+const PlayerProgressContext = createContext<number | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<ApiTrack | null>(null);
@@ -334,7 +342,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrack,
       queue,
       isPlaying,
-      progress,
       volume,
       shuffle,
       repeat,
@@ -352,7 +359,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrack,
       queue,
       isPlaying,
-      progress,
       volume,
       shuffle,
       repeat,
@@ -367,11 +373,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      <PlayerProgressContext.Provider value={progress}>{children}</PlayerProgressContext.Provider>
+    </PlayerContext.Provider>
+  );
 }
 
 export function usePlayer() {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error("usePlayer must be used within PlayerProvider");
   return ctx;
+}
+
+// Only the mini player and Now Playing sheet should call this — every other
+// consumer should use usePlayer() so it isn't re-rendered on every progress
+// tick (see PlayerProgressContext's own comment above).
+export function usePlayerProgress() {
+  const progress = useContext(PlayerProgressContext);
+  if (progress === null) throw new Error("usePlayerProgress must be used within PlayerProvider");
+  return progress;
 }

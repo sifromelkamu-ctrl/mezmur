@@ -23,7 +23,7 @@ export default function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[#161618] rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 max-h-[75vh] overflow-y-auto no-scrollbar">
+      <div className="relative bg-[#161618] rounded-t-3xl pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 max-h-[75vh] overflow-y-auto overscroll-y-contain no-scrollbar">
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4" />
         <div className="flex items-center justify-between px-5 mb-2">
           <div className="flex items-center gap-2">

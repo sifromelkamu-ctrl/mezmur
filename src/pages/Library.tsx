@@ -12,12 +12,12 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/Card";
 import CreatePlaylistModal from "../components/CreatePlaylistModal";
-import TrackRow from "../components/TrackRow";
 import TextField from "../components/form/TextField";
+import VirtualTrackList from "../components/VirtualTrackList";
 import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -218,8 +218,29 @@ export default function Library() {
     if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
   };
 
+  const headerRef = useRef<HTMLDivElement>(null);
+  // Same reasoning as AllSongs.tsx's identical measurement — the favorites
+  // tab's virtualized list needs an explicit height. Re-measured on `filter`
+  // changes too, since the "Create playlist" button row only appears for
+  // the playlists tab and shifts the header's height.
+  const [favoritesListHeight, setFavoritesListHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight - 352 : 400
+  );
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!headerRef.current) return;
+      const top = headerRef.current.getBoundingClientRect().bottom;
+      setFavoritesListHeight(Math.max(200, window.innerHeight - top - 192));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [filter]);
+
   return (
     <div className="px-6 py-6">
+      <div ref={headerRef}>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-6">
         <button
           onClick={() => navigate("/")}
@@ -279,7 +300,7 @@ export default function Library() {
         <Sparkles size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-brand pointer-events-none" />
       </div>
 
-      <div className="flex items-center gap-1 mb-6 flex-nowrap overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1 mb-6 flex-nowrap overflow-x-auto overscroll-x-contain no-scrollbar">
         {(["artists", "albums", "playlists", "favorites"] as Filter[]).map((f) => {
           const Icon = filterIcons[f];
           const active = filter === f;
@@ -298,6 +319,7 @@ export default function Library() {
             </button>
           );
         })}
+      </div>
       </div>
 
       {loading ? (
@@ -425,12 +447,8 @@ export default function Library() {
 
           {showFavorites &&
             (favorites.length > 0 ? (
-              <section className="mb-8">
-                <div className="max-w-2xl">
-                  {favorites.map((track, i) => (
-                    <TrackRow key={track.id} track={track} index={i + 1} queue={favorites} />
-                  ))}
-                </div>
+              <section className="mb-8 max-w-2xl">
+                <VirtualTrackList tracks={favorites} queue={favorites} height={favoritesListHeight} />
               </section>
             ) : (
               <div className="flex items-center gap-3 text-fg-muted text-sm bg-elevated/50 rounded-lg p-4 max-w-md">
