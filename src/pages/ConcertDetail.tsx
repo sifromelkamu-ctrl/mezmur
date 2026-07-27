@@ -9,6 +9,7 @@ import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { albumsApi, concertsApi, type ApiAlbum, type ApiAlbumDetail } from "../lib/api";
 import { isConcertAlbumItem } from "../lib/concerts";
+import { cachedDetailFetch } from "../lib/detailCache";
 import { renderWithAmharicStyle } from "../utils/scriptText";
 
 function formatDuration(totalSeconds: number): string {
@@ -63,8 +64,7 @@ export default function ConcertDetail() {
     if (!id) return;
     setLoading(true);
     setConcert(null);
-    albumsApi
-      .get(id)
+    cachedDetailFetch(`album:${id}`, () => albumsApi.get(id))
       .then(setConcert)
       .catch(() => setConcert(null))
       .finally(() => setLoading(false));

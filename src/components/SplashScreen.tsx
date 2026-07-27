@@ -7,7 +7,16 @@ const LETTERS_START_MS = 350;
 const SHIMMER_START_MS = LETTERS_START_MS + WORDMARK.length * LETTER_STAGGER_MS + 250;
 const TAGLINE_WORDS = ["Worship.", "Listen.", "Inspire."];
 const TAGLINE_STAGGER_MS = 300;
-const HOLD_MS = 2600;
+// Just past when the last tagline word finishes popping in (SHIMMER_START_MS
+// + 2 * TAGLINE_STAGGER_MS + ~0.5s pop duration ≈ 2030ms) — long enough to
+// see the full choreography, not an extra artificial hold on top of it.
+// Data fetching already starts immediately underneath this overlay (see
+// App.tsx — the whole provider tree mounts regardless of showSplash), so
+// shortening this doesn't defer any real loading, only the branded intro.
+const HOLD_MS = 2100;
+// Must match .splash-exiting's animation-duration in index.css (0.55s) —
+// this is only the JS-side timer that unmounts the component once that CSS
+// fade-out finishes, not an independent duration.
 const EXIT_MS = 550;
 
 interface SplashScreenProps {

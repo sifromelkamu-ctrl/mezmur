@@ -58,7 +58,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
+    // allSettled, not all — every section below already guards on its own
+    // array being non-empty, so a single slow/failing endpoint (e.g. one
+    // heavy query timing out) should only mean that one section stays
+    // empty, not blank out every other section that came back fine. With
+    // Promise.all, one rejection skips every setter (none of the 9 run),
+    // which is exactly what turned "the tracks query is slow today" into
+    // "Home shows a full No music imported yet screen" during testing.
+    Promise.allSettled([
       artistsApi.list(),
       albumsApi.list(),
       tracksApi.list(),
@@ -70,15 +77,15 @@ export default function Home() {
       singlesApi.list(),
     ])
       .then(([ar, al, tr, se, po, fb, co, cat, si]) => {
-        setArtists(ar);
-        setAlbums(al);
-        setTracks(tr);
-        setSermons(se);
-        setPodcasts(po);
-        setFeaturedBanners(fb);
-        setConcerts(co);
-        setConcertAlbumTracks(cat);
-        setSingles(si);
+        if (ar.status === "fulfilled") setArtists(ar.value);
+        if (al.status === "fulfilled") setAlbums(al.value);
+        if (tr.status === "fulfilled") setTracks(tr.value);
+        if (se.status === "fulfilled") setSermons(se.value);
+        if (po.status === "fulfilled") setPodcasts(po.value);
+        if (fb.status === "fulfilled") setFeaturedBanners(fb.value);
+        if (co.status === "fulfilled") setConcerts(co.value);
+        if (cat.status === "fulfilled") setConcertAlbumTracks(cat.value);
+        if (si.status === "fulfilled") setSingles(si.value);
       })
       .finally(() => setLoading(false));
   }, []);

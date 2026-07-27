@@ -9,6 +9,7 @@ import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { adminApi, albumsApi, type ApiAlbumDetail, type ApiAlbumType } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
+import { cachedDetailFetch } from "../lib/detailCache";
 
 function formatDuration(totalSeconds: number): string {
   const totalMinutes = Math.round(totalSeconds / 60);
@@ -46,8 +47,7 @@ export default function AlbumDetail() {
     setLoading(true);
     setAlbum(null);
     setEditing(false);
-    albumsApi
-      .get(id)
+    cachedDetailFetch(`album:${id}`, () => albumsApi.get(id))
       .then((a) => {
         setAlbum(a);
         setOrderedTracks(a.tracks);

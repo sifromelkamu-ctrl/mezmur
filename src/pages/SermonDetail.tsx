@@ -5,6 +5,7 @@ import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import { usePlayer } from "../context/PlayerContext";
 import { sermonsApi, sermonToTrack, type ApiSermon } from "../lib/api";
+import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
 
 export default function SermonDetail() {
@@ -16,8 +17,7 @@ export default function SermonDetail() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    sermonsApi
-      .get(id)
+    cachedDetailFetch(`sermon:${id}`, () => sermonsApi.get(id))
       .then(setSermon)
       .catch(() => setSermon(null))
       .finally(() => setLoading(false));

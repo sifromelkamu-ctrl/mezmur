@@ -108,7 +108,7 @@ export default function Search() {
           }
         })
         .finally(() => setLoading(false));
-    }, 400);
+    }, 250);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);

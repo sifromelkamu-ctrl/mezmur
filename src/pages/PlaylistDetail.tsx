@@ -8,6 +8,7 @@ import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { playlistsApi, searchApi, type ApiPlaylist, type ApiTrack } from "../lib/api";
+import { cachedDetailFetch, invalidateDetailCache } from "../lib/detailCache";
 
 export default function PlaylistDetail() {
   const { id } = useParams();
@@ -22,8 +23,7 @@ export default function PlaylistDetail() {
   const load = () => {
     if (!id) return;
     setLoading(true);
-    playlistsApi
-      .get(id)
+    cachedDetailFetch(`playlist:${id}`, () => playlistsApi.get(id))
       .then(setPlaylist)
       .catch(() => setPlaylist(null))
       .finally(() => setLoading(false));
@@ -71,12 +71,14 @@ export default function PlaylistDetail() {
   const addTrack = async (trackId: string) => {
     if (!id) return;
     await playlistsApi.addTrack(id, trackId);
+    invalidateDetailCache(`playlist:${id}`);
     load();
   };
 
   const removeTrack = async (trackId: string) => {
     if (!id) return;
     await playlistsApi.removeTrack(id, trackId);
+    invalidateDetailCache(`playlist:${id}`);
     load();
   };
 

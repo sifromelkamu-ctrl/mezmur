@@ -5,6 +5,7 @@ import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import { usePlayer } from "../context/PlayerContext";
 import { podcastsApi, podcastToTrack, type ApiPodcast } from "../lib/api";
+import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
 
 export default function PodcastDetail() {
@@ -16,8 +17,7 @@ export default function PodcastDetail() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    podcastsApi
-      .get(id)
+    cachedDetailFetch(`podcast:${id}`, () => podcastsApi.get(id))
       .then(setPodcast)
       .catch(() => setPodcast(null))
       .finally(() => setLoading(false));

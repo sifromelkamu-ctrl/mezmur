@@ -22,6 +22,7 @@ import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
 import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail, type ApiTrack } from "../lib/api";
+import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
 
 // The hero stays this one fixed teal gradient regardless of the app's
@@ -215,8 +216,7 @@ export default function ArtistDetail() {
     setHeroPhotoLoaded(false);
     setHeroPhotoFailed(false);
     setShowAllSongs(false);
-    artistsApi
-      .get(id)
+    cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id))
       .then(setArtist)
       .catch(() => setArtist(null))
       .finally(() => setLoading(false));

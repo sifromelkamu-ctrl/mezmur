@@ -10,10 +10,24 @@
     <title>Mezmur — Ethiopian Gospel Music</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded non-render-blocking: media="print" means the browser fetches
+         it at normal priority without holding up first paint on it, then
+         the onload flips it to screen media once it's actually ready.
+         display=swap in the URL means text still renders immediately with
+         a fallback font either way — this just stops the fetch itself
+         (12 font families) from delaying the very first paint. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Abyssinica+SIL&family=Agbalumo&family=EB+Garamond:wght@400;500;600;700&family=Google+Sans&family=Inter:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Menbere:wght@400;700&family=Merriweather:wght@400;700;900&family=Noto+Sans+Ethiopic:wght@400;700&family=Noto+Serif+Ethiopic:wght@400;700&family=Playfair+Display:wght@700;900&family=PT+Serif:wght@400;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Abyssinica+SIL&family=Agbalumo&family=EB+Garamond:wght@400;500;600;700&family=Google+Sans&family=Inter:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Menbere:wght@400;700&family=Merriweather:wght@400;700;900&family=Noto+Sans+Ethiopic:wght@400;700&family=Noto+Serif+Ethiopic:wght@400;700&family=Playfair+Display:wght@700;900&family=PT+Serif:wght@400;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
