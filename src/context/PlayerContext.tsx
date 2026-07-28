@@ -10,6 +10,7 @@ import {
 } from "react";
 import { tracksApi, type ApiTrack } from "../lib/api";
 import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
+import { emitMediaStarted, onMediaStarted } from "../lib/mediaEvents";
 import { recordPlayed, recordPosition } from "../lib/recentlyPlayed";
 import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
 
@@ -96,6 +97,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setQueue(newQueue && newQueue.length ? newQueue : [track]);
     setProgress(0);
     setIsPlaying(true);
+    emitMediaStarted("music");
     tracksApi.recordPlay(track.id).catch(() => {});
     recordPlayed(track.id);
   }, []);
@@ -110,11 +112,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const togglePlay = useCallback(() => {
-    setIsPlaying((p) => {
-      if (!currentTrack) return p;
-      return !p;
-    });
-  }, [currentTrack]);
+    if (!currentTrack) return;
+    const next = !isPlaying;
+    if (next) emitMediaStarted("music");
+    setIsPlaying(next);
+  }, [currentTrack, isPlaying]);
 
   const jump = useCallback(
     (direction: 1 | -1) => {
@@ -131,6 +133,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(nextTrack);
       setProgress(0);
       setIsPlaying(true);
+      emitMediaStarted("music");
       tracksApi.recordPlay(nextTrack.id).catch(() => {});
     },
     [currentTrack, queue, shuffle]
@@ -151,6 +154,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
   const toggleRepeat = useCallback(() => setRepeat((r) => !r), []);
+
+  // Bible chapter audio started (or resumed) elsewhere — only one audio
+  // source plays at a time, so this one just pauses (not clears) itself,
+  // the same way starting playback in another app pauses this one.
+  useEffect(() => {
+    return onMediaStarted((source) => {
+      if (source === "bible") setIsPlaying(false);
+    });
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;

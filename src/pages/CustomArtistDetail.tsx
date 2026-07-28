@@ -46,9 +46,11 @@ export default function CustomArtistDetail() {
   return (
     <div>
       <div
-        className="relative flex flex-col items-center text-center gap-4 px-6 pt-16 pb-6"
+        className="relative flex flex-col items-center text-center gap-4 px-6 pb-6"
         style={{
           backgroundImage: `linear-gradient(180deg, ${artist.gradient[0]}88, ${artist.gradient[1]}33)`,
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 4rem)",
         }}
       >
         <BackButton />

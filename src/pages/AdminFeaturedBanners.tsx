@@ -325,7 +325,7 @@ function EditBannerModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-2.5 rounded-full bg-brand text-white text-sm font-bold disabled:opacity-60"
+          className="flex-1 py-2.5 rounded-full bg-brand text-black text-sm font-bold disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save"}
         </button>

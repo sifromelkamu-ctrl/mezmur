@@ -92,9 +92,11 @@ export default function PlaylistDetail() {
   return (
     <div>
       <div
-        className="relative flex flex-col items-center text-center gap-4 px-6 pt-10 pb-6"
+        className="relative flex flex-col items-center text-center gap-4 px-6 pb-6"
         style={{
           backgroundImage: `linear-gradient(180deg, ${playlist.gradient[0]}66, ${playlist.gradient[1]}22)`,
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
         <BackButton />

@@ -6,6 +6,7 @@ import Card from "../components/Card";
 import ConcertSongTile from "../components/home/ConcertSongTile";
 import ContinueListeningCard from "../components/home/ContinueListeningCard";
 import HeroCarousel, { type HeroSlide } from "../components/home/HeroCarousel";
+import NotificationsPanel from "../components/home/NotificationsPanel";
 import QuickActionGrid, { type QuickAction } from "../components/home/QuickActionGrid";
 import SectionRow from "../components/SectionRow";
 import { devotionalLineOfTheDay } from "../data/devotionalLines";
@@ -40,22 +41,48 @@ function greetingKey(): "goodMorning" | "goodAfternoon" | "goodEvening" {
   return "goodEvening";
 }
 
+// Home fully unmounts every time you navigate to another tab (React Router
+// only keeps the active route's component alive), so without this, tapping
+// back to Home re-ran all 9 list fetches from an empty state every single
+// time — a full "Loading..." flash even seconds after you'd just seen this
+// exact data. Module-scope (outside the component, so it survives unmount)
+// cache of the last-fetched results: a remount seeds its state from here
+// synchronously (no loading flash at all) and re-fetches in the background
+// to pick up anything new, swapping in silently once it resolves instead of
+// blanking the screen first.
+interface HomeData {
+  artists: ApiArtist[];
+  albums: ApiAlbum[];
+  tracks: ApiTrack[];
+  sermons: ApiSermon[];
+  podcasts: ApiPodcast[];
+  featuredBanners: ApiFeaturedBanner[];
+  concerts: ApiConcertItem[];
+  concertAlbumTracks: ApiTrack[];
+  singles: ApiTrack[];
+}
+let homeDataCache: HomeData | null = null;
+
 export default function Home() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
   const { favorites } = useFavorites();
   const { currentTrack, isPlaying, playTrack, shuffle, toggleShuffle } = usePlayer();
-  const [artists, setArtists] = useState<ApiArtist[]>([]);
-  const [albums, setAlbums] = useState<ApiAlbum[]>([]);
-  const [tracks, setTracks] = useState<ApiTrack[]>([]);
-  const [sermons, setSermons] = useState<ApiSermon[]>([]);
-  const [podcasts, setPodcasts] = useState<ApiPodcast[]>([]);
-  const [featuredBanners, setFeaturedBanners] = useState<ApiFeaturedBanner[]>([]);
-  const [concerts, setConcerts] = useState<ApiConcertItem[]>([]);
-  const [concertAlbumTracks, setConcertAlbumTracks] = useState<ApiTrack[]>([]);
-  const [singles, setSingles] = useState<ApiTrack[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [artists, setArtists] = useState<ApiArtist[]>(() => homeDataCache?.artists ?? []);
+  const [albums, setAlbums] = useState<ApiAlbum[]>(() => homeDataCache?.albums ?? []);
+  const [tracks, setTracks] = useState<ApiTrack[]>(() => homeDataCache?.tracks ?? []);
+  const [sermons, setSermons] = useState<ApiSermon[]>(() => homeDataCache?.sermons ?? []);
+  const [podcasts, setPodcasts] = useState<ApiPodcast[]>(() => homeDataCache?.podcasts ?? []);
+  const [featuredBanners, setFeaturedBanners] = useState<ApiFeaturedBanner[]>(() => homeDataCache?.featuredBanners ?? []);
+  const [concerts, setConcerts] = useState<ApiConcertItem[]>(() => homeDataCache?.concerts ?? []);
+  const [concertAlbumTracks, setConcertAlbumTracks] = useState<ApiTrack[]>(() => homeDataCache?.concertAlbumTracks ?? []);
+  const [singles, setSingles] = useState<ApiTrack[]>(() => homeDataCache?.singles ?? []);
+  // Only the very first fetch this session (no cache yet) should show the
+  // loading state — a background refresh on a remount swaps data in
+  // silently once it resolves, never blanking what's already on screen.
+  const [loading, setLoading] = useState(!homeDataCache);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     // allSettled, not all — every section below already guards on its own
@@ -77,15 +104,27 @@ export default function Home() {
       singlesApi.list(),
     ])
       .then(([ar, al, tr, se, po, fb, co, cat, si]) => {
-        if (ar.status === "fulfilled") setArtists(ar.value);
-        if (al.status === "fulfilled") setAlbums(al.value);
-        if (tr.status === "fulfilled") setTracks(tr.value);
-        if (se.status === "fulfilled") setSermons(se.value);
-        if (po.status === "fulfilled") setPodcasts(po.value);
-        if (fb.status === "fulfilled") setFeaturedBanners(fb.value);
-        if (co.status === "fulfilled") setConcerts(co.value);
-        if (cat.status === "fulfilled") setConcertAlbumTracks(cat.value);
-        if (si.status === "fulfilled") setSingles(si.value);
+        const next: HomeData = {
+          artists: ar.status === "fulfilled" ? ar.value : homeDataCache?.artists ?? [],
+          albums: al.status === "fulfilled" ? al.value : homeDataCache?.albums ?? [],
+          tracks: tr.status === "fulfilled" ? tr.value : homeDataCache?.tracks ?? [],
+          sermons: se.status === "fulfilled" ? se.value : homeDataCache?.sermons ?? [],
+          podcasts: po.status === "fulfilled" ? po.value : homeDataCache?.podcasts ?? [],
+          featuredBanners: fb.status === "fulfilled" ? fb.value : homeDataCache?.featuredBanners ?? [],
+          concerts: co.status === "fulfilled" ? co.value : homeDataCache?.concerts ?? [],
+          concertAlbumTracks: cat.status === "fulfilled" ? cat.value : homeDataCache?.concertAlbumTracks ?? [],
+          singles: si.status === "fulfilled" ? si.value : homeDataCache?.singles ?? [],
+        };
+        homeDataCache = next;
+        setArtists(next.artists);
+        setAlbums(next.albums);
+        setTracks(next.tracks);
+        setSermons(next.sermons);
+        setPodcasts(next.podcasts);
+        setFeaturedBanners(next.featuredBanners);
+        setConcerts(next.concerts);
+        setConcertAlbumTracks(next.concertAlbumTracks);
+        setSingles(next.singles);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -247,6 +286,7 @@ export default function Home() {
   const initial = (user?.name || user?.email || "?").trim().charAt(0).toUpperCase();
 
   return (
+    <>
     <div className="px-5 py-5">
       {/* Compact header: greeting + devotional line, notification, profile.
           Home has its own fixed warm-gold identity here (like the Bible
@@ -272,6 +312,7 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={() => setShowNotifications(true)}
             aria-label={t("notifications")}
             className="relative w-10 h-10 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border text-fg-muted hover:text-fg active:scale-90 transition-all"
           >
@@ -514,5 +555,7 @@ export default function Home() {
         )}
       </section>
     </div>
+    {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
+    </>
   );
 }

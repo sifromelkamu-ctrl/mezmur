@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overrides Capacitor's library default (#3F51B5, indigo) — some
+         launchers fall back to colorPrimary as a badge/ring color behind
+         the app icon (e.g. Android 14's AOSP Launcher3 on this emulator),
+         which showed as a stray blue ring around our white/black icon.
+         White keeps that ring invisible against the icon's own background. -->
+    <color name="colorPrimary">#FFFFFF</color>
+    <color name="colorPrimaryDark">#FFFFFF</color>
+    <color name="colorAccent">#FFFFFF</color>
+</resources>

@@ -1,4 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { shade } from "../utils/colorExtraction";
 
 export interface AccentTheme {
   id: string;
@@ -50,8 +53,18 @@ export function getAvatarColor(id: string): { background: string; text: string }
 const STORAGE_KEY = "mezmur:accent-theme";
 const MODE_STORAGE_KEY = "mezmur:mode";
 const AVATAR_COLOR_STORAGE_KEY = "mezmur:avatar-color";
+const CUSTOM_COLOR_STORAGE_KEY = "mezmur:custom-accent-color";
+const NOW_PLAYING_THEME_STORAGE_KEY = "mezmur:now-playing-theme";
+const NOW_PLAYING_CUSTOM_COLOR_STORAGE_KEY = "mezmur:now-playing-custom-color";
 const DEFAULT_AVATAR_COLOR_ID = "white";
 const DEFAULT_THEME_ID = "purple";
+const DEFAULT_CUSTOM_COLOR = "#7c5cff";
+// Now Playing's color is deliberately independent of the app-wide accent
+// (see CUSTOM_THEME_ID's own comment) — picking a Royal Purple accent
+// shouldn't also force Now Playing purple. It defaults to CUSTOM_THEME_ID
+// with this exact hex so an install that never touches the new setting
+// still gets Now Playing's original hand-picked teal look, unchanged.
+const DEFAULT_NOW_PLAYING_CUSTOM_COLOR = "#1cc4a3";
 // The app shipped with "green" (Emerald) as its hardcoded default for a long
 // time, so most existing installs have it saved even though the user never
 // deliberately chose it — the 2026 premium rebrand replaces that default
@@ -59,7 +72,30 @@ const DEFAULT_THEME_ID = "purple";
 // exists in ACCENT_THEMES.
 const LEGACY_DEFAULT_IDS = new Set(["green", "royal"]);
 
+// Selecting this "theme" means the app-wide accent (buttons, glows, Now
+// Playing background, everything else driven by --color-brand) comes from
+// the user's own picked hex instead of one of the curated ACCENT_THEMES —
+// the whole-app color-customization option this file exists to add.
+export const CUSTOM_THEME_ID = "custom";
+
 export type ThemeMode = "dark" | "light";
+
+// Derives the dark/glow variants a picked-preset theme ships with by hand,
+// so a freely-chosen custom color gets the same "feels like one deliberate
+// palette" treatment instead of just being reused verbatim for all three
+// CSS variables.
+function resolveAccentTheme(themeId: string, customColor: string): AccentTheme {
+  if (themeId === CUSTOM_THEME_ID) {
+    return {
+      id: CUSTOM_THEME_ID,
+      name: "Custom",
+      brand: customColor,
+      brandDark: shade(customColor, 0.38, 1.05),
+      brandGlow: shade(customColor, 0.72, 0.85),
+    };
+  }
+  return ACCENT_THEMES.find((t) => t.id === themeId) ?? ACCENT_THEMES[0];
+}
 
 function applyTheme(theme: AccentTheme) {
   const root = document.documentElement;
@@ -70,6 +106,17 @@ function applyTheme(theme: AccentTheme) {
 
 function applyMode(mode: ThemeMode) {
   document.documentElement.classList.toggle("light", mode === "light");
+  // Native status bar (clock/network/battery row) content color has to be
+  // set explicitly — it doesn't auto-adapt to page background the way a
+  // browser's does. Overlay lets the app draw full-bleed behind it (same
+  // premium edge-to-edge look as Spotify/Apple Music) instead of the OS
+  // reserving a solid bar; Style.Light/.Dark below is Capacitor's naming
+  // for the *content* color, inverted from how it sounds — Dark means
+  // light/white text for dark backgrounds, Light means dark/black text.
+  if (Capacitor.isNativePlatform()) {
+    StatusBar.setOverlaysWebView({ overlay: true });
+    StatusBar.setStyle({ style: mode === "light" ? Style.Light : Style.Dark });
+  }
 }
 
 interface ThemeContextValue {
@@ -79,6 +126,23 @@ interface ThemeContextValue {
   setMode: (mode: ThemeMode) => void;
   avatarColorId: string;
   setAvatarColorId: (id: string) => void;
+  // The custom accent hex itself, and the setter that both stores it and
+  // switches themeId to CUSTOM_THEME_ID so picking a color also selects it.
+  customColor: string;
+  setCustomColor: (hex: string) => void;
+  // Whatever's actually active right now — one of ACCENT_THEMES or the
+  // custom-color-derived one — so any screen (Settings, Now Playing) that
+  // needs "the current app color" reads one thing instead of re-deriving
+  // it from themeId/customColor itself.
+  resolvedTheme: AccentTheme;
+  // Now Playing's own color — same shape as the accent theme fields above,
+  // but a fully separate selection so choosing an app-wide accent never
+  // also changes Now Playing, and vice versa.
+  nowPlayingThemeId: string;
+  setNowPlayingThemeId: (id: string) => void;
+  nowPlayingCustomColor: string;
+  setNowPlayingCustomColor: (hex: string) => void;
+  resolvedNowPlayingTheme: AccentTheme;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -95,11 +159,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [avatarColorId, setAvatarColorIdState] = useState<string>(
     () => localStorage.getItem(AVATAR_COLOR_STORAGE_KEY) ?? DEFAULT_AVATAR_COLOR_ID
   );
+  const [customColor, setCustomColorState] = useState<string>(
+    () => localStorage.getItem(CUSTOM_COLOR_STORAGE_KEY) ?? DEFAULT_CUSTOM_COLOR
+  );
+  const [nowPlayingThemeId, setNowPlayingThemeIdState] = useState<string>(
+    () => localStorage.getItem(NOW_PLAYING_THEME_STORAGE_KEY) ?? CUSTOM_THEME_ID
+  );
+  const [nowPlayingCustomColor, setNowPlayingCustomColorState] = useState<string>(
+    () => localStorage.getItem(NOW_PLAYING_CUSTOM_COLOR_STORAGE_KEY) ?? DEFAULT_NOW_PLAYING_CUSTOM_COLOR
+  );
+
+  const resolvedTheme = useMemo(() => resolveAccentTheme(themeId, customColor), [themeId, customColor]);
+  const resolvedNowPlayingTheme = useMemo(
+    () => resolveAccentTheme(nowPlayingThemeId, nowPlayingCustomColor),
+    [nowPlayingThemeId, nowPlayingCustomColor]
+  );
 
   useEffect(() => {
-    const theme = ACCENT_THEMES.find((t) => t.id === themeId) ?? ACCENT_THEMES[0];
-    applyTheme(theme);
-  }, [themeId]);
+    applyTheme(resolvedTheme);
+  }, [resolvedTheme]);
 
   useEffect(() => {
     applyMode(mode);
@@ -120,8 +198,42 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setAvatarColorIdState(id);
   };
 
+  const setCustomColor = (hex: string) => {
+    localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, hex);
+    setCustomColorState(hex);
+    setThemeId(CUSTOM_THEME_ID);
+  };
+
+  const setNowPlayingThemeId = (id: string) => {
+    localStorage.setItem(NOW_PLAYING_THEME_STORAGE_KEY, id);
+    setNowPlayingThemeIdState(id);
+  };
+
+  const setNowPlayingCustomColor = (hex: string) => {
+    localStorage.setItem(NOW_PLAYING_CUSTOM_COLOR_STORAGE_KEY, hex);
+    setNowPlayingCustomColorState(hex);
+    setNowPlayingThemeId(CUSTOM_THEME_ID);
+  };
+
   return (
-    <ThemeContext.Provider value={{ themeId, setThemeId, mode, setMode, avatarColorId, setAvatarColorId }}>
+    <ThemeContext.Provider
+      value={{
+        themeId,
+        setThemeId,
+        mode,
+        setMode,
+        avatarColorId,
+        setAvatarColorId,
+        customColor,
+        setCustomColor,
+        resolvedTheme,
+        nowPlayingThemeId,
+        setNowPlayingThemeId,
+        nowPlayingCustomColor,
+        setNowPlayingCustomColor,
+        resolvedNowPlayingTheme,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

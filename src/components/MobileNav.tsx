@@ -5,7 +5,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { prefetchRoute } from "../lib/prefetchRoute";
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center justify-center flex-1 py-1.5 transition-colors ${
+  `relative flex items-center justify-center flex-1 py-[1.6px] transition-colors ${
     isActive ? "text-fg" : "text-fg-subtle"
   }`;
 
@@ -26,20 +26,26 @@ function NavIcon({
     <span className="flex flex-col items-center justify-center gap-0.5">
       <span
         className={`tile-glow flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 ${
-          isActive ? "ring-1 ring-white/25" : ""
+          isActive ? "ring-1 ring-white/20" : ""
         }`}
         style={
           isActive
             ? ({
-                "--tile-glow": "color-mix(in oklab, var(--color-brand) 70%, transparent)",
+                "--tile-glow": "color-mix(in oklab, var(--color-brand) 60%, transparent)",
                 background:
-                  "radial-gradient(120% 130% at 35% 25%, color-mix(in oklab, var(--color-brand) 45%, white) 0%, var(--color-brand) 55%, color-mix(in oklab, var(--color-brand) 80%, black) 100%)",
+                  "radial-gradient(120% 130% at 35% 25%, color-mix(in oklab, var(--color-brand) 38%, white) 0%, var(--color-brand) 58%, color-mix(in oklab, var(--color-brand) 82%, black) 100%)",
+                // filter (not box-shadow) so it doesn't fight the pulsing
+                // inset highlight/shade the tile-glow-pulse keyframes
+                // already animate on this element — a real drop shadow
+                // grounding the orb, giving it depth against the bar
+                // instead of reading as a flat pasted-on circle.
+                filter: "drop-shadow(0 3px 6px color-mix(in oklab, var(--color-brand) 45%, transparent))",
               } as CSSProperties)
             : undefined
         }
       >
         <Icon
-          size={19}
+          size={23}
           strokeWidth={isActive ? 2.4 : 2}
           className={isActive ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" : ""}
         />
@@ -55,18 +61,21 @@ export default function MobileNav() {
   const { t } = useLanguage();
 
   return (
-    <nav className="relative overflow-hidden w-full flex items-center rounded-full bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.55)] px-1 py-1">
+    <nav
+      className="relative overflow-hidden w-full flex items-center rounded-t-2xl bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)] px-1 pt-[1.6px]"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.6px)" }}
+    >
       {/* Same specular highlight as the quick-action card, for a matching
           glass-premium finish across Home's chrome. */}
       <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
       <NavLink to="/" end className={itemClass}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Home} label={t("home")} />}
       </NavLink>
-      <NavLink to="/search" className={itemClass} onPointerDown={() => prefetchRoute("/search")} onMouseEnter={() => prefetchRoute("/search")}>
-        {({ isActive }) => <NavIcon isActive={isActive} Icon={Search} label={t("search")} />}
-      </NavLink>
       <NavLink to="/library" className={itemClass} onPointerDown={() => prefetchRoute("/library")} onMouseEnter={() => prefetchRoute("/library")}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Library} label={t("yourLibrary")} />}
+      </NavLink>
+      <NavLink to="/search" className={itemClass} onPointerDown={() => prefetchRoute("/search")} onMouseEnter={() => prefetchRoute("/search")}>
+        {({ isActive }) => <NavIcon isActive={isActive} Icon={Search} label={t("search")} />}
       </NavLink>
       <NavLink to="/bible" className={itemClass} onPointerDown={() => prefetchRoute("/bible")} onMouseEnter={() => prefetchRoute("/bible")}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={BookOpen} label="Bible" />}

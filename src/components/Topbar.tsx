@@ -23,10 +23,30 @@ export default function Topbar() {
   const { avatarColorId } = useTheme();
   const avatarColor = getAvatarColor(avatarColorId);
 
-  if (isLibrary || isBible) return null;
+  // Home renders its own header (greeting, notification bell, avatar) —
+  // same reasoning as Library/Bible above. Previously Topbar still
+  // rendered its sticky/blurred shell here with every child conditionally
+  // hidden, which looked empty at the top of the page but became a stray
+  // translucent bar once scrolled, since `sticky` keeps painting that
+  // background even with no content inside it.
+  if (isLibrary || isBible || isHome) return null;
+
+  const isSettingsPage = location.pathname === "/settings";
 
   return (
-    <header className="sticky top-0 z-10 bg-base/80 backdrop-blur-md">
+    <header
+      className={
+        // Settings keeps its original pinned, translucent-blur header —
+        // everywhere else, this used to stay sticky at the top with a
+        // bg-base/80 blur regardless of what page-specific content (e.g. a
+        // detail page's own colorful gradient/photo hero) was scrolling
+        // underneath it, reading as a floating overlay in a slightly
+        // different shade than the page itself. Scrolling away with the
+        // page instead, with no background of its own, removes both the
+        // "always-on-top overlay" feel and the color mismatch.
+        isSettingsPage ? "sticky top-0 z-10 bg-base/80 backdrop-blur-md" : ""
+      }
+    >
       <div className="flex items-center justify-between px-4 py-3 gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {!isSearchPage && !isHome && (
@@ -82,7 +102,6 @@ export default function Topbar() {
         <div className="relative px-4 pb-3">
           <Search size={18} className="absolute left-7 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <TextField
-            autoFocus
             type="text"
             value={searchParams.get("q") ?? ""}
             onChange={(e) => {

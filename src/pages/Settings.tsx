@@ -21,15 +21,15 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
 import { useLyricsSetting } from "../context/LyricsContext";
-import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, useTheme } from "../context/ThemeContext";
+import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, CUSTOM_THEME_ID, useTheme } from "../context/ThemeContext";
 import { LANGUAGES } from "../i18n/translations";
 
-type Section = "account" | "subscription" | "appearance" | "accent" | "avatar" | "language" | "lyrics" | "about";
+type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about";
 
 function SettingsRow({
   icon,
@@ -72,16 +72,33 @@ function SectionHeader({ title, onBack }: { title: string; onBack: () => void })
 
 export default function Settings() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout, updateName } = useAuth();
-  const { themeId, setThemeId, mode, setMode, avatarColorId, setAvatarColorId } = useTheme();
+  const {
+    themeId,
+    setThemeId,
+    mode,
+    setMode,
+    avatarColorId,
+    setAvatarColorId,
+    customColor,
+    setCustomColor,
+    nowPlayingThemeId,
+    setNowPlayingThemeId,
+    nowPlayingCustomColor,
+    setNowPlayingCustomColor,
+  } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { lyricsEnabled, setLyricsEnabled } = useLyricsSetting();
-  const [section, setSection] = useState<Section | null>(null);
+  // Lets a caller (e.g. the notification panel's "Go Premium" card) deep-
+  // link straight into a section instead of landing on the plain list —
+  // passed via navigate("/settings", { state: { section: "subscription" } }).
+  const [section, setSection] = useState<Section | null>(
+    () => (location.state as { section?: Section } | null)?.section ?? null
+  );
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
-  const currentAccent = ACCENT_THEMES.find((th) => th.id === themeId)?.name ?? "Emerald";
-  const currentAvatarColor = AVATAR_COLOR_OPTIONS.find((o) => o.id === avatarColorId)?.name ?? "White";
   const currentLanguage = LANGUAGES.find((l) => l.id === language)?.nativeName ?? "English";
 
   const startEditName = () => {
@@ -198,87 +215,167 @@ export default function Settings() {
     content = (
       <div className="px-6 py-6 max-w-2xl">
         <SectionHeader title="Appearance" onBack={() => setSection(null)} />
-        <div className="bg-elevated rounded-lg p-4">
-          <p className="text-sm text-fg-muted mb-4">Choose a light or dark background for the whole app.</p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setMode("dark")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold border transition-colors ${
-                mode === "dark" ? "bg-white text-black border-transparent" : "border-border text-fg-muted hover:text-fg"
-              }`}
-            >
-              <Moon size={16} />
-              Dark
-            </button>
-            <button
-              onClick={() => setMode("light")}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold border transition-colors ${
-                mode === "light"
-                  ? "bg-white text-black border-transparent shadow"
-                  : "border-border text-fg-muted hover:text-fg"
-              }`}
-            >
-              <Sun size={16} />
-              Light
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  } else if (section === "accent") {
-    content = (
-      <div className="px-6 py-6 max-w-2xl">
-        <SectionHeader title="Accent color" onBack={() => setSection(null)} />
-        <div className="bg-elevated rounded-lg p-4">
-          <p className="text-sm text-fg-muted mb-4">Pick an accent color for buttons, highlights, and glows.</p>
-          <div className="flex flex-wrap gap-3">
-            {ACCENT_THEMES.map((theme) => (
+        <div className="flex flex-col gap-6">
+          <div className="bg-elevated rounded-lg p-4">
+            <p className="text-sm font-semibold mb-1">Light / Dark</p>
+            <p className="text-sm text-fg-muted mb-4">Choose a light or dark background for the whole app.</p>
+            <div className="flex gap-3">
               <button
-                key={theme.id}
-                onClick={() => setThemeId(theme.id)}
-                className="flex flex-col items-center gap-2 group"
-                aria-label={`Use ${theme.name} theme`}
+                onClick={() => setMode("dark")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold border transition-colors ${
+                  mode === "dark"
+                    ? "bg-white text-black border-transparent"
+                    : "border-border text-fg-muted hover:text-fg"
+                }`}
               >
-                <span
-                  className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-2 ring-transparent group-hover:ring-border transition-all"
-                  style={{ backgroundImage: `linear-gradient(135deg, ${theme.brand}, ${theme.brandDark})` }}
-                >
-                  {themeId === theme.id && <Check size={18} className="text-black" strokeWidth={3} />}
-                </span>
-                <span className="text-xs text-fg-muted">{theme.name}</span>
+                <Moon size={16} />
+                Dark
               </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  } else if (section === "avatar") {
-    content = (
-      <div className="px-6 py-6 max-w-2xl">
-        <SectionHeader title="Avatar color" onBack={() => setSection(null)} />
-        <div className="bg-elevated rounded-lg p-4">
-          <p className="text-sm text-fg-muted mb-4">
-            Pick a color for the "M" mark in the header — independent of your accent color, defaults to white.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {AVATAR_COLOR_OPTIONS.map((opt) => (
               <button
-                key={opt.id}
-                onClick={() => setAvatarColorId(opt.id)}
-                className="flex flex-col items-center gap-2 group"
-                aria-label={`Use ${opt.name} avatar color`}
+                onClick={() => setMode("light")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold border transition-colors ${
+                  mode === "light"
+                    ? "bg-white text-black border-transparent shadow"
+                    : "border-border text-fg-muted hover:text-fg"
+                }`}
               >
-                <span
-                  className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-1 ring-border group-hover:ring-2 group-hover:ring-fg-subtle transition-all"
-                  style={{ backgroundColor: opt.color }}
+                <Sun size={16} />
+                Light
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-elevated rounded-lg p-4">
+            <p className="text-sm font-semibold mb-1">Accent color</p>
+            <p className="text-sm text-fg-muted mb-4">
+              For buttons, highlights, and glows throughout the app. Choose a preset or set any color of your own —
+              the Now Playing screen has its own separate color below.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => setThemeId(theme.id)}
+                  className="flex flex-col items-center gap-2 group"
+                  aria-label={`Use ${theme.name} theme`}
                 >
-                  {avatarColorId === opt.id && (
-                    <Check size={18} className={opt.id === "white" ? "text-black" : "text-white"} strokeWidth={3} />
+                  <span
+                    className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-2 ring-transparent group-hover:ring-border transition-all"
+                    style={{ backgroundImage: `linear-gradient(135deg, ${theme.brand}, ${theme.brandDark})` }}
+                  >
+                    {themeId === theme.id && <Check size={18} className="text-black" strokeWidth={3} />}
+                  </span>
+                  <span className="text-xs text-fg-muted">{theme.name}</span>
+                </button>
+              ))}
+              {/* Native color picker (an <input type="color"> visually hidden
+                  behind the swatch, opened via the label wrapping it) — the
+                  simplest way to a system color picker on every platform
+                  this app targets (iOS/Android WebView + desktop browsers)
+                  without shipping a custom color-wheel component. */}
+              <label className="flex flex-col items-center gap-2 group cursor-pointer">
+                <span
+                  className="relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-2 ring-transparent group-hover:ring-border transition-all overflow-hidden"
+                  style={{
+                    backgroundImage:
+                      themeId === CUSTOM_THEME_ID
+                        ? `linear-gradient(135deg, ${customColor}, ${customColor})`
+                        : "conic-gradient(from 180deg, #e0483c, #f3c969, #059669, #2563eb, #7c5cff, #db2777, #e0483c)",
+                  }}
+                >
+                  {themeId === CUSTOM_THEME_ID ? (
+                    <Check size={18} className="text-black" strokeWidth={3} />
+                  ) : (
+                    <Droplet size={18} className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
                   )}
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    aria-label="Choose a custom accent color"
+                  />
                 </span>
-                <span className="text-xs text-fg-muted">{opt.name}</span>
-              </button>
-            ))}
+                <span className="text-xs text-fg-muted">Custom</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="bg-elevated rounded-lg p-4">
+            <p className="text-sm font-semibold mb-1">Now Playing color</p>
+            <p className="text-sm text-fg-muted mb-4">
+              Just for the Now Playing screen's background — independent of your accent color above.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => setNowPlayingThemeId(theme.id)}
+                  className="flex flex-col items-center gap-2 group"
+                  aria-label={`Use ${theme.name} for Now Playing`}
+                >
+                  <span
+                    className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-2 ring-transparent group-hover:ring-border transition-all"
+                    style={{ backgroundImage: `linear-gradient(135deg, ${theme.brand}, ${theme.brandDark})` }}
+                  >
+                    {nowPlayingThemeId === theme.id && <Check size={18} className="text-black" strokeWidth={3} />}
+                  </span>
+                  <span className="text-xs text-fg-muted">{theme.name}</span>
+                </button>
+              ))}
+              <label className="flex flex-col items-center gap-2 group cursor-pointer">
+                <span
+                  className="relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-2 ring-transparent group-hover:ring-border transition-all overflow-hidden"
+                  style={{
+                    backgroundImage:
+                      nowPlayingThemeId === CUSTOM_THEME_ID
+                        ? `linear-gradient(135deg, ${nowPlayingCustomColor}, ${nowPlayingCustomColor})`
+                        : "conic-gradient(from 180deg, #e0483c, #f3c969, #059669, #2563eb, #7c5cff, #db2777, #e0483c)",
+                  }}
+                >
+                  {nowPlayingThemeId === CUSTOM_THEME_ID ? (
+                    <Check size={18} className="text-black" strokeWidth={3} />
+                  ) : (
+                    <Droplet size={18} className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
+                  )}
+                  <input
+                    type="color"
+                    value={nowPlayingCustomColor}
+                    onChange={(e) => setNowPlayingCustomColor(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    aria-label="Choose a custom Now Playing color"
+                  />
+                </span>
+                <span className="text-xs text-fg-muted">Custom</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="bg-elevated rounded-lg p-4">
+            <p className="text-sm font-semibold mb-1">Avatar color</p>
+            <p className="text-sm text-fg-muted mb-4">
+              For the "M" mark in the header — independent of your accent color, defaults to white.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {AVATAR_COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setAvatarColorId(opt.id)}
+                  className="flex flex-col items-center gap-2 group"
+                  aria-label={`Use ${opt.name} avatar color`}
+                >
+                  <span
+                    className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg ring-1 ring-border group-hover:ring-2 group-hover:ring-fg-subtle transition-all"
+                    style={{ backgroundColor: opt.color }}
+                  >
+                    {avatarColorId === opt.id && (
+                      <Check size={18} className={opt.id === "white" ? "text-black" : "text-white"} strokeWidth={3} />
+                    )}
+                  </span>
+                  <span className="text-xs text-fg-muted">{opt.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -374,22 +471,10 @@ export default function Settings() {
             onClick={() => setSection("subscription")}
           />
           <SettingsRow
-            icon={mode === "light" ? <Sun size={20} /> : <Moon size={20} />}
+            icon={<Palette size={20} />}
             label="Appearance"
             value={mode === "light" ? "Light" : "Dark"}
             onClick={() => setSection("appearance")}
-          />
-          <SettingsRow
-            icon={<Palette size={20} />}
-            label="Accent color"
-            value={currentAccent}
-            onClick={() => setSection("accent")}
-          />
-          <SettingsRow
-            icon={<Droplet size={20} />}
-            label="Avatar color"
-            value={currentAvatarColor}
-            onClick={() => setSection("avatar")}
           />
           <SettingsRow
             icon={<Globe2 size={20} />}

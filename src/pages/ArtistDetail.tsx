@@ -342,7 +342,13 @@ export default function ArtistDetail() {
     // edge landed mid-transition — still greenish, not yet black — right
     // where the photo's own overlay above it was already solid black,
     // producing a visible hard seam. A flat fill always matches exactly.
-    <div style={{ backgroundColor: "#050707" }}>
+    <div
+      style={{
+        backgroundColor: "#050707",
+        marginTop: "calc(-1 * env(safe-area-inset-top))",
+        paddingTop: "env(safe-area-inset-top)",
+      }}
+    >
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (

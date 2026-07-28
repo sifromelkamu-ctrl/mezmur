@@ -67,7 +67,10 @@ export default function BibleSettingsModal({
   onClose,
 }: BibleSettingsModalProps) {
   return createPortal(
-    <div className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain p-5 pt-8 pb-10">
+    <div
+      className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain p-5 pb-10"
+      style={{ paddingTop: "calc(env(safe-area-inset-top) + 2rem)" }}
+    >
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="font-agbalumo text-xl font-bold text-gold">Bible Settings</h2>

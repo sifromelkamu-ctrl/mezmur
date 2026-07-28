@@ -16,16 +16,18 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useFavorites } from "../context/FavoritesContext";
 import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
 import { useSleepTimer } from "../context/SleepTimerContext";
+import { useTheme } from "../context/ThemeContext";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { adminApi, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
+import { hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from "../utils/colorExtraction";
 import { formatDuration } from "../utils/format";
 import { renderWithAmharicStyle } from "../utils/scriptText";
 import AddToPlaylistModal from "./AddToPlaylistModal";
@@ -39,22 +41,35 @@ interface NowPlayingProps {
   onClose: () => void;
 }
 
-// Now Playing's own background is fixed to this one gradient for every
-// track — deliberately not derived from currentTrack.gradient (that's still
-// used for the artwork placeholder and its glow only, untouched below).
-// Picked to match the look of the "Bereket Tesfaye - መምህሩ Vol 3" Now Playing
-// screen: a premium teal -> emerald -> deep-black blend, multiple stops so
-// the transition reads as one continuous gradient rather than two flat bands.
-const NOW_PLAYING_BACKGROUND = `linear-gradient(
-  180deg,
-  #1cc4a3 0%,
-  #14b8a6 14%,
-  #0f8f7e 32%,
-  #134e4a 52%,
-  #0d2f2c 70%,
-  #0a1614 86%,
-  #050707 100%
-)`;
+// Now Playing's background is derived from the user's chosen app-wide
+// accent color (Settings -> Appearance -> Accent color, including their own
+// custom pick) rather than one fixed hue for every track — deliberately
+// still not derived from currentTrack.gradient (that's used for the artwork
+// placeholder/glow only, untouched below): the whole point is that this
+// screen matches whatever color the user chose for the rest of the app, the
+// same way every button/highlight/glow already does via --color-brand.
+// Same 7-stop shape as the original hand-picked teal -> emerald ->
+// deep-black gradient (lightness ramps down the same way at the same
+// positions), just re-hued to the accent color instead of a fixed teal —
+// keeps the "premium continuous blend, not two flat bands" look regardless
+// of which color is active.
+const NOW_PLAYING_GRADIENT_STOPS: { lightness: number; satMul: number; pos: string }[] = [
+  { lightness: 0.45, satMul: 1, pos: "0%" },
+  { lightness: 0.4, satMul: 1, pos: "14%" },
+  { lightness: 0.31, satMul: 0.95, pos: "32%" },
+  { lightness: 0.2, satMul: 0.85, pos: "52%" },
+  { lightness: 0.12, satMul: 0.7, pos: "70%" },
+  { lightness: 0.07, satMul: 0.5, pos: "86%" },
+  { lightness: 0.03, satMul: 0.25, pos: "100%" },
+];
+
+function buildNowPlayingBackground(accentHex: string): string {
+  const [h, s] = rgbToHsl(hexToRgb(accentHex));
+  const stops = NOW_PLAYING_GRADIENT_STOPS.map(
+    ({ lightness, satMul, pos }) => `${rgbToHex(hslToRgb([h, Math.min(1, s * satMul), lightness]))} ${pos}`
+  );
+  return `linear-gradient(180deg, ${stops.join(", ")})`;
+}
 
 // Slow, readable scroll speed for overflowing text — the animation's total
 // duration is derived from this plus the actual overflow distance (see
@@ -148,6 +163,11 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { remainingLabel } = useSleepTimer();
+  const { resolvedNowPlayingTheme } = useTheme();
+  const nowPlayingBackground = useMemo(
+    () => buildNowPlayingBackground(resolvedNowPlayingTheme.brand),
+    [resolvedNowPlayingTheme.brand]
+  );
   const [showQueue, setShowQueue] = useState(false);
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
@@ -313,7 +333,7 @@ export default function NowPlaying({ onClose }: NowPlayingProps) {
       onTouchStart={handleSheetTouchStart}
       onTouchEnd={handleSheetTouchEnd}
     >
-      <div className="absolute inset-0 -z-10" style={{ backgroundImage: NOW_PLAYING_BACKGROUND }} />
+      <div className="absolute inset-0 -z-10" style={{ backgroundImage: nowPlayingBackground }} />
 
       <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+16px)] pb-2 shrink-0">
         <button

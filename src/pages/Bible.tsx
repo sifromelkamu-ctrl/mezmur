@@ -28,6 +28,7 @@ import { useAuth } from "../context/useAuth";
 import { useTheme } from "../context/ThemeContext";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import BibleSettingsModal from "../components/bible/BibleSettingsModal";
+import NotificationsPanel from "../components/home/NotificationsPanel";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
@@ -56,9 +57,7 @@ import {
   type ReadingPrefs,
 } from "../utils/bibleReadingPrefs";
 import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../utils/bibleReadingHistory";
-import { bibleAudioUrl } from "../lib/bibleAudio";
-
-const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+import { speechSupported, useBibleAudio } from "../context/BibleAudioContext";
 
 type BookText = Record<string, string[]>; // chapter number -> verses
 
@@ -195,13 +194,10 @@ export default function Bible() {
   const [bookText, setBookText] = useState<BookText | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  // Flips true if the real chapter recording 404s (a handful of chapters
-  // aren't recorded yet, e.g. 1 Kings 8-22) — falls back to browser
-  // text-to-speech below rather than leaving the Listen button dead.
-  const [audioUnavailable, setAudioUnavailable] = useState(false);
+  // Chapter audio/text-to-speech lives in a top-level context now, not local
+  // state — it needs to keep playing after this page unmounts (see
+  // BibleAudioContext.tsx's own comment).
+  const bibleAudio = useBibleAudio();
   // Which testament's book list is open, if any — mutually exclusive
   // (opening one closes the other) rather than two independent booleans,
   // so only one book list is ever visible at a time.
@@ -215,6 +211,7 @@ export default function Bible() {
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
   const [showBibleSettings, setShowBibleSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [heroVerse, setHeroVerse] = useState<
     { id: string; ref: string; text: string; slug: string; chapter: number; verseIndex: number } | null
   >(null);
@@ -343,28 +340,12 @@ export default function Bible() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpToVerse, verses]);
 
-  const stopSpeaking = () => {
-    if (speechSupported) window.speechSynthesis.cancel();
-    setSpeaking(false);
-  };
-
-  const stopAudio = () => {
-    const el = audioRef.current;
-    if (el) {
-      el.pause();
-      el.currentTime = 0;
-    }
-    setAudioPlaying(false);
-  };
-
   // Fetch the whole book once per selection+language (public/bible/<slug>.json
   // for Amharic, public/bible/en/<slug>.json for the King James Version), not
   // bundled into the app — a full Bible translation is several MB, too large
   // to ship in the JS bundle, so each book loads on demand the first time
   // it's opened (and again if the reader switches language mid-chapter).
   useEffect(() => {
-    stopSpeaking();
-    stopAudio();
     setBookText(null);
     setLoadError(false);
     if (!bookSlug) return;
@@ -382,9 +363,6 @@ export default function Bible() {
   }, [bookSlug, prefs.language, prefs.englishVersion]);
 
   useEffect(() => {
-    stopSpeaking();
-    stopAudio();
-    setAudioUnavailable(false);
     setSelectedVerses(new Set());
     setEditingNoteVerse(null);
     setAnnotations(bookSlug && chapter ? loadChapterAnnotations(bookSlug, chapter) : {});
@@ -396,11 +374,6 @@ export default function Bible() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter]);
 
-  useEffect(() => () => {
-    stopSpeaking();
-    stopAudio();
-  }, []);
-
   // Home screen's hero — a single "verse of the day", one per local
   // calendar day (keys off each visitor's own device clock, so it rotates
   // at their own midnight regardless of time zone). Note this is the GLOBAL
@@ -411,8 +384,13 @@ export default function Bible() {
     let cancelled = false;
     // Roughly what fits in 3 lines of the hero card's text column at its
     // current width/font (measured, not exact — the card's line-clamp-3
-    // still clips as a hard backstop if this estimate is ever off).
-    const MAX_VERSE_CHARS = 100;
+    // still clips as a hard backstop if this estimate is ever off). English
+    // translations run noticeably longer than the Amharic text for the same
+    // verse (e.g. 1 John 4:16 is 99 characters in Amharic but 135 in KJV) —
+    // a single Amharic-tuned limit made most English picks fail this check
+    // on every attempt, silently leaving the *previous* (Amharic) verse on
+    // screen instead of ever switching over when English was selected.
+    const MAX_VERSE_CHARS = prefs.language === "en" ? 170 : 100;
     const bookCache = new Map<string, BookText | null>();
 
     async function fetchBook(slug: string): Promise<BookText | null> {
@@ -489,50 +467,24 @@ export default function Bible() {
   };
 
   // Real chapter recordings only exist for Amharic (the app's default
-  // reading language) — English mode keeps the browser text-to-speech
-  // fallback below, same as chapters whose recording hasn't been made yet.
-  const hasRealAudio = prefs.language === "am" && !audioUnavailable;
-  const listening = hasRealAudio ? audioPlaying : speaking;
-
-  const startSpeaking = () => {
-    if (!speechSupported || !verses) return;
-    const utterance = new SpeechSynthesisUtterance(verses.filter(Boolean).join(" "));
-    utterance.lang = "am-ET";
-    utterance.rate = 0.9;
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-    setSpeaking(true);
-  };
-
-  // Fires only as a direct result of the user pressing Listen (the <audio>
-  // element uses preload="none", so nothing else ever triggers a load) —
-  // safe to fall straight into text-to-speech here so a chapter missing its
-  // recording still plays something on the very first tap, not the second.
-  const handleAudioError = () => {
-    setAudioUnavailable(true);
-    startSpeaking();
-  };
+  // reading language) — English mode uses the browser text-to-speech
+  // fallback instead, same as chapters whose recording hasn't been made yet
+  // (BibleAudioContext falls back automatically if the recording 404s).
+  // `listening` only reflects THIS chapter — a different chapter can be
+  // playing in the background (see BibleAudioBar), in which case this
+  // button still reads "Listen" and starting it here takes over as the
+  // active one, stopping the other.
+  const listening = bibleAudio.isTarget(bookSlug ?? "", chapter ?? -1) && bibleAudio.isPlaying;
 
   const toggleListen = () => {
-    if (hasRealAudio) {
-      const el = audioRef.current;
-      if (!el) return;
-      if (audioPlaying) {
-        el.pause();
-        setAudioPlaying(false);
-      } else {
-        el.play()
-          .then(() => setAudioPlaying(true))
-          .catch(handleAudioError);
-      }
-      return;
-    }
-    if (speaking) {
-      stopSpeaking();
-      return;
-    }
-    startSpeaking();
+    if (!bookSlug || !chapter || !verses) return;
+    bibleAudio.toggleListen({
+      bookSlug,
+      chapter,
+      label: `${book?.name ?? bookSlug} ${chapter}`,
+      language: prefs.language,
+      verseText: verses.filter(Boolean).join(" "),
+    });
   };
 
   const applyAnnotationUpdate = (key: string, updated: VerseAnnotation | undefined) => {
@@ -614,7 +566,13 @@ export default function Bible() {
   // Full-page verse search within the currently open book
   if (showBookSearch && book) {
     return (
-      <div className="bible-scope bg-base min-h-full max-w-2xl mx-auto px-6 py-6">
+      <div
+        className="bible-scope bg-base min-h-full max-w-2xl mx-auto px-6 pb-6"
+        style={{
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)",
+        }}
+      >
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => setShowBookSearch(false)}
@@ -744,7 +702,13 @@ export default function Bible() {
   // Chapter reading view
   if (book && chapter) {
     return (
-      <div className="bible-scope bg-base min-h-full max-w-2xl mx-auto px-6 py-6">
+      <div
+        className="bible-scope bg-base min-h-full max-w-2xl mx-auto px-6 pb-6"
+        style={{
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)",
+        }}
+      >
         <div className="flex items-center gap-3 mb-2">
           <button
             onClick={() => setChapter(null)}
@@ -780,7 +744,7 @@ export default function Bible() {
           >
             <ChevronLeft size={16} />
           </button>
-          {(hasRealAudio || (speechSupported && verses)) && (
+          {(prefs.language === "am" || (speechSupported && verses)) && (
             <button
               onClick={toggleListen}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
@@ -790,17 +754,6 @@ export default function Bible() {
               {listening ? <Pause size={16} /> : <Volume2 size={16} />}
               {listening ? "Stop listening" : "Listen"}
             </button>
-          )}
-          {prefs.language === "am" && (
-            <audio
-              key={`${bookSlug}-${chapter}`}
-              ref={audioRef}
-              src={bookSlug ? bibleAudioUrl(bookSlug, chapter) : undefined}
-              preload="none"
-              onEnded={() => setAudioPlaying(false)}
-              onError={handleAudioError}
-              className="hidden"
-            />
           )}
           <button
             onClick={() => setChapter((c) => Math.min(book.chapterCount, (c ?? 1) + 1))}
@@ -1067,7 +1020,13 @@ export default function Bible() {
   // Chapter picker for a selected book
   if (book) {
     return (
-      <div className="bible-scope bg-base min-h-full px-6 py-6 max-w-2xl">
+      <div
+        className="bible-scope bg-base min-h-full px-6 pb-6 max-w-2xl"
+        style={{
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)",
+        }}
+      >
         <div className="flex items-center gap-2 mb-6 -ml-2">
           <button
             onClick={() => setBookSlug(null)}
@@ -1322,12 +1281,12 @@ export default function Bible() {
     return (
       <button
         onClick={() => setExpandedTestament((prev) => (prev === id ? null : id))}
-        className="relative overflow-hidden text-center rounded-[28px] pt-3 px-4 pb-2 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
+        className="relative overflow-hidden text-center rounded-[28px] pt-2 px-4 pb-1 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
         style={{
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
       >
-        <div className="relative mx-auto mb-1.5 w-[77px] h-[77px]">
+        <div className="relative mx-auto mb-1 w-[54px] h-[54px]">
           <svg viewBox="0 0 64 64" className="absolute inset-0 w-full h-full -rotate-90">
             <circle cx="32" cy="32" r={radius} fill="none" stroke="white" strokeOpacity="0.65" strokeWidth="5" />
             <circle
@@ -1352,15 +1311,15 @@ export default function Bible() {
           {theme.label}
         </p>
 
-        <div className="flex items-center justify-center gap-1.5 my-1 opacity-70">
+        <div className="flex items-center justify-center gap-1.5 my-0.5 opacity-70">
           <span className="h-px w-6" style={{ background: accentVar }} />
           <span className="w-1.5 h-1.5 rotate-45 shrink-0" style={{ background: accentVar }} />
           <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1.5 line-clamp-2">{subtitle}</p>
+        <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1 line-clamp-2">{subtitle}</p>
 
-        <div className="grid grid-cols-3 rounded-xl py-1.5" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
+        <div className="grid grid-cols-3 rounded-xl py-1" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
           {stats.map((s, i) => (
             <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
               <s.icon size={12} style={{ color: s.color }} />
@@ -1376,14 +1335,29 @@ export default function Bible() {
   };
 
   return (
-    <div className="bible-scope bg-base min-h-full px-6 py-4 max-w-2xl" style={bibleHomeTheme}>
+    <div
+      className="bible-scope bg-base min-h-full px-6 pb-2.5 max-w-2xl"
+      style={{
+        ...bibleHomeTheme,
+        // Pulls this page's own themed background up to cover the status
+        // bar's safe-area strip too (main's shared padding-top otherwise
+        // leaves that strip showing main's own panel-to-base gradient, a
+        // visibly different shade from this page's flat bg-base right
+        // below it — a seam right at the top edge). The matching
+        // padding-top keeps content sitting exactly where it did before.
+        marginTop: "calc(-1 * env(safe-area-inset-top))",
+        paddingTop: "calc(env(safe-area-inset-top) + 0.625rem)",
+      }}
+    >
       {/* Header — this screen's own bespoke header (Topbar suppresses itself
           on /bible), matching the Home/Library convention: brand mark +
-          settings/login entry point on the left, decorative notification
-          bell on the right (mirrors Home's own not-yet-wired bell). Kept
+          settings/login entry point on the left, notification bell on the
+          right opening the same NotificationsPanel as Home's bell (the
+          daily-verse push subscribe toggle this bell used to be lives on in
+          Bible Settings below, so nothing was lost by repurposing it). Kept
           compact — the whole page is meant to fit one non-scrolling
           screen, same rule the previous design held to. */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <button
           onClick={() => navigate(user ? "/settings" : "/auth")}
           className="flex items-center gap-2.5 text-left -m-1 p-1"
@@ -1409,13 +1383,16 @@ export default function Bible() {
             <Settings2 size={16} />
           </button>
           <button
-            onClick={handleToggleNotifications}
-            disabled={pushBusy}
-            aria-label={pushSubscribed ? "Turn off daily verse notifications" : "Turn on daily verse notifications"}
-            className="relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border transition-opacity disabled:opacity-60"
+            onClick={() => setShowNotifications(true)}
+            aria-label="Notifications"
+            className="relative w-9 h-9 rounded-full flex items-center justify-center bg-elevated ring-1 ring-border"
             style={{ color: "var(--color-gold-dark)" }}
           >
-            <Bell size={16} fill={pushSubscribed ? "currentColor" : "none"} />
+            <Bell size={16} />
+            <span
+              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-base"
+              style={{ background: "var(--color-gold)" }}
+            />
           </button>
         </div>
       </div>
@@ -1433,12 +1410,14 @@ export default function Bible() {
         />
       )}
 
+      {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
+
       {/* Reading Plan — moved to the top of the page (above the hero) so
           it's the first thing visible. Repurposes the real Old/New
           Testament reading progress (see comment above oldPercent/
           newPercent) into this card look, rather than inventing a
           fictional day-count plan the app has no data for. */}
-      <div className="mb-3">
+      <div className="mb-1.5">
         <div className="grid grid-cols-2 gap-3">
           <ReadingPlanCard id="old" />
           <ReadingPlanCard id="new" />
@@ -1460,11 +1439,11 @@ export default function Bible() {
           the day's pick from HERO_IMAGES but is swipeable across the whole
           set, with dots below to show/jump to position. */}
       {!heroVerse ? (
-        <div className="w-full h-[175px] rounded-3xl mb-3 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
+        <div className="w-full h-[176px] rounded-3xl mb-2 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
-        <div className="mb-3">
+        <div className="mb-1.5">
           <div
-            className="relative w-full h-[175px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
+            className="relative w-full h-[176px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
             onTouchStart={(e) => {
               heroTouchStartX.current = e.touches[0].clientX;
             }}
@@ -1529,7 +1508,7 @@ export default function Bible() {
             </div>
           </div>
           </div>
-          <div className="flex items-center justify-center gap-1.5 mt-2">
+          <div className="flex items-center justify-center gap-1.5 mt-1.5">
             {HERO_IMAGES.map((src, i) => (
               <button
                 key={src}
@@ -1549,7 +1528,7 @@ export default function Bible() {
 
       {/* Quick Access — Bookmarks / Notes / History / Favorites in one card. */}
       <div
-        className="relative rounded-2xl mb-5 shadow-[0_10px_28px_-16px_rgba(36,28,61,0.3)] ring-1 ring-black/[0.04] overflow-hidden"
+        className="relative rounded-2xl mb-3 shadow-[0_10px_28px_-16px_rgba(36,28,61,0.3)] ring-1 ring-black/[0.04] overflow-hidden"
         style={{ background: "var(--color-elevated)" }}
       >
         <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
@@ -1558,7 +1537,7 @@ export default function Bible() {
             <button
               key={item.id}
               onClick={item.onClick}
-              className={`flex flex-col items-center gap-2 py-4 min-w-0 active:scale-95 transition-transform ${
+              className={`flex flex-col items-center gap-1 py-2.5 min-w-0 active:scale-95 transition-transform ${
                 i > 0 ? "border-l border-border" : ""
               }`}
             >
@@ -1584,7 +1563,7 @@ export default function Bible() {
           there's no per-chapter scroll-position tracking to derive a truer
           in-chapter percentage from. */}
       {recentHistory.length > 0 && (
-        <div className="mb-2">
+        <div className="mb-1.5">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <BookOpen size={16} style={{ color: "var(--color-gold-dark)" }} />
@@ -1617,7 +1596,7 @@ export default function Bible() {
                   style={{ background: "var(--color-elevated)" }}
                 >
                   <div
-                    className="w-full h-12 rounded-lg flex items-center justify-between px-2 mb-2"
+                    className="w-full h-9 rounded-lg flex items-center justify-between px-2 mb-1"
                     style={{ backgroundImage: `linear-gradient(160deg, rgba(0,0,0,0.05), rgba(0,0,0,0.4)), ${tileGradient}` }}
                   >
                     <span

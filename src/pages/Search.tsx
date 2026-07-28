@@ -1,4 +1,4 @@
-import { ChevronLeft, Clock, ListMusic, Sparkles, TrendingUp, X, type LucideIcon } from "lucide-react";
+import { ChevronLeft, Clock, ListMusic, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/Card";
@@ -40,7 +40,6 @@ interface BrowseTile {
 // alongside any other section an admin creates the same way.
 const BROWSE_TILES: BrowseTile[] = [
   { name: "Most Played", kind: "trending", gradient: ["#f2b705", "#7c2d12"], icon: TrendingUp },
-  { name: "New Releases", kind: "era", value: "new", gradient: ["#14b866", "#052e16"], icon: Sparkles },
 ];
 
 type ResultFilter = "all" | "songs" | "artists" | "albums" | "playlists";

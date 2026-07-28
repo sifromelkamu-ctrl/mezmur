@@ -1,10 +1,12 @@
 import { lazy, Suspense, useState } from "react";
 import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
+import BibleAudioBar from "./components/BibleAudioBar";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
 import SplashScreen from "./components/SplashScreen";
 import Topbar from "./components/Topbar";
 import { AuthProvider } from "./context/AuthContext";
+import { BibleAudioProvider } from "./context/BibleAudioContext";
 import { CustomArtistsProvider } from "./context/CustomArtistsContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import { LanguageProvider } from "./context/LanguageContext";
@@ -95,18 +97,21 @@ function AppShell() {
 
   return (
     <div className="h-dvh w-screen flex flex-col bg-base overflow-hidden">
-      <main className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48">
+      <main
+        className="relative flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain bg-gradient-to-b from-panel to-base rounded-lg m-0 pb-48"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="aurora-bg" />
         <div className="relative z-10">
           <Topbar />
           {routes}
         </div>
       </main>
-      <div
-        className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-3 pb-2"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
-      >
-        <PlayerBar />
+      <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2">
+        <div className="px-3 flex flex-col gap-2">
+          <PlayerBar />
+          <BibleAudioBar />
+        </div>
         <MobileNav />
       </div>
     </div>
@@ -124,11 +129,13 @@ export default function App() {
             <FavoritesProvider>
               <LyricsProvider>
                 <PlayerProvider>
-                  <SleepTimerProvider>
-                    <HashRouter>
-                      <AppShell />
-                    </HashRouter>
-                  </SleepTimerProvider>
+                  <BibleAudioProvider>
+                    <SleepTimerProvider>
+                      <HashRouter>
+                        <AppShell />
+                      </HashRouter>
+                    </SleepTimerProvider>
+                  </BibleAudioProvider>
                 </PlayerProvider>
               </LyricsProvider>
             </FavoritesProvider>

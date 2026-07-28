@@ -88,6 +88,16 @@ export default function CoverArt({
   const { user } = useAuth();
   const [loaded, setLoaded] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
+  // On a real device's cellular/Wi-Fi a single image request can drop or
+  // time out even though the file is fine — happens far more than on a
+  // simulator riding the host Mac's own stable network. Without a retry,
+  // that one hiccup permanently sticks the item on the gradient fallback
+  // until the component remounts, which reads as "some album art just
+  // never loads." A couple of quick automatic retries (each forcing a
+  // fresh request via a cache-busting query param, since the browser
+  // won't re-issue an identical failed request on its own) papers over
+  // exactly that kind of transient drop.
+  const [retryCount, setRetryCount] = useState(0);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [editing, setEditing] = useState(false);
   // Reflects a just-saved edit immediately in this instance, without
@@ -126,6 +136,7 @@ export default function CoverArt({
   useEffect(() => {
     setLoaded(false);
     setPhotoFailed(false);
+    setRetryCount(0);
     setNatural(null);
     setSavedOverride(undefined);
   }, [photoUrl]);
@@ -133,6 +144,16 @@ export default function CoverArt({
   const resolvedSizeClass = rounded && size === "xl" ? roundedXlClass : sizeClasses[size];
   const badge = badgeSizes[size];
   const roundedClass = rounded ? "rounded-full" : size === "card" || size === "albumHero" ? "rounded-2xl" : "rounded-md";
+
+  const MAX_PHOTO_RETRIES = 2;
+  const retrySrc = retryCount > 0 && photoUrl ? `${photoUrl}${photoUrl.includes("?") ? "&" : "?"}retry=${retryCount}` : photoUrl;
+  const handlePhotoError = () => {
+    if (retryCount < MAX_PHOTO_RETRIES) {
+      setTimeout(() => setRetryCount((c) => c + 1), 700);
+    } else {
+      setPhotoFailed(true);
+    }
+  };
 
   // Until the smart/saved frame and natural dimensions are both known, fall
   // back to plain object-cover so something reasonable shows immediately —
@@ -199,7 +220,7 @@ export default function CoverArt({
             style={{ transform: `rotate(${activeFrame.rotation}deg)`, transformOrigin: "center" }}
           >
             <img
-              src={photoUrl}
+              src={retrySrc}
               alt=""
               loading="lazy"
               className={`absolute transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
@@ -215,12 +236,12 @@ export default function CoverArt({
                 setLoaded(true);
                 setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
               }}
-              onError={() => setPhotoFailed(true)}
+              onError={handlePhotoError}
             />
           </div>
         ) : (
           <img
-            src={photoUrl}
+            src={retrySrc}
             alt=""
             loading="lazy"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
@@ -228,7 +249,7 @@ export default function CoverArt({
               setLoaded(true);
               setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
             }}
-            onError={() => setPhotoFailed(true)}
+            onError={handlePhotoError}
           />
         ))}
       {!showPhoto && (

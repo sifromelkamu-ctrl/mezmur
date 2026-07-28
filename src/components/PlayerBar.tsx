@@ -71,7 +71,7 @@ export default function PlayerBar() {
         </button>
         <button
           onClick={togglePlay}
-          className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-brand to-brand-dark text-white shadow-[0_6px_18px_-4px_rgba(124,92,255,0.7)] active:scale-90 transition-transform"
+          className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-brand to-brand-dark text-black shadow-[0_6px_18px_-4px_rgba(124,92,255,0.7)] active:scale-90 transition-transform"
           aria-label={isPlaying ? "Pause" : "Play"}
         >
           {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}

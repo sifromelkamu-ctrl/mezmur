@@ -19,7 +19,7 @@ function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
-function rgbToHsl([r, g, b]: RGB): HSL {
+export function rgbToHsl([r, g, b]: RGB): HSL {
   const rn = r / 255;
   const gn = g / 255;
   const bn = b / 255;
@@ -43,7 +43,7 @@ function rgbToHsl([r, g, b]: RGB): HSL {
   return [h * 60, s, l];
 }
 
-function hslToRgb([h, s, l]: HSL): RGB {
+export function hslToRgb([h, s, l]: HSL): RGB {
   if (s === 0) {
     const v = Math.round(l * 255);
     return [v, v, v];
@@ -67,12 +67,12 @@ function hslToRgb([h, s, l]: HSL): RGB {
   ];
 }
 
-function rgbToHex([r, g, b]: RGB): string {
+export function rgbToHex([r, g, b]: RGB): string {
   const toHex = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-function hexToRgb(hex: string): RGB {
+export function hexToRgb(hex: string): RGB {
   const clean = hex.replace("#", "");
   const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
   const num = parseInt(full, 16);
@@ -83,7 +83,7 @@ function hexToRgb(hex: string): RGB {
 // used to derive a deep background wash and a soft shadow tint from the
 // two extracted swatches, so every accent color feels like it came from
 // the same artwork rather than being picked independently.
-function shade(hex: string, targetL: number, satMul: number): string {
+export function shade(hex: string, targetL: number, satMul: number): string {
   const [h, s, _l] = rgbToHsl(hexToRgb(hex));
   return rgbToHex(hslToRgb([h, clamp01(s * satMul), clamp01(targetL)]));
 }
