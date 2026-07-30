@@ -6,14 +6,20 @@ const LETTER_STAGGER_MS = 55;
 const LETTERS_START_MS = 350;
 const SHIMMER_START_MS = LETTERS_START_MS + WORDMARK.length * LETTER_STAGGER_MS + 250;
 const TAGLINE_WORDS = ["Worship.", "Listen.", "Inspire."];
-const TAGLINE_STAGGER_MS = 300;
-// Just past when the last tagline word finishes popping in (SHIMMER_START_MS
-// + 2 * TAGLINE_STAGGER_MS + ~0.5s pop duration ≈ 2030ms) — long enough to
-// see the full choreography, not an extra artificial hold on top of it.
-// Data fetching already starts immediately underneath this overlay (see
-// App.tsx — the whole provider tree mounts regardless of showSplash), so
-// shortening this doesn't defer any real loading, only the branded intro.
-const HOLD_MS = 2100;
+// Each word's 0.5s pop animation peaks (scale overshoot + full opacity) at
+// its own 60% mark — 300ms in — which is exactly when a 300ms stagger let
+// the next word start, so the three used to visually overlap/cascade into
+// each other instead of reading as a clear 1-2-3 sequence. Widening the gap
+// past that peak fixes it.
+const TAGLINE_STAGGER_MS = 450;
+// The last tagline word finishes popping in and settles at SHIMMER_START_MS
+// + 2 * TAGLINE_STAGGER_MS + 0.5s pop duration = 2330ms; this holds another
+// half second past that so all three words are unmistakably shown together,
+// at rest, before exiting — not just barely finished landing. Data fetching
+// already starts immediately underneath this overlay (see App.tsx — the
+// whole provider tree mounts regardless of showSplash), so lengthening this
+// only extends the branded intro, not any real loading.
+const HOLD_MS = 2830;
 // Must match .splash-exiting's animation-duration in index.css (0.55s) —
 // this is only the JS-side timer that unmounts the component once that CSS
 // fade-out finishes, not an independent duration.
@@ -130,7 +136,14 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           className="h-full rounded-full"
           style={{
             background: `linear-gradient(90deg, ${SPLASH_TEAL}, ${SPLASH_TEAL_LIGHT})`,
-            animation: `splash-progress-fill 1.4s cubic-bezier(0.4, 0, 0.2, 1) ${LETTERS_START_MS}ms forwards`,
+            // Duration is HOLD_MS - LETTERS_START_MS (its own start delay),
+            // not a fixed guess — that way it keeps moving at a constant
+            // rate right up until the instant the splash starts exiting,
+            // instead of finishing early and sitting fully filled for a few
+            // hundred idle ms first, which read as the bar getting stuck.
+            // Linear rather than the previous decelerating ease-out too, so
+            // it doesn't visibly slow down just before that.
+            animation: `splash-progress-fill ${HOLD_MS - LETTERS_START_MS}ms linear ${LETTERS_START_MS}ms forwards`,
           }}
         />
       </div>

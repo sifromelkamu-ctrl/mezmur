@@ -1,7 +1,8 @@
-import { Music2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { memo, useState } from "react";
 import { prefetchRoute } from "../lib/prefetchRoute";
 import { useNavigate } from "react-router-dom";
+import defaultAlbumArt from "../assets/default-album-art.jpg";
 import CoverArt from "./CoverArt";
 import EqualizerBars from "./EqualizerBars";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
@@ -114,15 +115,12 @@ function Card({
             onError={() => setPhotoFailed(true)}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className={`rounded-full flex items-center justify-center bg-white/10 ring-1 ring-white/25 backdrop-blur-sm shadow-inner ${
-                fullWidth ? "w-20 h-20" : "w-14 h-14"
-              }`}
-            >
-              <Music2 size={fullWidth ? 36 : 26} className="text-white/90" strokeWidth={1.5} />
-            </div>
-          </div>
+          // Portrait mode is artist-cards-only (see the `portrait` prop's own
+          // doc) — same branded fallback cover CoverArt uses for albums/
+          // artists/tracks with no artwork, kept in sync here since this
+          // branch renders its own artwork entirely rather than going
+          // through CoverArt.
+          <img src={defaultAlbumArt} alt="" className="absolute inset-0 w-full h-full object-cover" />
         )}
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-3 pr-12">

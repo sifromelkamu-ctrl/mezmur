@@ -107,12 +107,32 @@ function AppShell() {
           {routes}
         </div>
       </main>
-      <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2">
-        <div className="px-3 flex flex-col gap-2">
+      <div className="fixed inset-x-0 bottom-0 z-30">
+        {/* One continuous frosted zone spanning the whole bottom band, edge
+            to edge — covers the corner slivers beside the nav pill (its own
+            side margins/rounding otherwise leave scrolling content peeking
+            through there) and the safe-area gap below it, not just a patch
+            directly under the pill. Faded in via a top-to-bottom mask
+            instead of a hard blur edge, so it reads as a soft graduated
+            vignette — the same look as Apple Music's mini-player backdrop —
+            rather than a rectangle dropped on top of the page. */}
+        <div
+          className="absolute inset-0 backdrop-blur-xl pointer-events-none"
+          style={{
+            WebkitMaskImage: "linear-gradient(to bottom, transparent, black 45%)",
+            maskImage: "linear-gradient(to bottom, transparent, black 45%)",
+            background:
+              "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--color-base) 60%, transparent) 45%)",
+          }}
+        />
+        <div
+          className="relative flex flex-col gap-2 px-3"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) - 10px)" }}
+        >
           <PlayerBar />
           <BibleAudioBar />
+          <MobileNav />
         </div>
-        <MobileNav />
       </div>
     </div>
   );

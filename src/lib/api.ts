@@ -236,6 +236,8 @@ export interface ApiFeaturedBannerAdmin {
 
 export interface ApiArtistDetail extends ApiArtist {
   albums: ApiAlbum[];
+  singleReleases: ApiTrack[];
+  // Populated only when singleReleases is empty — see GET /api/artists/:id.
   topTracks: ApiTrack[];
 }
 
@@ -539,6 +541,7 @@ export const adminApi = {
     duration: number;
     fileExt?: string;
     trackNumber?: number;
+    isSingle?: boolean;
   }) => request<AdminUploadTrackResult>("/admin/upload-track", { method: "POST", body: JSON.stringify(input) }),
 
   // The track row + signed URL come from uploadTrack(); this sends the

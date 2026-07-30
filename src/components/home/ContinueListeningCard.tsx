@@ -1,6 +1,7 @@
 import { Play } from "lucide-react";
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
+import defaultAlbumArt from "../../assets/default-album-art.jpg";
 import EqualizerBars from "../EqualizerBars";
 import { getPosition } from "../../lib/recentlyPlayed";
 import { formatDuration } from "../../utils/format";
@@ -46,9 +47,7 @@ function ContinueListeningCard({
         <div
           className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
           style={{
-            backgroundImage: track.coverUrl
-              ? `url(${track.coverUrl})`
-              : `linear-gradient(150deg, ${track.gradient[0]}, ${track.gradient[1]})`,
+            backgroundImage: `url(${track.coverUrl || defaultAlbumArt})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}

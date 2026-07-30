@@ -210,7 +210,10 @@ export default function Library() {
 
   const playArtist = async (id: string) => {
     const full = await artistsApi.get(id);
-    if (full.topTracks[0]) playTrack(full.topTracks[0], full.topTracks);
+    // Single Releases when the artist has any, their top-played tracks
+    // otherwise — same fallback ArtistDetail's own Songs section uses.
+    const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;
+    if (tracks[0]) playTrack(tracks[0], tracks);
   };
 
   const playAlbum = async (id: string) => {

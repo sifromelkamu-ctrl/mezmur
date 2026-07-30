@@ -1,12 +1,18 @@
 import { BookOpen, Home, Library, Search } from "lucide-react";
-import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { prefetchRoute } from "../lib/prefetchRoute";
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex items-center justify-center flex-1 py-[1.6px] transition-colors ${
-    isActive ? "text-fg" : "text-fg-subtle"
+  `relative flex items-center justify-center flex-1 py-[2.5px] mx-0.5 rounded-2xl transition-all duration-300 active:scale-[0.94] ${
+    // fg-based, not literal white — in dark mode fg is white, so this is
+    // pixel-identical to before; in light mode fg is near-black, so the
+    // same "raised frosted panel" reads as a soft tinted panel against the
+    // light cream bar instead of vanishing (a literal white tint on an
+    // already near-white background has essentially no contrast to see).
+    isActive
+      ? "bg-gradient-to-b from-fg/14 to-fg/6 ring-1 ring-inset ring-fg/10 shadow-[inset_0_1px_1px_color-mix(in_oklab,var(--color-fg)_15%,transparent)]"
+      : ""
   }`;
 
 function NavIcon({
@@ -18,39 +24,31 @@ function NavIcon({
   Icon: typeof Home;
   label: string;
 }) {
-  // Active state used to be a translucent brand-tinted circle with a
-  // brand-colored icon on top — same hue on both layers, so the icon
-  // nearly disappeared into its own background (worst in light mode).
-  // A solid orb with a white icon keeps it legible in any theme/accent.
+  // Matches the reference iOS 26 tab bar: the active item sits inside a
+  // raised, lightly-frosted capsule (the parent NavLink's own glass gradient
+  // + inset highlight, see itemClass), with its icon further picked out in
+  // a solid accent-filled circle badge (white icon on brand color) —
+  // inactive items stay plain, no circle, so the one active badge reads as
+  // a clear focal point rather than every tab getting the same treatment.
   return (
-    <span className="flex flex-col items-center justify-center gap-0.5">
+    <span className="flex flex-col items-center justify-center gap-[2.5px]">
       <span
-        className={`tile-glow flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 ${
-          isActive ? "ring-1 ring-white/20" : ""
+        className={`flex items-center justify-center w-[46px] h-[46px] rounded-full transition-all duration-300 ${
+          isActive ? "bg-brand/70 shadow-[0_2px_8px_-1px_color-mix(in_oklab,var(--color-brand)_45%,transparent)]" : ""
         }`}
-        style={
-          isActive
-            ? ({
-                "--tile-glow": "color-mix(in oklab, var(--color-brand) 60%, transparent)",
-                background:
-                  "radial-gradient(120% 130% at 35% 25%, color-mix(in oklab, var(--color-brand) 38%, white) 0%, var(--color-brand) 58%, color-mix(in oklab, var(--color-brand) 82%, black) 100%)",
-                // filter (not box-shadow) so it doesn't fight the pulsing
-                // inset highlight/shade the tile-glow-pulse keyframes
-                // already animate on this element — a real drop shadow
-                // grounding the orb, giving it depth against the bar
-                // instead of reading as a flat pasted-on circle.
-                filter: "drop-shadow(0 3px 6px color-mix(in oklab, var(--color-brand) 45%, transparent))",
-              } as CSSProperties)
-            : undefined
-        }
       >
         <Icon
-          size={23}
-          strokeWidth={isActive ? 2.4 : 2}
-          className={isActive ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" : ""}
+          size={19}
+          strokeWidth={isActive ? 2.2 : 1.9}
+          fill={isActive ? "currentColor" : "none"}
+          className={`transition-all duration-200 ${isActive ? "text-white scale-105" : "text-fg-subtle"}`}
         />
       </span>
-      <span className={`font-sans text-[9.5px] font-medium leading-none tracking-wide ${isActive ? "text-brand" : "text-fg-subtle"}`}>
+      <span
+        className={`font-sans text-[11px] font-semibold leading-none tracking-wide transition-colors duration-200 ${
+          isActive ? "text-fg" : "text-fg-subtle"
+        }`}
+      >
         {label}
       </span>
     </span>
@@ -61,13 +59,18 @@ export default function MobileNav() {
   const { t } = useLanguage();
 
   return (
-    <nav
-      className="relative overflow-hidden w-full flex items-center rounded-t-2xl bg-elevated/90 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.45)] px-1 pt-[1.6px]"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.6px)" }}
-    >
-      {/* Same specular highlight as the quick-action card, for a matching
-          glass-premium finish across Home's chrome. */}
-      <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
+    <nav className="relative overflow-hidden w-full flex items-center rounded-full bg-elevated/75 backdrop-blur-2xl ring-1 ring-brand/25 shadow-[0_18px_44px_-14px_rgba(0,0,0,0.55)] px-[7px] py-[5px]">
+      {/* Liquid-glass sheen: a soft top-lit gradient across the whole pill,
+          as if it's a curved, lit-from-above surface — plus the sharper rim
+          highlights tracing the top/bottom edges where the "glass" catches
+          the most light. Together these read as one continuous refractive
+          material instead of a flat tinted rectangle. fg-based rather than
+          literal white for the same reason as the active capsule above —
+          stays visible against the light-mode bar instead of just
+          disappearing into an already-light background. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-fg/10 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-fg/60 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-10 bottom-0 h-px bg-gradient-to-r from-transparent via-fg/15 to-transparent pointer-events-none" />
       <NavLink to="/" end className={itemClass}>
         {({ isActive }) => <NavIcon isActive={isActive} Icon={Home} label={t("home")} />}
       </NavLink>

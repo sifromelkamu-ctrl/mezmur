@@ -90,7 +90,14 @@ export default function Artists() {
                 <X size={13} />
               </button>
               <div className="mb-4">
-                <CoverArt gradient={artist.gradient} size="md" rounded photoUrl={artist.photoUrl} />
+                <CoverArt
+                  gradient={artist.gradient}
+                  size="md"
+                  rounded
+                  photoUrl={artist.photoUrl}
+                  entityType="artist"
+                  entityId={artist.id}
+                />
               </div>
               <p className="text-sm font-semibold truncate">{artist.name}</p>
               <p className="text-xs text-fg-muted mt-1">

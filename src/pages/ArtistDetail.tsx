@@ -7,6 +7,7 @@ import {
   Pause,
   Pencil,
   Play,
+  Plus,
   Share2,
   Shuffle,
   Trash2,
@@ -15,13 +16,22 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import defaultAlbumArt from "../assets/default-album-art.jpg";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import EqualizerBars from "../components/EqualizerBars";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
-import { albumsApi, artistsApi, type ApiAlbum, type ApiAlbumType, type ApiArtistDetail, type ApiTrack } from "../lib/api";
+import {
+  adminApi,
+  albumsApi,
+  artistsApi,
+  type ApiAlbum,
+  type ApiAlbumType,
+  type ApiArtistDetail,
+  type ApiTrack,
+} from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
 
@@ -128,7 +138,7 @@ function AlbumCard({
   );
 }
 
-// Bespoke Popular Songs row for the split-theme content surface — the
+// Bespoke Single Releases row for the split-theme content surface — the
 // shared TrackRow reads the app's generic text-fg/text-fg-muted tokens,
 // which don't match this section's exact spec'd hex values (#111111 title /
 // #6B7280 artist / #9CA3AF duration in light mode), so this mirrors
@@ -200,6 +210,11 @@ export default function ArtistDetail() {
   const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false);
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
   const [showAllSongs, setShowAllSongs] = useState(false);
+  const [addingAlbum, setAddingAlbum] = useState(false);
+  const [newAlbumTitle, setNewAlbumTitle] = useState("");
+  const [newAlbumType, setNewAlbumType] = useState<ApiAlbumType>("album");
+  const [creatingAlbum, setCreatingAlbum] = useState(false);
+  const [addAlbumError, setAddAlbumError] = useState<string | null>(null);
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
@@ -285,15 +300,22 @@ export default function ArtistDetail() {
     flashCopied();
   };
 
+  // Single Releases when the artist has any; their most-played tracks
+  // otherwise (server only bothers computing that fallback list when
+  // singleReleases is empty — see GET /api/artists/:id), so this section
+  // never just goes blank for an artist with no standalone singles yet.
+  const songsSectionTracks = artist.singleReleases.length > 0 ? artist.singleReleases : artist.topTracks;
+  const songsSectionTitle = artist.singleReleases.length > 0 ? "Single Releases" : "Popular Songs";
+
   const handlePlayAll = () => {
-    if (artist.topTracks[0]) playTrack(artist.topTracks[0], artist.topTracks);
+    if (songsSectionTracks[0]) playTrack(songsSectionTracks[0], songsSectionTracks);
   };
 
   const handleShuffle = () => {
-    if (artist.topTracks.length === 0) return;
+    if (songsSectionTracks.length === 0) return;
     if (!shuffle) toggleShuffle();
-    const randomTrack = artist.topTracks[Math.floor(Math.random() * artist.topTracks.length)];
-    playTrack(randomTrack, artist.topTracks);
+    const randomTrack = songsSectionTracks[Math.floor(Math.random() * songsSectionTracks.length)];
+    playTrack(randomTrack, songsSectionTracks);
   };
 
   const handleArtistRadio = () => {
@@ -320,6 +342,24 @@ export default function ArtistDetail() {
     }
   };
 
+  const handleCreateAlbum = async () => {
+    const title = newAlbumTitle.trim();
+    if (!title) return;
+    setCreatingAlbum(true);
+    setAddAlbumError(null);
+    try {
+      const album = await adminApi.addAlbum(artist.id, title, newAlbumType);
+      setArtist({ ...artist, albums: [...artist.albums, album] });
+      setNewAlbumTitle("");
+      setNewAlbumType("album");
+      setAddingAlbum(false);
+    } catch (err) {
+      setAddAlbumError(err instanceof Error ? err.message : "Could not create album");
+    } finally {
+      setCreatingAlbum(false);
+    }
+  };
+
   const handlePhotoUpload = async (file: File) => {
     const updated = await artistsApi.uploadPhoto(artist.id, file);
     setArtist({ ...artist, photoUrl: updated.photoUrl });
@@ -331,7 +371,7 @@ export default function ArtistDetail() {
   };
 
   const showHeroPhoto = Boolean(artist.photoUrl) && !heroPhotoFailed;
-  const visibleTopTracks = showAllSongs ? artist.topTracks : artist.topTracks.slice(0, 5);
+  const visibleSongs = showAllSongs ? songsSectionTracks : songsSectionTracks.slice(0, 5);
 
   return (
     // Flat, not a gradient — the teal→black transition now lives entirely
@@ -360,10 +400,11 @@ export default function ArtistDetail() {
               onError={() => setHeroPhotoFailed(true)}
             />
           ) : (
-            <div
-              className="w-full h-full"
-              style={{ backgroundImage: `linear-gradient(150deg, ${artist.gradient[0]}, ${artist.gradient[1]})` }}
-            />
+            // Same branded fallback cover as CoverArt/Card use for other
+            // artists/albums with no artwork — this hero renders its own
+            // artwork directly rather than through CoverArt, so it's kept
+            // in sync here instead.
+            <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
         {/* Teal→black wash — stays fully transparent for the top half of the
@@ -581,10 +622,75 @@ export default function ArtistDetail() {
           </div>
         </div>
 
-        {artist.albums.length === 0 && (
+        {isAdmin &&
+          (addingAlbum ? (
+            <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
+              <div>
+                <label className="text-xs text-fg-muted block mb-1">Album title</label>
+                <input
+                  value={newAlbumTitle}
+                  onChange={(e) => setNewAlbumTitle(e.target.value)}
+                  placeholder="e.g. Live in Addis"
+                  autoFocus
+                  className="w-full bg-base rounded-md px-3 py-2 text-sm placeholder:text-fg-subtle focus:outline-none focus:ring-2 focus:ring-border"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-fg-muted block mb-1">Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {ALBUM_TYPE_ORDER.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setNewAlbumType(type)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                        newAlbumType === type
+                          ? "bg-brand text-black border-transparent"
+                          : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle"
+                      }`}
+                    >
+                      {ALBUM_TYPE_LABEL[type]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {addAlbumError && <p className="text-xs text-accent-red">{addAlbumError}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCreateAlbum}
+                  disabled={creatingAlbum || !newAlbumTitle.trim()}
+                  className="flex items-center gap-1.5 bg-brand text-black text-sm font-semibold px-3 py-1.5 rounded-full disabled:opacity-60"
+                >
+                  <Check size={14} />
+                  {creatingAlbum ? "Creating…" : "Create album"}
+                </button>
+                <button
+                  onClick={() => {
+                    setAddingAlbum(false);
+                    setAddAlbumError(null);
+                    setNewAlbumTitle("");
+                  }}
+                  className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg px-3 py-1.5"
+                >
+                  <X size={14} />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingAlbum(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2.5 mb-8 text-fg-muted hover:text-fg bg-elevated hover:bg-elevated-hover border border-border transition-colors"
+            >
+              <Plus size={15} />
+              Add album
+            </button>
+          ))}
+
+        {artist.albums.length === 0 && !addingAlbum && (
           <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
             <Music2 size={18} />
-            No albums yet — check back soon.
+            No albums yet{isAdmin ? " — add one above." : " — check back soon."}
           </div>
         )}
 
@@ -619,16 +725,16 @@ export default function ArtistDetail() {
           </section>
         ))}
 
-        {artist.topTracks.length > 0 && (
+        {songsSectionTracks.length > 0 && (
           <section className="mb-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
                 <h2 className="text-xl font-bold tracking-tight text-fg">
-                  Popular Songs
+                  {songsSectionTitle}
                 </h2>
               </div>
-              {artist.topTracks.length > 5 && (
+              {songsSectionTracks.length > 5 && (
                 <button
                   onClick={() => setShowAllSongs((s) => !s)}
                   className="text-sm font-semibold text-brand hover:text-brand-glow transition-colors"
@@ -637,8 +743,8 @@ export default function ArtistDetail() {
                 </button>
               )}
             </div>
-            {visibleTopTracks.map((track, i) => (
-              <SongRow key={track.id} track={track} index={i + 1} queue={visibleTopTracks} />
+            {visibleSongs.map((track, i) => (
+              <SongRow key={track.id} track={track} index={i + 1} queue={visibleSongs} />
             ))}
           </section>
         )}

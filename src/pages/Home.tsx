@@ -158,10 +158,15 @@ export default function Home() {
     // concertsApi.tracks()) — neither kind of concert content should be
     // held to a different Continue Listening bar than anything else.
     const concertSongs = concerts.filter(isConcertSongItem);
-    // Keeps recency order but only the most-recent track per artist — the
-    // raw play log otherwise repeats the same artist's tiles whenever the
-    // listener replayed a few of their songs back to back.
-    const seenArtists = new Set<string>();
+    // Keeps recency order but collapses to just the most-recently-played
+    // track per album — playing several tracks off the same album otherwise
+    // repeated that album's tiles down the whole row. A single most-recent
+    // card is enough to resume from, and its own card already links into
+    // the full album (see ContinueListeningCard's albumHref) to pick up any
+    // other track from it. Tracks with no album (standalone singles) have
+    // nothing to collapse into, so every one of those still gets its own
+    // card.
+    const seenAlbums = new Set<string>();
     const result: ApiTrack[] = [];
     for (const id of ids) {
       const tr =
@@ -169,9 +174,9 @@ export default function Home() {
         concertSongs.find((t) => t.id === id) ??
         concertAlbumTracks.find((t) => t.id === id);
       if (!tr) continue;
-      if (tr.artistId) {
-        if (seenArtists.has(tr.artistId)) continue;
-        seenArtists.add(tr.artistId);
+      if (tr.albumId) {
+        if (seenAlbums.has(tr.albumId)) continue;
+        seenAlbums.add(tr.albumId);
       }
       result.push(tr);
     }
@@ -198,7 +203,10 @@ export default function Home() {
   const playArtist = useCallback(
     async (id: string) => {
       const full = await artistsApi.get(id);
-      if (full.topTracks[0]) playTrack(full.topTracks[0], full.topTracks);
+      // Single Releases when the artist has any, their top-played tracks
+      // otherwise — same fallback ArtistDetail's own Songs section uses.
+      const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;
+      if (tracks[0]) playTrack(tracks[0], tracks);
     },
     [playTrack]
   );

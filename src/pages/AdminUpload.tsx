@@ -312,6 +312,10 @@ export default function AdminUpload() {
         duration: row.duration,
         fileExt: ext,
         trackNumber: row.albumId && row.trackNumber ? row.trackNumber : undefined,
+        // The album dropdown's own "No album (single)" option already
+        // promises this — it just didn't actually tag the track as one
+        // before, so it never showed up under the artist's Single Releases.
+        isSingle: !row.albumId,
       });
       await adminApi.putAudioFile(upload.signedUrl, row.file);
       updateRow(row.id, { status: "done" });

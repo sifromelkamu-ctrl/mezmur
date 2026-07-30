@@ -156,6 +156,13 @@ const uploadTrackSchema = z.object({
   // (see AdminUpload.tsx's folder picker, which parses this from each
   // filename's leading number).
   trackNumber: z.number().int().positive().max(999).optional(),
+  // Deliberate tag, not inferred from albumId being absent — same
+  // "explicit, not implied" rule GET /api/singles documents (a track can
+  // end up without an album for reasons that have nothing to do with being
+  // a single). AdminUpload.tsx only ever sends this alongside an empty
+  // albumId, but it's still enforced server-side below rather than trusted
+  // as-is.
+  isSingle: z.boolean().optional(),
 });
 
 // POST /api/admin/upload-track
@@ -172,7 +179,11 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const { title, artistId, albumId, genre, duration, fileExt, trackNumber } = parsed.data;
+  const { title, artistId, albumId, genre, duration, fileExt, trackNumber, isSingle } = parsed.data;
+  // Marking a track a Single only ever means "standalone" — forces it off
+  // any album regardless of what else was sent, mirroring the same rule
+  // adminLibrary.ts's PATCH route already enforces for edits.
+  const effectiveAlbumId = isSingle ? undefined : albumId;
 
   try {
     const artist = await prisma.artist.findUnique({ where: { id: artistId } });
@@ -180,8 +191,8 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
       res.status(404).json({ error: "Artist not found" });
       return;
     }
-    if (albumId) {
-      const album = await prisma.album.findUnique({ where: { id: albumId } });
+    if (effectiveAlbumId) {
+      const album = await prisma.album.findUnique({ where: { id: effectiveAlbumId } });
       if (!album || album.artistId !== artistId) {
         res.status(404).json({ error: "Album not found for this artist" });
         return;
@@ -205,16 +216,17 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
       data: {
         title,
         artistId,
-        albumId,
+        albumId: effectiveAlbumId,
         genre,
         duration,
         audioUrl: publicUrlData.publicUrl,
-        trackNumber: albumId ? trackNumber : undefined,
+        trackNumber: effectiveAlbumId ? trackNumber : undefined,
+        isSingle: Boolean(isSingle),
       },
       include: { artist: true, album: true },
     });
 
-    await logAudit(req.userId!, "upload_track", { trackId: track.id, title, artistId, albumId });
+    await logAudit(req.userId!, "upload_track", { trackId: track.id, title, artistId, albumId: effectiveAlbumId });
 
     res.status(201).json({
       track: toTrackDTO(track),

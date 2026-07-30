@@ -1,5 +1,6 @@
 import { Music2, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
+import defaultAlbumArt from "../assets/default-album-art.jpg";
 import { useAuth } from "../context/useAuth";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { useSmartFrame } from "../hooks/useSmartFrame";
@@ -7,6 +8,16 @@ import { adminApi, type ArtworkEntityType, type ArtworkFrame } from "../lib/api"
 import { emitArtworkChanged } from "../lib/artworkEvents";
 import { computeRenderRect, hasLetterbox } from "../utils/artworkTransform";
 import ArtworkEditor from "./ArtworkEditor";
+
+// Branded fallback cover for albums/artists/tracks with no artwork uploaded
+// yet (tracks fall under this too since a track with an album has no
+// artwork of its own — see readOnlyArtwork's doc below — so its "missing
+// photo" case is really the album's). Only ever swapped in for the
+// `!showPhoto` branch below, i.e. exactly the entities with no real artwork
+// set — anything with a photoUrl already renders that untouched, same as
+// before. Playlists/sermons/podcasts still keep the plain gradient + Music2
+// badge, unchanged.
+const DEFAULT_ART_ENTITY_TYPES = new Set<ArtworkEntityType>(["album", "artist", "track"]);
 
 interface CoverArtProps {
   gradient: [string, string];
@@ -252,13 +263,16 @@ export default function CoverArt({
             onError={handlePhotoError}
           />
         ))}
-      {!showPhoto && (
-        <div
-          className={`relative rounded-full flex items-center justify-center bg-white/10 ring-1 ring-white/25 backdrop-blur-sm shadow-inner ${badge.badge}`}
-        >
-          <Music2 size={badge.icon} className="text-white/90" strokeWidth={1.5} />
-        </div>
-      )}
+      {!showPhoto &&
+        (entityType && DEFAULT_ART_ENTITY_TYPES.has(entityType) ? (
+          <img src={defaultAlbumArt} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div
+            className={`relative rounded-full flex items-center justify-center bg-white/10 ring-1 ring-white/25 backdrop-blur-sm shadow-inner ${badge.badge}`}
+          >
+            <Music2 size={badge.icon} className="text-white/90" strokeWidth={1.5} />
+          </div>
+        ))}
       {canEdit && (
         <button
           onClick={(e) => {

@@ -150,7 +150,10 @@ export default function Search() {
 
   const playArtist = async (id: string) => {
     const full = await artistsApi.get(id);
-    if (full.topTracks[0]) playTrack(full.topTracks[0], full.topTracks);
+    // Single Releases when the artist has any, their top-played tracks
+    // otherwise — same fallback ArtistDetail's own Songs section uses.
+    const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;
+    if (tracks[0]) playTrack(tracks[0], tracks);
   };
 
   const playAlbum = async (id: string) => {
@@ -411,7 +414,7 @@ export default function Search() {
                 <div className="w-9 h-9 shrink-0 rounded-full bg-white/15 ring-1 ring-white/25 backdrop-blur-sm flex items-center justify-center">
                   <tile.icon size={18} className="text-white" />
                 </div>
-                <p className="font-bold text-base text-white truncate">{tile.name}</p>
+                <p className="font-bold text-base text-white truncate">{renderWithAmharicStyle(tile.name)}</p>
               </div>
             ))}
             {sections.map((pl) => (

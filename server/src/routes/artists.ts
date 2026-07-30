@@ -174,29 +174,29 @@ router.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // GET /api/artists/:id - single artist with albums (grouped by type,
-// track-order preserved within each) and a short "popular" list of top
-// tracks. The full song list lives behind each album, not flattened here.
+// track-order preserved within each) and their standalone Single Releases.
+// The full song list for an album lives behind that album, not flattened
+// here — this is specifically the tracks that were never part of one.
 router.get("/:id", optionalAuth, async (req, res) => {
   const artist = await prisma.artist.findUnique({
     where: { id: String(req.params.id) },
     include: {
       // Concerts are a completely separate content type — never merged into
-      // an artist's own discography or Popular Songs, even though a
+      // an artist's own discography or Single Releases, even though a
       // concert's tracks/album still technically belong to this artist.
       albums: {
         where: { albumType: { not: "live" } },
         include: { tracks: { select: { duration: true } } },
         orderBy: { year: "desc" },
       },
+      // Same isSingle-gated definition GET /api/singles uses (deliberately
+      // NOT just "any track with no album" — see that route's own comment
+      // for why), scoped to just this artist. Newest release first, since
+      // this reads as "their single releases," not a popularity ranking.
       tracks: {
-        // Excludes both a concert album's own tracks (album.albumType) and
-        // a standalone Concert Song (isConcertSong, no album at all) — see
-        // routes/concerts.ts, the only place either kind of concert content
-        // is meant to surface.
-        where: { NOT: { album: { albumType: "live" } }, isConcertSong: false },
+        where: { isSingle: true, albumId: null },
         include: { album: true },
-        orderBy: { playCount: "desc" },
-        take: 10,
+        orderBy: { createdAt: "desc" },
       },
     },
   });
@@ -204,10 +204,29 @@ router.get("/:id", optionalAuth, async (req, res) => {
     res.status(404).json({ error: "Artist not found" });
     return;
   }
+
+  const singleReleases = artist.tracks.map((t) => toTrackDTO({ ...t, artist }));
+
+  // Falls back to the artist's most-played tracks when they have no
+  // standalone Single Releases yet, so the section never just goes empty —
+  // a second query only when it's actually needed, not fetched alongside
+  // every request.
+  let topTracks: ReturnType<typeof toTrackDTO>[] = [];
+  if (singleReleases.length === 0) {
+    const fallbackTracks = await prisma.track.findMany({
+      where: { artistId: artist.id, NOT: { album: { albumType: "live" } }, isConcertSong: false },
+      include: { album: true },
+      orderBy: { playCount: "desc" },
+      take: 10,
+    });
+    topTracks = fallbackTracks.map((t) => toTrackDTO({ ...t, artist }));
+  }
+
   res.json({
     ...toArtistDTO(artist),
     albums: artist.albums.map(toAlbumDTO),
-    topTracks: artist.tracks.map((t) => toTrackDTO({ ...t, artist })),
+    singleReleases,
+    topTracks,
   });
 });
 
