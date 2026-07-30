@@ -52,7 +52,7 @@ function ContinueListeningCard({
             backgroundPosition: "center",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
         <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl" />
 
         {playing && (
@@ -72,9 +72,8 @@ function ContinueListeningCard({
           <Play size={12} fill="white" className="ml-0.5" />
         </button>
 
-        <div className="absolute inset-x-0 bottom-0 p-3">
-          <p className="font-abyssinica text-[11px] font-bold text-white leading-tight truncate">{track.title}</p>
-          <p className="text-[13px] text-white/70 truncate mt-0.5">{track.artistName}</p>
+        <div className="absolute inset-x-0 bottom-0 p-3.5 pr-10">
+          <p className="font-abyssinica text-[13px] font-bold text-white leading-snug line-clamp-2">{track.title}</p>
         </div>
       </div>
 
