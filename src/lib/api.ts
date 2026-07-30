@@ -734,6 +734,13 @@ export const adminLibraryApi = {
       method: "POST",
       body: JSON.stringify({ trackIds, destinationAlbumId }),
     }),
+  // Covers both directions: from the Singles inbox, or from inside an
+  // album — either way the result is a tagged single release for artistId.
+  moveTracksToSingle: (trackIds: string[], artistId: string) =>
+    request<{ movedCount: number; artist: ApiArtist }>("/admin/library/tracks/move-to-single", {
+      method: "POST",
+      body: JSON.stringify({ trackIds, artistId }),
+    }),
   deleteTrack: (id: string) => request<void>(`/admin/library/tracks/${id}`, { method: "DELETE" }),
   mergeAlbums: (sourceAlbumId: string, targetAlbumId: string) =>
     request<ApiAlbum>("/admin/library/albums/merge", {

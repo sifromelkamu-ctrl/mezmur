@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { isAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
-import { toAlbumDTO } from "./artists.js";
+import { toAlbumDTO, toArtistDTO } from "./artists.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 // Admin-only "Library Management" tools: reassigning a song's album/artist,
@@ -240,7 +240,15 @@ router.post("/tracks/move", async (req: AuthedRequest, res) => {
     trackIds.map((id, index) =>
       prisma.track.update({
         where: { id },
-        data: { albumId: destinationAlbumId, artistId: destAlbum.artistId, trackNumber: existingCount + index + 1 },
+        data: {
+          albumId: destinationAlbumId,
+          artistId: destAlbum.artistId,
+          trackNumber: existingCount + index + 1,
+          // A track moved here from the Singles inbox (or another artist's
+          // single release) is no longer a standalone single — same
+          // mutual-exclusivity rule the PATCH route below already enforces.
+          isSingle: false,
+        },
       })
     )
   );
@@ -249,6 +257,50 @@ router.post("/tracks/move", async (req: AuthedRequest, res) => {
 
   const album = await prisma.album.findUnique({ where: { id: destinationAlbumId }, include: { artist: true } });
   res.json({ movedCount: trackIds.length, album: toAlbumDTO(album!) });
+});
+
+const moveTracksToSingleSchema = z.object({
+  trackIds: z.array(z.string().min(1)).min(1),
+  artistId: z.string().min(1),
+});
+
+// POST /api/admin/library/tracks/move-to-single - bulk "Move to Single
+// Releases". Covers both directions at once: from the unassigned Singles
+// inbox (artistId was null) and from inside an album (artistId changes to
+// match, album is dropped) — either way the result is the same: tagged
+// isSingle, no album, showing up under this artist's own Single Releases.
+router.post("/tracks/move-to-single", async (req: AuthedRequest, res) => {
+  const parsed = moveTracksToSingleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { trackIds, artistId } = parsed.data;
+
+  const artist = await prisma.artist.findUnique({ where: { id: artistId } });
+  if (!artist) {
+    res.status(404).json({ error: "Artist not found" });
+    return;
+  }
+
+  const tracks = await prisma.track.findMany({ where: { id: { in: trackIds } } });
+  if (tracks.length !== trackIds.length) {
+    res.status(400).json({ error: "One or more tracks not found" });
+    return;
+  }
+
+  await prisma.$transaction(
+    trackIds.map((id) =>
+      prisma.track.update({
+        where: { id },
+        data: { artistId, albumId: null, trackNumber: null, isSingle: true },
+      })
+    )
+  );
+
+  await logAudit(req.userId!, "admin_move_tracks_to_single", { trackIds, artistId });
+
+  res.json({ movedCount: trackIds.length, artist: toArtistDTO(artist) });
 });
 
 // DELETE /api/admin/library/tracks/:id - removes the catalog row only. The

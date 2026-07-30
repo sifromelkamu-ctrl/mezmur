@@ -493,7 +493,10 @@ interface MoveToAlbumModalProps {
   artists: ApiArtist[];
   albums: ApiAlbum[];
   onClose: () => void;
-  onMoved: (result: { movedCount: number; album: ApiAlbum }) => void;
+  // A plain display label rather than the raw album/artist, so this modal
+  // can report either destination (an album, or an artist's Single
+  // Releases) through one shape the caller doesn't need to branch on.
+  onMoved: (result: { movedCount: number; label: string }) => void;
 }
 
 type MoveStep = "artist" | "album" | "create";
@@ -536,7 +539,7 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
     setError("");
     try {
       const result = await adminLibraryApi.moveTracks(trackIds, destinationAlbumId);
-      onMoved(result);
+      onMoved({ movedCount: result.movedCount, label: `"${result.album.title}"` });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Move failed");
       setBusy(false);
@@ -551,7 +554,20 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
     try {
       const album = await adminApi.addAlbum(selectedArtistId, title);
       const result = await adminLibraryApi.moveTracks(trackIds, album.id);
-      onMoved(result);
+      onMoved({ movedCount: result.movedCount, label: `"${result.album.title}"` });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Move failed");
+      setBusy(false);
+    }
+  };
+
+  const moveToSingleRelease = async () => {
+    if (!selectedArtistId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await adminLibraryApi.moveTracksToSingle(trackIds, selectedArtistId);
+      onMoved({ movedCount: result.movedCount, label: `${result.artist.name}'s Single Releases` });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Move failed");
       setBusy(false);
@@ -621,6 +637,14 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
           >
             <Plus size={16} />
             Create new album...
+          </button>
+          <button
+            onClick={moveToSingleRelease}
+            disabled={busy}
+            className="flex items-center gap-2 w-full px-3 py-2.5 mb-2 rounded-md text-sm font-semibold text-brand hover:bg-hover transition-colors text-left disabled:opacity-50"
+          >
+            <Disc3 size={16} />
+            Make single release for {selectedArtist?.name ?? "this artist"}
           </button>
           <div className="flex flex-col gap-1 max-h-56 overflow-y-auto overscroll-y-contain">
             {artistAlbums.map((al) => (
@@ -941,7 +965,10 @@ export default function AdminLibraryManagement() {
   const [editSongId, setEditSongId] = useState<string | null>(null);
   // Bundles the moving trackIds with the album they're moving *from*, so a
   // completed move can be undone by moving them straight back.
-  const [moveRequest, setMoveRequest] = useState<{ trackIds: string[]; sourceAlbumId: string } | null>(null);
+  // sourceAlbumId is absent when the tracks came from the unassigned
+  // Singles inbox rather than an album — Undo has nothing to revert to in
+  // that case (see lastMove/undoLastMove below).
+  const [moveRequest, setMoveRequest] = useState<{ trackIds: string[]; sourceAlbumId?: string } | null>(null);
   const [editAlbum, setEditAlbum] = useState<ApiAlbum | null>(null);
   // A Concert Album selected for editing — reuses the same full-featured
   // EditConcertModal the Concerts page itself uses (rename/artwork/
@@ -955,8 +982,8 @@ export default function AdminLibraryManagement() {
   const [busy, setBusy] = useState(false);
   const [lastMove, setLastMove] = useState<{
     trackIds: string[];
-    sourceAlbumId: string;
-    destinationAlbumTitle: string;
+    sourceAlbumId?: string;
+    destinationLabel: string;
     count: number;
   } | null>(null);
   const [undoing, setUndoing] = useState(false);
@@ -986,6 +1013,8 @@ export default function AdminLibraryManagement() {
     setSelectedArtist(detail);
     setLevel("albums");
     setQuery("");
+    setSelectedTrackIds(new Set());
+    setLastMove(null);
   };
 
   const refreshSelectedArtist = async () => {
@@ -1039,6 +1068,8 @@ export default function AdminLibraryManagement() {
   const openSingles = () => {
     setLevel("singles");
     setQuery("");
+    setSelectedTrackIds(new Set());
+    setLastMove(null);
     setSinglesLoading(true);
     refreshSingles().finally(() => setSinglesLoading(false));
   };
@@ -1078,7 +1109,7 @@ export default function AdminLibraryManagement() {
   };
 
   const undoLastMove = async () => {
-    if (!lastMove) return;
+    if (!lastMove?.sourceAlbumId) return;
     setUndoing(true);
     try {
       await adminLibraryApi.moveTracks(lastMove.trackIds, lastMove.sourceAlbumId);
@@ -1100,6 +1131,7 @@ export default function AdminLibraryManagement() {
       loadCatalog();
       if (level === "concerts") await refreshConcerts();
       if (level === "singles") await refreshSingles();
+      if (level === "albums") await refreshSelectedArtist();
     } finally {
       setBusy(false);
     }
@@ -1160,6 +1192,11 @@ export default function AdminLibraryManagement() {
     return q ? singles.filter((s) => s.title.toLowerCase().includes(q)) : singles;
   }, [singles, query]);
 
+  // The selected artist's own Single Releases (artistId set, no album) —
+  // distinct from the global Singles inbox above, which is only the
+  // artistId: null unassigned pool (see server/src/routes/singles.ts).
+  const artistSingleReleases = selectedArtist?.singleReleases ?? [];
+
   const filteredTracks = useMemo(() => {
     const list = selectedAlbum?.tracks ?? [];
     const q = query.trim().toLowerCase();
@@ -1204,6 +1241,50 @@ export default function AdminLibraryManagement() {
             : "Browse artists, albums, and songs";
   const allVisibleSelected =
     filteredTracks.length > 0 && filteredTracks.every((t) => selectedTrackIds.has(t.id));
+  const allVisibleSinglesSelected =
+    filteredSingles.length > 0 && filteredSingles.every((t) => selectedTrackIds.has(t.id));
+  const toggleSelectAllSingles = () => {
+    const visible = filteredSingles.map((t) => t.id);
+    const allSelected = visible.length > 0 && visible.every((id) => selectedTrackIds.has(id));
+    setSelectedTrackIds(allSelected ? new Set() : new Set(visible));
+  };
+  const allArtistSinglesSelected =
+    artistSingleReleases.length > 0 && artistSingleReleases.every((t) => selectedTrackIds.has(t.id));
+  const toggleSelectAllArtistSingles = () => {
+    const visible = artistSingleReleases.map((t) => t.id);
+    const allSelected = visible.length > 0 && visible.every((id) => selectedTrackIds.has(id));
+    setSelectedTrackIds(allSelected ? new Set() : new Set(visible));
+  };
+
+  // Shared between the album-tracks view, an artist's Single Releases
+  // list, and the global Singles inbox — all three can trigger a bulk
+  // move (see moveRequest), so all three need to be able to show its
+  // result.
+  const lastMoveBanner = lastMove && (
+    <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg bg-brand/10 border border-brand/25">
+      <p className="text-sm text-fg">
+        ✓ {lastMove.count} song{lastMove.count > 1 ? "s" : ""} moved to {lastMove.destinationLabel}.
+      </p>
+      <div className="flex items-center gap-3 shrink-0">
+        {lastMove.sourceAlbumId && (
+          <button
+            onClick={undoLastMove}
+            disabled={undoing}
+            className="text-sm font-semibold text-brand hover:underline disabled:opacity-50"
+          >
+            {undoing ? "Undoing…" : "Undo"}
+          </button>
+        )}
+        <button
+          onClick={() => setLastMove(null)}
+          className="text-fg-muted hover:text-fg transition-colors"
+          aria-label="Dismiss"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="px-6 py-6 max-w-3xl pb-24">
@@ -1397,34 +1478,99 @@ export default function AdminLibraryManagement() {
               <p className="text-sm text-fg-muted px-2 py-8 text-center">No albums found.</p>
             )}
           </div>
+
+          {lastMoveBanner}
+
+          <div className="flex items-center justify-between mt-6 mb-2 px-1">
+            <p className="text-sm font-semibold text-fg-muted">Single Releases</p>
+            {artistSingleReleases.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer select-none">
+                <span
+                  onClick={toggleSelectAllArtistSingles}
+                  className={`w-5 h-5 shrink-0 rounded flex items-center justify-center border transition-colors ${
+                    allArtistSinglesSelected ? "bg-brand border-brand" : "border-fg-subtle"
+                  }`}
+                >
+                  {allArtistSinglesSelected && <span className="w-2 h-2 rounded-sm bg-black" />}
+                </span>
+                <span onClick={toggleSelectAllArtistSingles}>Select all</span>
+              </label>
+            )}
+          </div>
+          {artistSingleReleases.some((t) => selectedTrackIds.has(t.id)) && (
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setMoveRequest({ trackIds: Array.from(selectedTrackIds) })}
+                className="flex items-center gap-2 bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform"
+              >
+                Move Selected
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            {artistSingleReleases.map((track) => (
+              <div
+                key={track.id}
+                className={`flex items-center gap-1 rounded-md transition-colors group ${
+                  selectedTrackIds.has(track.id) ? "bg-hover" : "hover:bg-hover"
+                }`}
+              >
+                <button
+                  onClick={() => toggleTrack(track.id)}
+                  className={`w-5 h-5 shrink-0 ml-2 rounded flex items-center justify-center border transition-colors ${
+                    selectedTrackIds.has(track.id) ? "bg-brand border-brand" : "border-fg-subtle"
+                  }`}
+                  aria-label={`Select ${track.title}`}
+                >
+                  {selectedTrackIds.has(track.id) && <span className="w-2 h-2 rounded-sm bg-black" />}
+                </button>
+                <button
+                  onClick={() => setEditSongId(track.id)}
+                  className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+                >
+                  <CoverArt
+                    gradient={track.gradient}
+                    size="sm"
+                    photoUrl={track.coverUrl}
+                    entityType="track"
+                    entityId={track.id}
+                    artworkFrame={track.artworkFrame}
+                  />
+                  <p className="text-sm font-medium truncate">{track.title}</p>
+                </button>
+                <button
+                  onClick={() => setEditSongId(track.id)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Edit ${track.title}`}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setMoveRequest({ trackIds: [track.id] })}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Move ${track.title}`}
+                >
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteTrack(track)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
+                  aria-label={`Delete ${track.title}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            {artistSingleReleases.length === 0 && (
+              <p className="text-sm text-fg-muted px-2 py-8 text-center">No single releases yet.</p>
+            )}
+          </div>
         </>
       )}
 
       {!loading && level === "tracks" && selectedAlbum && (
         <>
-          {lastMove && (
-            <div className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-lg bg-brand/10 border border-brand/25">
-              <p className="text-sm text-fg">
-                ✓ {lastMove.count} song{lastMove.count > 1 ? "s" : ""} moved to "{lastMove.destinationAlbumTitle}".
-              </p>
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={undoLastMove}
-                  disabled={undoing}
-                  className="text-sm font-semibold text-brand hover:underline disabled:opacity-50"
-                >
-                  {undoing ? "Undoing…" : "Undo"}
-                </button>
-                <button
-                  onClick={() => setLastMove(null)}
-                  className="text-fg-muted hover:text-fg transition-colors"
-                  aria-label="Dismiss"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-          )}
+          {lastMoveBanner}
 
           {filteredTracks.length > 0 && (
             <div className="flex items-center justify-between mb-2 px-1">
@@ -1597,48 +1743,98 @@ export default function AdminLibraryManagement() {
       )}
 
       {!singlesLoading && level === "singles" && (
-        <div className="flex flex-col gap-1">
-          {filteredSingles.map((track) => (
-            <div key={track.id} className="flex items-center gap-1 rounded-md hover:bg-hover transition-colors group">
+        <>
+          {lastMoveBanner}
+
+          {filteredSingles.length > 0 && (
+            <div className="flex items-center justify-between mb-2 px-1">
+              <label className="flex items-center gap-2 text-sm text-fg-muted cursor-pointer select-none">
+                <span
+                  onClick={toggleSelectAllSingles}
+                  className={`w-5 h-5 shrink-0 rounded flex items-center justify-center border transition-colors ${
+                    allVisibleSinglesSelected ? "bg-brand border-brand" : "border-fg-subtle"
+                  }`}
+                >
+                  {allVisibleSinglesSelected && <span className="w-2 h-2 rounded-sm bg-black" />}
+                </span>
+                <span onClick={toggleSelectAllSingles}>Select all</span>
+              </label>
               <button
-                onClick={() => setEditSongId(track.id)}
-                className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+                // No sourceAlbumId — these came from the unassigned inbox,
+                // so there's nothing for Undo to revert to (see lastMove).
+                onClick={() => setMoveRequest({ trackIds: Array.from(selectedTrackIds) })}
+                disabled={selectedTrackIds.size === 0}
+                className="flex items-center gap-2 bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform disabled:opacity-40 disabled:hover:scale-100 disabled:cursor-not-allowed"
               >
-                <CoverArt
-                  gradient={track.gradient}
-                  size="sm"
-                  photoUrl={track.coverUrl}
-                  entityType="track"
-                  entityId={track.id}
-                  artworkFrame={track.artworkFrame}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{track.title}</p>
-                  <p className="text-xs text-fg-muted truncate">
-                    {track.artistName ? track.artistName : "No artist"} · Single
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => setEditSongId(track.id)}
-                className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
-                aria-label={`Edit ${track.title}`}
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                onClick={() => setConfirmDeleteTrack(track)}
-                className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
-                aria-label={`Delete ${track.title}`}
-              >
-                <Trash2 size={14} />
+                Move Selected
               </button>
             </div>
-          ))}
-          {filteredSingles.length === 0 && (
-            <p className="text-sm text-fg-muted px-2 py-8 text-center">No singles found.</p>
           )}
-        </div>
+
+          <div className="flex flex-col gap-1">
+            {filteredSingles.map((track) => (
+              <div
+                key={track.id}
+                className={`flex items-center gap-1 rounded-md transition-colors group ${
+                  selectedTrackIds.has(track.id) ? "bg-hover" : "hover:bg-hover"
+                }`}
+              >
+                <button
+                  onClick={() => toggleTrack(track.id)}
+                  className={`w-5 h-5 shrink-0 ml-2 rounded flex items-center justify-center border transition-colors ${
+                    selectedTrackIds.has(track.id) ? "bg-brand border-brand" : "border-fg-subtle"
+                  }`}
+                  aria-label={`Select ${track.title}`}
+                >
+                  {selectedTrackIds.has(track.id) && <span className="w-2 h-2 rounded-sm bg-black" />}
+                </button>
+                <button
+                  onClick={() => setEditSongId(track.id)}
+                  className="flex items-center gap-3 px-2 py-2.5 flex-1 min-w-0 text-left"
+                >
+                  <CoverArt
+                    gradient={track.gradient}
+                    size="sm"
+                    photoUrl={track.coverUrl}
+                    entityType="track"
+                    entityId={track.id}
+                    artworkFrame={track.artworkFrame}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{track.title}</p>
+                    <p className="text-xs text-fg-muted truncate">
+                      {track.artistName ? track.artistName : "No artist"} · Single
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setEditSongId(track.id)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Edit ${track.title}`}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setMoveRequest({ trackIds: [track.id] })}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-fg hover:bg-elevated-hover transition-colors"
+                  aria-label={`Move ${track.title}`}
+                >
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteTrack(track)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors mr-1"
+                  aria-label={`Delete ${track.title}`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            {filteredSingles.length === 0 && (
+              <p className="text-sm text-fg-muted px-2 py-8 text-center">No singles found.</p>
+            )}
+          </div>
+        </>
       )}
 
       {editSongId && (
@@ -1653,6 +1849,7 @@ export default function AdminLibraryManagement() {
             loadCatalog();
             if (level === "concerts") await refreshConcerts();
             if (level === "singles") await refreshSingles();
+            if (level === "albums") await refreshSelectedArtist();
           }}
           onArtistUpserted={(artist) => {
             setArtists((prev) => {
@@ -1662,6 +1859,7 @@ export default function AdminLibraryManagement() {
             });
             if (level === "concerts") refreshConcerts();
             if (level === "singles") refreshSingles();
+            if (level === "albums") refreshSelectedArtist();
           }}
         />
       )}
@@ -1677,12 +1875,14 @@ export default function AdminLibraryManagement() {
             setLastMove({
               trackIds: moveRequest.trackIds,
               sourceAlbumId: moveRequest.sourceAlbumId,
-              destinationAlbumTitle: result.album.title,
+              destinationLabel: result.label,
               count: result.movedCount,
             });
             setMoveRequest(null);
             setSelectedTrackIds(new Set());
             await refreshSelectedAlbum();
+            if (level === "albums") await refreshSelectedArtist();
+            if (level === "singles") await refreshSingles();
             loadCatalog();
           }}
         />
