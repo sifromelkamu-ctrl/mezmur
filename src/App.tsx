@@ -45,6 +45,7 @@ const Recommended = lazy(routeLoaders.recommended);
 const Search = lazy(routeLoaders.search);
 const SermonDetail = lazy(routeLoaders.sermonDetail);
 const Settings = lazy(routeLoaders.settings);
+const TelegramImport = lazy(routeLoaders.telegramImport);
 const YoutubeCatalogImport = lazy(routeLoaders.youtubeCatalogImport);
 const YoutubeImport = lazy(routeLoaders.youtubeImport);
 
@@ -76,6 +77,7 @@ function AppShell() {
         <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
         <Route path="/admin/youtube-import" element={<YoutubeImport />} />
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
+        <Route path="/admin/telegram-import" element={<TelegramImport />} />
         <Route path="/playlist/:id" element={<PlaylistDetail />} />
         <Route path="/album/:id" element={<AlbumDetail />} />
         {/* Its own dedicated page (not AlbumDetail) — a Concert is still an

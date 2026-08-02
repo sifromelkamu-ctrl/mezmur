@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import ImportHistoryPanel, { type ImportHistorySummary } from "../components/ImportHistoryPanel";
@@ -23,16 +23,15 @@ import {
   adminApi,
   artistsApi,
   type ApiArtist,
-  type YoutubeCatalogBatch,
-  type YoutubeCatalogBatchSummary,
-  type YoutubeCatalogItem,
+  type TelegramCatalogBatch,
+  type TelegramCatalogBatchSummary,
+  type TelegramCatalogItem,
 } from "../lib/api";
 import { formatDuration } from "../utils/format";
 
 // Mirrors the server's normalizeForMatch (server/src/artwork/matching.ts)
-// closely enough for a client-side hard-block check before submitting —
-// the server re-validates authoritatively regardless, this is just so the
-// admin sees the conflict immediately instead of after a round trip.
+// closely enough for a client-side hard-block check before submitting — see
+// YoutubeCatalogImport.tsx's identical helper.
 function normalizeArtistName(input: string): string {
   return input
     .normalize("NFD")
@@ -47,7 +46,7 @@ const POLL_INTERVAL_MS = 1500;
 const ACTIVE_ITEM_STATUSES = new Set(["selected", "downloading", "processing", "uploading", "saving"]);
 const HISTORY_PAGE_SIZE = 10;
 
-function statusIcon(status: YoutubeCatalogItem["status"]) {
+function statusIcon(status: TelegramCatalogItem["status"]) {
   switch (status) {
     case "done":
       return <CheckCircle2 size={16} className="text-brand shrink-0" />;
@@ -67,10 +66,10 @@ function statusIcon(status: YoutubeCatalogItem["status"]) {
 interface ImportItemRowProps {
   id: string;
   title: string;
-  status: YoutubeCatalogItem["status"];
+  performer: string | null;
+  status: TelegramCatalogItem["status"];
   message: string | null;
   error: string | null;
-  thumbnailUrl: string | null;
   duration: number | null;
   selected: boolean;
   phase: "form" | "enumerating" | "selecting" | "importing" | "done" | "error";
@@ -78,22 +77,16 @@ interface ImportItemRowProps {
   onCancel: (id: string) => void;
 }
 
-// Split out and memoized so a poll tick's fresh batch object (a new item
-// array/reference every ~1.5s during an active import, see POLL_INTERVAL_MS)
-// only actually re-renders the handful of rows whose real fields changed —
-// not all 100+ rows a big channel import can have. Un-memoized, every row
-// re-rendering on every tick (images included) was heavy enough, combined
-// with the concurrent yt-dlp/ffmpeg work, to make the page's scroll feel
-// stuck/janky. onToggleSelect/onCancel must be stable function references
-// (see toggleSelectItem/cancelSingleItem below) — an inline closure recreated
-// every parent render would defeat this memoization entirely.
+// Memoized for the same reason as YoutubeCatalogImport.tsx's ImportItemRow —
+// see that component's comment for why onToggleSelect/onCancel must be
+// stable function references.
 const ImportItemRow = memo(function ImportItemRow({
   id,
   title,
+  performer,
   status,
   message,
   error,
-  thumbnailUrl,
   duration,
   selected,
   phase,
@@ -111,14 +104,10 @@ const ImportItemRow = memo(function ImportItemRow({
       ) : (
         statusIcon(status)
       )}
-      {thumbnailUrl && <img src={thumbnailUrl} alt="" className="w-10 h-10 rounded object-cover shrink-0 bg-panel" />}
       <div className="min-w-0 flex-1">
         <p className="text-sm truncate">{title}</p>
+        {performer && phase === "selecting" && <p className="text-xs text-fg-subtle truncate">{performer}</p>}
         {phase !== "selecting" && message && (
-          // Not truncated (unlike the title above) — an error here is the
-          // full backend reason (see server/src/youtube/safeError.ts) and
-          // getting cut off with "..." is exactly what made the last
-          // reported failure unreadable/undiagnosable from the UI alone.
           <p className="text-xs text-fg-muted break-words">{error ?? message}</p>
         )}
         {status === "skipped_duplicate" && <p className="text-xs text-fg-subtle">Already in catalog</p>}
@@ -138,33 +127,16 @@ const ImportItemRow = memo(function ImportItemRow({
   );
 });
 
-export default function YoutubeCatalogImport() {
+export default function TelegramImport() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
 
   const [url, setUrl] = useState("");
   const [confirmRights, setConfirmRights] = useState(false);
-  // "Allow duplicate imports" — off by default (skip anything that already
-  // exists, today's behavior). When on, every album/single/track in this
-  // batch imports as a brand-new library item instead of being matched or
-  // skipped against existing content.
   const [allowDuplicates, setAllowDuplicates] = useState(false);
-  // "Regular Album" (default) vs "Concert Album" — whichever Album row(s)
-  // this batch creates get tagged accordingly (see
-  // routes/youtubeCatalogImport.ts). Deep-linkable from Home's Concerts
-  // section (?destination=concert), same pattern as the single-video
-  // import screen's own ?destination=live.
-  const [destinationType, setDestinationType] = useState<"album" | "concert">(
-    () => (searchParams.get("destination") === "concert" ? "concert" : "album")
-  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Artist targeting — required, explicit, never guessed from the channel
-  // name. "existing" reuses a catalog artist; "new" hard-blocks (both here
-  // and, authoritatively, server-side) on a normalized-name match against
-  // an artist that already exists.
   const [artists, setArtists] = useState<ApiArtist[]>([]);
   const [artistMode, setArtistMode] = useState<"existing" | "new">("existing");
   const [artistQuery, setArtistQuery] = useState("");
@@ -187,16 +159,13 @@ export default function YoutubeCatalogImport() {
     return artists.find((a) => normalizeArtistName(a.name) === normalized) ?? null;
   }, [artistMode, newArtistName, artists]);
 
-  const [history, setHistory] = useState<YoutubeCatalogBatchSummary[]>([]);
+  const [history, setHistory] = useState<TelegramCatalogBatchSummary[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyStatus, setHistoryStatus] = useState("");
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
-  const [batch, setBatch] = useState<YoutubeCatalogBatch | null>(null);
-  // Lets toggleSelectItem/cancelSingleItem read the current batch without
-  // being recreated every time `batch` itself changes (every poll tick) —
-  // see ImportItemRow above for why keeping their identity stable matters.
+  const [batch, setBatch] = useState<TelegramCatalogBatch | null>(null);
   const batchRef = useRef(batch);
   useEffect(() => {
     batchRef.current = batch;
@@ -205,9 +174,15 @@ export default function YoutubeCatalogImport() {
   const [collapsedAlbums, setCollapsedAlbums] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // "Assign to album" bar — text the admin types to apply to whichever items
+  // are currently checked (no YouTube equivalent: a Telegram channel has no
+  // Releases/Playlists to detect album grouping from, so this is the only
+  // way songs from one channel end up in more than one album).
+  const [albumAssignValue, setAlbumAssignValue] = useState("");
+
   const loadHistory = () =>
     adminApi
-      .listYoutubeCatalogBatches({
+      .listTelegramCatalogBatches({
         q: historyQuery || undefined,
         status: historyStatus || undefined,
         page: historyPage,
@@ -237,7 +212,7 @@ export default function YoutubeCatalogImport() {
   };
 
   const deleteHistoryEntry = async (id: string) => {
-    await adminApi.deleteYoutubeCatalogBatch(id);
+    await adminApi.deleteTelegramCatalogBatch(id);
     setSelectedHistoryIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -248,38 +223,38 @@ export default function YoutubeCatalogImport() {
 
   const deleteSelectedHistory = async () => {
     if (selectedHistoryIds.size === 0) return;
-    await adminApi.deleteSelectedYoutubeCatalogBatches([...selectedHistoryIds]);
+    await adminApi.deleteSelectedTelegramCatalogBatches([...selectedHistoryIds]);
     setSelectedHistoryIds(new Set());
     loadHistory();
   };
 
   const clearCompletedHistory = async () => {
-    await adminApi.clearCompletedYoutubeCatalogBatches();
+    await adminApi.clearCompletedTelegramCatalogBatches();
     loadHistory();
   };
 
   const clearFailedHistory = async () => {
-    await adminApi.clearFailedYoutubeCatalogBatches();
+    await adminApi.clearFailedTelegramCatalogBatches();
     loadHistory();
   };
 
   const clearAllHistory = async () => {
-    await adminApi.clearAllYoutubeCatalogBatches();
+    await adminApi.clearAllTelegramCatalogBatches();
     loadHistory();
   };
 
   const retryHistoryEntry = async (b: ImportHistorySummary) => {
-    const full = await adminApi.getYoutubeCatalogBatch(b.id);
+    const full = await adminApi.getTelegramCatalogBatch(b.id);
     const failedIds = full.items.filter((i) => i.status === "error").map((i) => i.id);
     if (failedIds.length > 0) {
-      await adminApi.selectYoutubeCatalogItems(b.id, { selected: true, itemIds: failedIds });
-      await adminApi.startYoutubeCatalogImport(b.id);
+      await adminApi.selectTelegramCatalogItems(b.id, { selected: true, itemIds: failedIds });
+      await adminApi.startTelegramCatalogImport(b.id);
     }
     openBatch(b.id);
   };
 
   const renameHistoryEntry = async (id: string, label: string | null) => {
-    await adminApi.renameYoutubeCatalogBatch(id, label);
+    await adminApi.renameTelegramCatalogBatch(id, label);
     loadHistory();
   };
 
@@ -290,7 +265,7 @@ export default function YoutubeCatalogImport() {
 
   const openBatch = (batchId: string) => {
     setShowingSelection(false);
-    adminApi.getYoutubeCatalogBatch(batchId).then(setBatch);
+    adminApi.getTelegramCatalogBatch(batchId).then(setBatch);
     poll(batchId);
   };
 
@@ -298,7 +273,7 @@ export default function YoutubeCatalogImport() {
     stopPolling();
     pollRef.current = setTimeout(async () => {
       try {
-        const latest = await adminApi.getYoutubeCatalogBatch(batchId);
+        const latest = await adminApi.getTelegramCatalogBatch(batchId);
         setBatch(latest);
         if (latest.status === "enumerating" || latest.status === "importing") {
           poll(batchId);
@@ -306,7 +281,6 @@ export default function YoutubeCatalogImport() {
           loadHistory();
         }
       } catch {
-        // transient network hiccup — try again on the next tick
         poll(batchId);
       }
     }, POLL_INTERVAL_MS);
@@ -315,7 +289,7 @@ export default function YoutubeCatalogImport() {
   const startEnumeration = async () => {
     setFormError(null);
     if (!url.trim()) {
-      setFormError("Paste a YouTube channel/artist URL first");
+      setFormError("Paste a Telegram channel link first");
       return;
     }
     if (!confirmRights) {
@@ -336,14 +310,13 @@ export default function YoutubeCatalogImport() {
     }
     setSubmitting(true);
     try {
-      const { batchId } = await adminApi.startYoutubeCatalogEnumeration({
+      const { batchId } = await adminApi.startTelegramCatalogEnumeration({
         url: url.trim(),
         confirmRights,
         artistMode,
         artistId: artistMode === "existing" ? selectedArtistId : undefined,
         artistName: artistMode === "new" ? newArtistName.trim() : undefined,
         allowDuplicates,
-        destinationType,
       });
       setUrl("");
       setConfirmRights(false);
@@ -360,7 +333,7 @@ export default function YoutubeCatalogImport() {
 
   const refreshBatch = async () => {
     if (!batch) return;
-    const latest = await adminApi.getYoutubeCatalogBatch(batch.id);
+    const latest = await adminApi.getTelegramCatalogBatch(batch.id);
     setBatch(latest);
   };
 
@@ -373,49 +346,14 @@ export default function YoutubeCatalogImport() {
     });
   };
 
-  // Each of these applies the change to local state immediately so the
-  // checkbox/count reflects the tap instantly instead of waiting on a round
-  // trip — the network call still happens right after and refreshBatch()
-  // still reconciles with the server's actual state, this just removes the
-  // visible lag (and the race window where a second rapid tap on the same
-  // item would read a stale `.selected` before the first request resolved).
   const selectAll = async (selected: boolean) => {
     if (!batch) return;
     setBatch((b) =>
       b
-        ? {
-            ...b,
-            items: b.items.map((i) => (i.status === "pending" || i.status === "error" || i.status === "cancelled" ? { ...i, selected } : i)),
-          }
+        ? { ...b, items: b.items.map((i) => (i.status === "pending" || i.status === "error" || i.status === "cancelled" ? { ...i, selected } : i)) }
         : b
     );
-    await adminApi.selectYoutubeCatalogItems(batch.id, { selected, all: true });
-    await refreshBatch();
-  };
-
-  // "Import Albums Only" / "Import Singles Only" / "Import Albums & Singles"
-  // — selects every item of the wanted kind and deselects the other, reusing
-  // the same selection endpoint the per-album/select-all controls already use.
-  const filterByKind = async (want: "album" | "single" | "both") => {
-    if (!batch) return;
-    const wantAlbums = want !== "single";
-    const wantSingles = want !== "album";
-    setBatch((b) =>
-      b
-        ? {
-            ...b,
-            items: b.items.map((i) =>
-              i.status === "pending" || i.status === "error" || i.status === "cancelled"
-                ? { ...i, selected: i.albumTitle !== null ? wantAlbums : wantSingles }
-                : i
-            ),
-          }
-        : b
-    );
-    await Promise.all([
-      adminApi.selectYoutubeCatalogItems(batch.id, { selected: wantAlbums, hasAlbum: true }),
-      adminApi.selectYoutubeCatalogItems(batch.id, { selected: wantSingles, hasAlbum: false }),
-    ]);
+    await adminApi.selectTelegramCatalogItems(batch.id, { selected, all: true });
     await refreshBatch();
   };
 
@@ -433,65 +371,63 @@ export default function YoutubeCatalogImport() {
           }
         : b
     );
-    await adminApi.selectYoutubeCatalogItems(batch.id, { selected, albumTitle });
+    await adminApi.selectTelegramCatalogItems(batch.id, { selected, albumTitle });
     await refreshBatch();
   };
 
-  // Stable identity (empty dep array, reads batchRef instead of closing over
-  // `batch` directly) so ImportItemRow's memoization actually holds across
-  // poll ticks — see that component's comment for why.
   const toggleSelectItem = useCallback(async (itemId: string) => {
     const current = batchRef.current;
     if (!current) return;
     const item = current.items.find((i) => i.id === itemId);
     if (!item) return;
     const nextSelected = !item.selected;
-    setBatch((b) =>
-      b ? { ...b, items: b.items.map((i) => (i.id === itemId ? { ...i, selected: nextSelected } : i)) } : b
-    );
-    await adminApi.selectYoutubeCatalogItems(current.id, { selected: nextSelected, itemIds: [itemId] });
-    const latest = await adminApi.getYoutubeCatalogBatch(current.id);
+    setBatch((b) => (b ? { ...b, items: b.items.map((i) => (i.id === itemId ? { ...i, selected: nextSelected } : i)) } : b));
+    await adminApi.selectTelegramCatalogItems(current.id, { selected: nextSelected, itemIds: [itemId] });
+    const latest = await adminApi.getTelegramCatalogBatch(current.id);
     setBatch(latest);
   }, []);
 
+  // Applies the typed album name to every currently-checked item — repeatable
+  // with a different name/selection to build several albums out of one
+  // channel run. Passing null (the "Make Single" button) clears it back to
+  // ungrouped instead.
+  const checkedItemIds = useMemo(() => (batch?.items ?? []).filter((i) => i.selected).map((i) => i.id), [batch]);
+  const assignAlbum = async (albumTitle: string | null) => {
+    if (!batch || checkedItemIds.length === 0) return;
+    await adminApi.assignTelegramAlbum(batch.id, checkedItemIds, albumTitle);
+    setAlbumAssignValue("");
+    await refreshBatch();
+  };
+
   const startImport = async () => {
     if (!batch) return;
-    await adminApi.startYoutubeCatalogImport(batch.id);
+    await adminApi.startTelegramCatalogImport(batch.id);
     setShowingSelection(false);
     openBatch(batch.id);
   };
 
   const resumeStalled = async () => {
     if (!batch) return;
-    await adminApi.resumeYoutubeCatalogImport(batch.id);
+    await adminApi.resumeTelegramCatalogImport(batch.id);
     poll(batch.id);
   };
 
   const stopImport = async () => {
     if (!batch) return;
-    await adminApi.stopYoutubeCatalogImport(batch.id);
+    await adminApi.stopTelegramCatalogImport(batch.id);
     openBatch(batch.id);
   };
 
   const cancelSingleItem = useCallback(async (itemId: string) => {
     const current = batchRef.current;
     if (!current) return;
-    // Optimistic: flip it to "cancelled" (hiding the X button and showing
-    // the cancelled label) the instant it's clicked, rather than waiting on
-    // the round trip — the actual kill signal is already sent by the time
-    // this call resolves, the fetch below just confirms the true state.
     setBatch((b) =>
       b
-        ? {
-            ...b,
-            items: b.items.map((i) =>
-              i.id === itemId ? { ...i, status: "cancelled", message: "Cancelled", selected: false } : i
-            ),
-          }
+        ? { ...b, items: b.items.map((i) => (i.id === itemId ? { ...i, status: "cancelled", message: "Cancelled", selected: false } : i)) }
         : b
     );
-    await adminApi.cancelYoutubeCatalogItem(current.id, itemId);
-    const latest = await adminApi.getYoutubeCatalogBatch(current.id);
+    await adminApi.cancelTelegramCatalogItem(current.id, itemId);
+    const latest = await adminApi.getTelegramCatalogBatch(current.id);
     setBatch(latest);
   }, []);
 
@@ -503,15 +439,15 @@ export default function YoutubeCatalogImport() {
 
   const groups = useMemo(() => {
     if (!batch) return [];
-    const byAlbum = new Map<string | null, YoutubeCatalogItem[]>();
+    const byAlbum = new Map<string | null, TelegramCatalogItem[]>();
     for (const item of batch.items) {
       const key = item.albumTitle;
       if (!byAlbum.has(key)) byAlbum.set(key, []);
       byAlbum.get(key)!.push(item);
     }
-    const albums = [...byAlbum.entries()].filter((entry): entry is [string, YoutubeCatalogItem[]] => entry[0] !== null);
+    const albums = [...byAlbum.entries()].filter((entry): entry is [string, TelegramCatalogItem[]] => entry[0] !== null);
     const ungrouped = byAlbum.get(null) ?? [];
-    return ungrouped.length > 0 ? [...albums, [null, ungrouped] as [null, YoutubeCatalogItem[]]] : albums;
+    return ungrouped.length > 0 ? [...albums, [null, ungrouped] as [null, TelegramCatalogItem[]]] : albums;
   }, [batch]);
 
   const selectableCount = batch?.items.filter((i) => i.status === "pending" || i.status === "error" || i.status === "cancelled").length ?? 0;
@@ -522,10 +458,6 @@ export default function YoutubeCatalogImport() {
   const activeCount = batch?.items.filter((i) => ACTIVE_ITEM_STATUSES.has(i.status)).length ?? 0;
   const importTotal = doneCount + errorCount + activeCount;
 
-  // Six-bucket import summary — derived purely from each item's albumTitle
-  // (album vs. single) and its trackWasNew/albumWasNew flags (set once by
-  // the worker when the item finishes; see YoutubeImportItem in the Prisma
-  // schema for why these are snapshot-based rather than live counters).
   const summary = useMemo(() => {
     const items = (batch?.items ?? []).filter((i) => i.status === "done" || i.status === "skipped_duplicate");
     const albumItems = items.filter((i) => i.albumTitle !== null);
@@ -582,10 +514,10 @@ export default function YoutubeCatalogImport() {
           <ChevronLeft size={22} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold">Import Artist Catalog</h1>
+          <h1 className="text-2xl font-bold">Import from Telegram</h1>
           <p className="text-sm text-fg-muted mt-1">
-            Paste a whole channel/artist to pull in everything at once, or paste a single YouTube playlist URL to
-            import just that playlist as one album.
+            Paste a public channel link to pull in its audio posts, pick which songs to import, then group them into
+            albums (or leave them as Singles).
           </p>
         </div>
       </div>
@@ -594,8 +526,8 @@ export default function YoutubeCatalogImport() {
         <AlertCircle size={18} className="shrink-0 mt-0.5 text-accent-red" />
         <p>
           Only import channels you own or have explicit permission to use. Downloading and rehosting copyrighted
-          YouTube content without authorization can violate YouTube's Terms of Service and copyright law. Every
-          import is logged with your account and the source video.
+          music without authorization can violate Telegram's Terms of Service and copyright law. Every import is
+          logged with your account and the source message.
         </p>
       </div>
 
@@ -706,46 +638,18 @@ export default function YoutubeCatalogImport() {
             )}
           </div>
 
-          <div className="bg-elevated rounded-lg p-4 flex flex-col gap-3 mb-4">
-            <p className="text-xs font-bold text-fg-muted uppercase tracking-wide">Import as</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setDestinationType("album")}
-                className={`flex-1 text-sm font-semibold px-3 py-2 rounded-full transition-colors ${
-                  destinationType === "album" ? "bg-brand text-black" : "bg-panel text-fg-muted hover:text-fg"
-                }`}
-              >
-                Regular Album
-              </button>
-              <button
-                onClick={() => setDestinationType("concert")}
-                className={`flex-1 text-sm font-semibold px-3 py-2 rounded-full transition-colors ${
-                  destinationType === "concert" ? "bg-brand text-black" : "bg-panel text-fg-muted hover:text-fg"
-                }`}
-              >
-                Concert Album
-              </button>
-            </div>
-            {destinationType === "concert" && (
-              <p className="text-xs text-fg-muted -mt-1">
-                Every album this batch creates shows up in Home → Concerts instead of the regular Albums section —
-                ideal for a single playlist that's one whole concert recording.
-              </p>
-            )}
-          </div>
-
           <div className="bg-elevated rounded-lg p-4 flex flex-col gap-3">
             <TextField
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Channel URL, or a single playlist URL to import as one album"
+              placeholder="Telegram channel link"
               variant="panel"
               className="px-3 py-2 text-base"
             />
             <p className="text-xs text-fg-muted -mt-1.5">
-              Whole channel: <span className="text-fg-subtle">https://www.youtube.com/@channelname</span> · One
-              album: <span className="text-fg-subtle">https://www.youtube.com/playlist?list=...</span>
+              e.g. <span className="text-fg-subtle">https://t.me/channelname</span> or{" "}
+              <span className="text-fg-subtle">@channelname</span> — must be a public channel.
             </p>
             <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
               <input
@@ -766,8 +670,8 @@ export default function YoutubeCatalogImport() {
               <span>
                 Allow duplicate imports
                 <span className="block text-xs text-fg-muted mt-0.5">
-                  Import albums, singles, and tracks even if they already exist, as new separate items — instead of
-                  skipping duplicates (the default).
+                  Import songs even if they already exist, as new separate items — instead of skipping duplicates
+                  (the default).
                 </span>
               </span>
             </label>
@@ -783,7 +687,7 @@ export default function YoutubeCatalogImport() {
               className="self-start flex items-center gap-2 bg-brand text-black text-sm font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-              Find Catalog
+              Find Songs
             </button>
           </div>
         </>
@@ -792,9 +696,7 @@ export default function YoutubeCatalogImport() {
       {phase === "enumerating" && (
         <div className="bg-elevated rounded-lg p-6 flex flex-col items-center gap-3 text-center">
           <Loader2 size={28} className="animate-spin text-brand" />
-          <p className="text-sm text-fg-muted">
-            Scanning channel for playlists and videos… this can take a minute for channels with many playlists.
-          </p>
+          <p className="text-sm text-fg-muted">Scanning channel for audio posts… this can take a minute for large channels.</p>
         </div>
       )}
 
@@ -843,26 +745,6 @@ export default function YoutubeCatalogImport() {
 
           {phase === "selecting" && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => filterByKind("album")}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full bg-elevated hover:bg-elevated-hover transition-colors"
-                >
-                  Import Albums Only
-                </button>
-                <button
-                  onClick={() => filterByKind("single")}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full bg-elevated hover:bg-elevated-hover transition-colors"
-                >
-                  Import Singles Only
-                </button>
-                <button
-                  onClick={() => filterByKind("both")}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full bg-elevated hover:bg-elevated-hover transition-colors"
-                >
-                  Import Albums &amp; Singles
-                </button>
-              </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => selectAll(true)}
@@ -880,6 +762,31 @@ export default function YoutubeCatalogImport() {
                   {selectedCount} of {selectableCount} selectable songs chosen
                 </span>
               </div>
+              {checkedItemIds.length > 0 && (
+                <div className="flex items-center gap-2 bg-elevated rounded-lg p-2.5">
+                  <TextField
+                    type="text"
+                    value={albumAssignValue}
+                    onChange={(e) => setAlbumAssignValue(e.target.value)}
+                    placeholder="Album name (existing or new)"
+                    variant="panel"
+                    className="flex-1 px-3 py-1.5 text-sm"
+                  />
+                  <button
+                    onClick={() => assignAlbum(albumAssignValue.trim() || null)}
+                    disabled={!albumAssignValue.trim()}
+                    className="text-xs font-semibold px-3 py-2 rounded-full bg-brand text-black disabled:opacity-50 shrink-0"
+                  >
+                    Assign {checkedItemIds.length} to album
+                  </button>
+                  <button
+                    onClick={() => assignAlbum(null)}
+                    className="text-xs font-semibold px-3 py-2 rounded-full bg-panel text-fg-muted hover:text-fg transition-colors shrink-0"
+                  >
+                    Make Single
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -909,9 +816,7 @@ export default function YoutubeCatalogImport() {
               <div className="h-2 rounded-full bg-panel overflow-hidden">
                 <div
                   className="h-full bg-brand transition-all duration-300"
-                  style={{
-                    width: `${Math.max(4, importTotal ? ((doneCount + errorCount) / importTotal) * 100 : 0)}%`,
-                  }}
+                  style={{ width: `${Math.max(4, importTotal ? ((doneCount + errorCount) / importTotal) * 100 : 0)}%` }}
                 />
               </div>
               <p className="text-xs text-fg-muted">
@@ -960,7 +865,7 @@ export default function YoutubeCatalogImport() {
                 {errorCount > 0 && (
                   <button
                     onClick={async () => {
-                      await adminApi.selectYoutubeCatalogItems(batch.id, {
+                      await adminApi.selectTelegramCatalogItems(batch.id, {
                         selected: true,
                         itemIds: batch.items.filter((i) => i.status === "error").map((i) => i.id),
                       });
@@ -1012,10 +917,10 @@ export default function YoutubeCatalogImport() {
                           key={item.id}
                           id={item.id}
                           title={item.title}
+                          performer={item.performer}
                           status={item.status}
                           message={item.message}
                           error={item.error}
-                          thumbnailUrl={item.thumbnailUrl}
                           duration={item.duration}
                           selected={item.selected}
                           phase={phase}

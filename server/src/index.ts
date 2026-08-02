@@ -16,9 +16,11 @@ import pushRouter from "./routes/push.js";
 import searchRouter from "./routes/search.js";
 import sermonsRouter from "./routes/sermons.js";
 import singlesRouter from "./routes/singles.js";
+import telegramImportRouter from "./routes/telegramImport.js";
 import tracksRouter from "./routes/tracks.js";
 import youtubeImportRouter from "./routes/youtubeImport.js";
 import { resumeAllInterrupted } from "./youtube/catalogWorker.js";
+import { resumeAllInterrupted as resumeAllInterruptedTelegram } from "./telegram/worker.js";
 import { startDailyVersePushSchedule } from "./jobs/dailyVerse.js";
 
 // Backstop for the whole process. Without this, any unhandled promise
@@ -73,6 +75,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/admin/library", adminLibraryRouter);
 app.use("/api/admin/featured-banners", adminFeaturedBannersRouter);
 app.use("/api/admin/youtube-import", youtubeImportRouter);
+app.use("/api/admin/telegram-import", telegramImportRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
@@ -87,6 +90,9 @@ app.listen(port, () => {
 // process last exited, so a server restart doesn't strand them mid-queue.
 resumeAllInterrupted().catch((err) => {
   console.error("Failed to resume interrupted YouTube catalog imports:", err);
+});
+resumeAllInterruptedTelegram().catch((err) => {
+  console.error("Failed to resume interrupted Telegram catalog imports:", err);
 });
 
 startDailyVersePushSchedule();

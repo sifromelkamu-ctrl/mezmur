@@ -4,10 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "../prisma.js";
 import { supabaseAdmin } from "../supabase.js";
-import { uploadImageToStorage } from "../upload.js";
-import { gradientForSeed } from "../routes/admin.js";
 import { toTrackDTO } from "../routes/artists.js";
-import { normalizeForMatch, similarity } from "../artwork/matching.js";
+import { similarity } from "../artwork/matching.js";
 import { normalizeYoutubeChannelUrl } from "./validate.js";
 import {
   downloadYoutubeAudio,
@@ -19,9 +17,18 @@ import {
 } from "./ytdlp.js";
 import { generateWaveform } from "./waveform.js";
 import { CancelledImportError } from "./safeError.js";
+import {
+  createSignedAudioUploadUrl,
+  DuplicateImportError,
+  findExistingArtist,
+  findOrCreateAlbum,
+  findOrCreateArtist,
+  IDENTITY_MIN,
+  importImageFromUrl,
+} from "../catalogImport/shared.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
 
-export { CancelledImportError };
+export { CancelledImportError, DuplicateImportError };
 
 // Not every channel exposes a "Videos" tab — YouTube Music-style Official
 // Artist Channels in particular often only have Releases/Playlists — so a
@@ -56,18 +63,6 @@ export async function importBestReachableImage(candidates: (string | null | unde
     if (uploaded) return uploaded;
   }
   return undefined;
-}
-
-// Thrown when the video has already been imported (matched by sourceId).
-// Kept distinct from a generic Error so callers — the quick single-URL job
-// and the catalog batch worker — can tell "already have this one" apart from
-// a real failure and react differently (e.g. mark a catalog item
-// skipped_duplicate instead of error).
-export class DuplicateImportError extends Error {
-  constructor(public readonly videoId: string) {
-    super("This video has already been imported");
-    this.name = "DuplicateImportError";
-  }
 }
 
 export interface ImportVideoParams {
@@ -163,10 +158,6 @@ export interface ImportVideoParams {
   signal?: AbortSignal;
 }
 
-// Same bar used elsewhere (artwork/matching.ts, spotifySync/sync.ts) for
-// fuzzy title matching.
-const IDENTITY_MIN = 0.55;
-
 function parseUploadDate(value: string | null): Date | undefined {
   if (!value || value.length !== 8) return undefined;
   const year = Number(value.slice(0, 4));
@@ -174,43 +165,6 @@ function parseUploadDate(value: string | null): Date | undefined {
   const day = Number(value.slice(6, 8));
   const date = new Date(Date.UTC(year, month - 1, day));
   return Number.isNaN(date.getTime()) ? undefined : date;
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// createSignedUploadUrl has been observed to intermittently fail with a
-// spurious "row-level security policy" error under sustained back-to-back
-// use (a fresh call with identical arguments in isolation succeeds every
-// time) — this retries with exponential backoff before giving up for real,
-// so a run of transient blips doesn't fail an otherwise-successful import.
-async function createSignedAudioUploadUrl(path: string, attempts = 7): Promise<string> {
-  let lastError = "unknown error";
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    const { data, error } = await supabaseAdmin.storage.from("audio-tracks").createSignedUploadUrl(path);
-    if (!error && data) return data.signedUrl;
-    lastError = error?.message ?? lastError;
-    if (attempt < attempts) await sleep(Math.min(30_000, 1000 * 2 ** attempt));
-  }
-  throw new Error(`Could not create upload URL: ${lastError}`);
-}
-
-// Downloads an external image (a YouTube thumbnail, a playlist/release cover,
-// a channel avatar) and re-uploads it into Supabase Storage — so neither a
-// track's, album's, nor artist's image ever ends up pointing at a raw
-// external i.ytimg.com/YouTube CDN URL that could expire or disappear.
-export async function importImageFromUrl(url: string | null | undefined): Promise<string | undefined> {
-  if (!url) return undefined;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return undefined;
-    const contentType = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return await uploadImageToStorage(buffer, contentType);
-  } catch {
-    return undefined;
-  }
 }
 
 // Fetches a YouTube channel's own avatar/thumbnail and re-uploads it into
@@ -221,115 +175,6 @@ export async function importImageFromUrl(url: string | null | undefined): Promis
 async function fetchChannelAvatarUrl(channelUrl: string): Promise<string | undefined> {
   const candidates = await fetchChannelThumbnailCandidates(channelUrl);
   return await importBestReachableImage(candidates);
-}
-
-// Reuses an existing catalog artist with a case-insensitive matching name, or
-// creates one — "auto-create from the YouTube channel name" is how imported
-// tracks get attributed, rather than picking from an existing artist. When
-// neither the existing row nor a new one has a photo yet, the artist's
-// YouTube channel avatar (if a channelUrl was resolved for this import) is
-// fetched as a fallback — this only ever runs once per artist in practice,
-// since after the first track's import sets photoUrl, later tracks from the
-// same channel see existing.photoUrl already set and skip the lookup.
-async function findOrCreateArtist(name: string, channelUrl: string | null) {
-  const existing = await prisma.artist.findFirst({
-    where: { ownerId: null, name: { equals: name, mode: "insensitive" } },
-  });
-  if (existing) {
-    if (existing.photoUrl || !channelUrl) return existing;
-    const photoUrl = await fetchChannelAvatarUrl(channelUrl);
-    if (!photoUrl) return existing;
-    return prisma.artist.update({ where: { id: existing.id }, data: { photoUrl } });
-  }
-
-  const photoUrl = channelUrl ? await fetchChannelAvatarUrl(channelUrl) : undefined;
-  const [gradientFrom, gradientTo] = gradientForSeed(name);
-  return prisma.artist.create({ data: { name, gradientFrom, gradientTo, photoUrl } });
-}
-
-// Single imports never auto-create an artist (see importYoutubeVideo's
-// isSingle branch below) — this only ever looks for a case-insensitive name
-// match among existing catalog artists, returning null rather than creating
-// one when there's no match. A Single that matches links to that existing
-// artist exactly like any other track would; one that doesn't stays
-// unassigned (Track.artistId null, Track.artistNameOverride holds the name).
-async function findExistingArtist(name: string) {
-  return prisma.artist.findFirst({
-    where: { ownerId: null, name: { equals: name, mode: "insensitive" } },
-  });
-}
-
-// Reuses an existing album (matched by title, under the same artist) or
-// creates one — this is what turns a catalog import's album/release
-// grouping into a real Album row rather than just a string label. Re-running
-// an import against the same channel finds the existing album and adds only
-// the tracks it's missing, rather than creating a duplicate Album each time.
-// Exclusively used by catalog import (the single-video quick-import job
-// never sets albumTitle) — catalog import never fetches or assigns any
-// artwork, so a created album always starts coverUrl-less; the manual Album
-// Artwork Editor is the only way to set one afterward.
-async function findOrCreateAlbum(
-  artistId: string,
-  title: string,
-  options?: { allowDuplicates?: boolean; batchId?: string; albumType?: AlbumType }
-) {
-  const artist = await prisma.artist.findUniqueOrThrow({ where: { id: artistId } });
-
-  // Allow-duplicates path: never reuse an existing album by match — but
-  // still only create ONE new duplicate album per distinct title per batch
-  // (not one per track), by caching the newly-created album's id on the
-  // batch row keyed by normalized title. Safe without locking because
-  // catalogWorker.ts only ever processes one item at a time, globally.
-  if (options?.allowDuplicates && options?.batchId) {
-    const normalized = normalizeForMatch(title);
-    const batch = await prisma.youtubeImportBatch.findUniqueOrThrow({ where: { id: options.batchId } });
-    const map = (batch.duplicateAlbumMap as Record<string, string> | null) ?? {};
-    if (map[normalized]) {
-      return prisma.album.findUniqueOrThrow({ where: { id: map[normalized] } });
-    }
-    const created = await prisma.album.create({
-      data: {
-        title,
-        artistId,
-        gradientFrom: artist.gradientFrom,
-        gradientTo: artist.gradientTo,
-        albumType: options.albumType,
-      },
-    });
-    await prisma.youtubeImportBatch.update({
-      where: { id: options.batchId },
-      data: { duplicateAlbumMap: { ...map, [normalized]: created.id } },
-    });
-    return created;
-  }
-
-  const exact = await prisma.album.findFirst({ where: { artistId, title: { equals: title, mode: "insensitive" } } });
-  if (exact) return exact;
-
-  // No exact match — fall back to fuzzy title matching (same bar as the
-  // rest of the app) so minor punctuation/spacing differences between two
-  // enumeration passes ("Agizegn Vol 1" vs "Agizegn, Vol. 1") don't spawn a
-  // duplicate album.
-  const candidates = await prisma.album.findMany({ where: { artistId }, select: { id: true, title: true } });
-  const best = candidates
-    .map((c) => ({ id: c.id, score: similarity(c.title, title) }))
-    .sort((a, b) => b.score - a.score)[0];
-  if (best && best.score >= IDENTITY_MIN) {
-    // A match against an existing album keeps whatever type it already
-    // had — choosing "Concert Album" for this batch can never silently
-    // retag a regular album that just happens to share this title.
-    return prisma.album.findUniqueOrThrow({ where: { id: best.id } });
-  }
-
-  return prisma.album.create({
-    data: {
-      title,
-      artistId,
-      gradientFrom: artist.gradientFrom,
-      gradientTo: artist.gradientTo,
-      albumType: options?.albumType,
-    },
-  });
 }
 
 // The full download -> convert -> waveform -> upload -> save pipeline for a
@@ -388,7 +233,7 @@ export async function importYoutubeVideo({
           // matched no existing artist and the admin didn't pick one from
           // the list either, so create one — same as Album/Concert Album's
           // always-auto-create behavior, just deliberately chosen here.
-          await findOrCreateArtist(resolvedArtistName, channelUrl)
+          await findOrCreateArtist(resolvedArtistName, channelUrl ? () => fetchChannelAvatarUrl(channelUrl) : null)
         : // A Single never *automatically* creates an artist — it links to
           // an existing match by name, or stays unassigned (see
           // findExistingArtist). Every other destination (Album/Concert
@@ -396,7 +241,7 @@ export async function importYoutubeVideo({
           // auto-create-from-channel-name behavior.
           isSingle
           ? await findExistingArtist(resolvedArtistName)
-          : await findOrCreateArtist(resolvedArtistName, channelUrl);
+          : await findOrCreateArtist(resolvedArtistName, channelUrl ? () => fetchChannelAvatarUrl(channelUrl) : null);
 
     const existingBySourceId = await prisma.track.findUnique({ where: { sourceId: metadata.id } });
     if (existingBySourceId && !allowDuplicates) throw new DuplicateImportError(metadata.id);
@@ -486,7 +331,20 @@ export async function importYoutubeVideo({
             },
           })
         : albumTitle && artist
-          ? await findOrCreateAlbum(artist.id, albumTitle, { allowDuplicates, batchId, albumType })
+          ? await findOrCreateAlbum(artist.id, albumTitle, {
+              allowDuplicates,
+              albumType,
+              duplicateAlbumMap: batchId
+                ? {
+                    get: async () =>
+                      (await prisma.youtubeImportBatch.findUniqueOrThrow({ where: { id: batchId } }))
+                        .duplicateAlbumMap as Record<string, string> | null,
+                    set: async (map) => {
+                      await prisma.youtubeImportBatch.update({ where: { id: batchId }, data: { duplicateAlbumMap: map } });
+                    },
+                  }
+                : undefined,
+            })
           : undefined;
 
     const track = await prisma.track.create({

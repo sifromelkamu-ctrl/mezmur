@@ -18,28 +18,29 @@ enum Role {
 // that keeps this table populated on signup live in a hand-written migration
 // (Prisma's schema DSL can't express cross-schema FKs or triggers).
 model Profile {
-  id                String               @id @db.Uuid
+  id                    String                @id @db.Uuid
   // Nullable: a phone-only signup has no email, and vice versa — exactly one
   // of email/phone is guaranteed to be set by the app, never both null.
-  email             String?              @unique
-  phone             String?              @unique
+  email                 String?               @unique
+  phone                 String?               @unique
   // Case-insensitive uniqueness is enforced by a functional index on
   // lower(username) in the migration (no citext extension needed); always
   // query/compare usernames via lower() from application code.
-  username          String?
-  name              String?
-  avatarUrl         String?
-  bio               String?
-  country           String?
-  preferredLanguage String               @default("en")
-  lastLoginAt       DateTime?
-  role              Role                 @default(user)
-  createdAt         DateTime             @default(now())
-  artists           Artist[]
-  playlists         Playlist[]
-  auditLogs         AuditLog[]
-  importBatches     YoutubeImportBatch[]
-  pushSubscriptions PushSubscription[]
+  username              String?
+  name                  String?
+  avatarUrl             String?
+  bio                   String?
+  country               String?
+  preferredLanguage     String                @default("en")
+  lastLoginAt           DateTime?
+  role                  Role                  @default(user)
+  createdAt             DateTime              @default(now())
+  artists               Artist[]
+  playlists             Playlist[]
+  auditLogs             AuditLog[]
+  importBatches         YoutubeImportBatch[]
+  telegramImportBatches TelegramImportBatch[]
+  pushSubscriptions     PushSubscription[]
 
   @@map("profiles")
 }
@@ -91,7 +92,7 @@ model Artist {
   // Admin-only artwork framing (pan/zoom/rotate/flip), applied on top of
   // photoUrl at render time — never touches the original image. Null means
   // "no manual edit yet, use the smart-framing default."
-  artworkFrame     Json?
+  artworkFrame Json?
 
   // Manual Spotify artist link: the admin-confirmed Spotify artist ID this
   // catalog artist is permanently linked to (see the artist-level "Link to
@@ -135,40 +136,40 @@ model Album {
   // Spotify Catalog Sync — see Artist.spotifyId for the caching contract.
   // copyright/recordLabel come from Spotify's per-album copyrights/label
   // fields (only available via the full album lookup, not search results).
-  spotifyId    String? @unique
-  copyright    String?
-  recordLabel  String?
+  spotifyId   String? @unique
+  copyright   String?
+  recordLabel String?
 
   @@index([artistId])
 }
 
 model Track {
-  id             String          @id @default(cuid())
-  title          String
-  duration       Int             @default(0)
-  language       String?
-  genre          String?
-  audioUrl       String?
-  coverUrl       String?
-  moods          String[]        @default([])
-  playCount      Int             @default(0)
+  id                 String          @id @default(cuid())
+  title              String
+  duration           Int             @default(0)
+  language           String?
+  genre              String?
+  audioUrl           String?
+  coverUrl           String?
+  moods              String[]        @default([])
+  playCount          Int             @default(0)
   // Nullable — a Single imported from YouTube that doesn't match any
   // existing artist is left unassigned rather than auto-creating a new
   // Artist row (see youtube/pipeline.ts's findExistingArtist). Every other
   // track (regular album/EP/concert tracks, and any Single that does match
   // an existing artist) still always has one, exactly as before.
-  artistId       String?
-  artist         Artist?         @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artistId           String?
+  artist             Artist?         @relation(fields: [artistId], references: [id], onDelete: Cascade)
   // Plain-text fallback for artistName display (Now Playing, track rows,
   // etc.) when artistId is null — never a substitute for a real Artist
   // link, and never read when artist is set.
   artistNameOverride String?
-  albumId        String?
-  album          Album?          @relation(fields: [albumId], references: [id], onDelete: SetNull)
-  trackNumber    Int?
-  discNumber     Int?
-  playlistTracks PlaylistTrack[]
-  createdAt      DateTime        @default(now())
+  albumId            String?
+  album              Album?          @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  trackNumber        Int?
+  discNumber         Int?
+  playlistTracks     PlaylistTrack[]
+  createdAt          DateTime        @default(now())
 
   // Set only for tracks imported from YouTube (see /api/admin/youtube-import).
   // sourceId is the YouTube video ID and is unique so the same video can
@@ -409,23 +410,23 @@ model FeaturedBanner {
 }
 
 model YoutubeImportItem {
-  id            String                  @id @default(cuid())
-  batchId       String
-  batch         YoutubeImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  videoId       String
-  title         String
-  albumTitle    String?
-  position      Int
-  thumbnailUrl  String?
-  duration      Int?
-  selected      Boolean                 @default(false)
-  status        YoutubeImportItemStatus @default(pending)
-  progress      Int                     @default(0)
-  message       String?
-  error         String?
-  trackId       String?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  id           String                  @id @default(cuid())
+  batchId      String
+  batch        YoutubeImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  videoId      String
+  title        String
+  albumTitle   String?
+  position     Int
+  thumbnailUrl String?
+  duration     Int?
+  selected     Boolean                 @default(false)
+  status       YoutubeImportItemStatus @default(pending)
+  progress     Int                     @default(0)
+  message      String?
+  error        String?
+  trackId      String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
   // Set once this item finishes processing (success or skipped-duplicate),
   // used only to compute the import summary — see YoutubeCatalogImport.tsx.
@@ -437,5 +438,114 @@ model YoutubeImportItem {
   albumWasNew Boolean?
 
   @@unique([batchId, videoId])
+  @@index([batchId])
+}
+
+enum TelegramImportBatchStatus {
+  enumerating
+  ready
+  importing
+  // Admin manually stopped an in-progress batch — mirrors
+  // YoutubeImportBatchStatus.stopped.
+  stopped
+  completed
+  completed_with_errors
+  error
+}
+
+enum TelegramImportItemStatus {
+  pending // enumerated, not yet selected
+  selected // chosen by the admin, queued for processing
+  downloading
+  processing // waveform generation
+  uploading
+  saving
+  done
+  error
+  skipped_duplicate
+  // Admin manually cancelled this one item — mirrors
+  // YoutubeImportItemStatus.cancelled.
+  cancelled
+}
+
+// One "Import from Telegram channel" run against a single channel link.
+// Deliberately parallel to YoutubeImportBatch/YoutubeImportItem rather than
+// generalizing those existing models — a Telegram channel has no
+// Releases/Playlists to auto-detect album grouping from (unlike YouTube), so
+// every item enumerated here starts with albumTitle: null and the admin
+// assigns it explicitly (see routes/telegramImport.ts's /assign-album) before
+// starting the import, rather than it being detected up front.
+model TelegramImportBatch {
+  id          String                    @id @default(cuid())
+  sourceUrl   String
+  channelName String?
+  status      TelegramImportBatchStatus @default(enumerating)
+  error       String?
+  createdBy   String                    @db.Uuid
+  admin       Profile                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  items       TelegramImportItem[]
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  // Purely cosmetic, admin-editable display name for the Import History
+  // list — never read or written by the pipeline itself.
+  label String?
+
+  // The artist this whole batch imports into — chosen explicitly by the
+  // admin before enumeration starts (never guessed from the channel name).
+  targetArtistId String?
+
+  // Normalized titles of albums that already existed under targetArtistId at
+  // the moment this batch was created — see YoutubeImportBatch's field of
+  // the same name for why this is a snapshot rather than a live check.
+  existingAlbumTitlesSnapshot Json?
+
+  // "Allow duplicate imports" — off by default (skip anything that already
+  // exists). See YoutubeImportBatch.allowDuplicates.
+  allowDuplicates Boolean @default(false)
+
+  // Maps a normalized album title to the id of the new duplicate Album
+  // created for it *during this batch run* — see YoutubeImportBatch's field
+  // of the same name.
+  duplicateAlbumMap Json?
+
+  @@index([createdBy])
+}
+
+model TelegramImportItem {
+  id           String                   @id @default(cuid())
+  batchId      String
+  batch        TelegramImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  // Telegram message id of the audio post, scoped to the channel — combined
+  // with the channel id to form the Track.sourceId this import writes
+  // (`tg:<channelId>:<messageId>`), so a message id alone is only unique
+  // within this batch's own channel, not globally.
+  messageId    String
+  title        String
+  // Telegram's own DocumentAttributeAudio.performer tag, if the uploader set
+  // one — shown for reference only, never used for artist resolution (the
+  // admin's explicit artist choice for the whole batch always wins).
+  performer    String?
+  // Null until the admin explicitly assigns it via /assign-album — unlike
+  // YoutubeImportItem, never auto-populated at enumeration time (see the
+  // TelegramImportBatch doc comment for why).
+  albumTitle   String?
+  position     Int
+  thumbnailUrl String?
+  duration     Int?
+  selected     Boolean                  @default(false)
+  status       TelegramImportItemStatus @default(pending)
+  progress     Int                      @default(0)
+  message      String?
+  error        String?
+  trackId      String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  // See YoutubeImportItem's fields of the same name.
+  trackWasNew Boolean?
+  albumWasNew Boolean?
+
+  @@unique([batchId, messageId])
   @@index([batchId])
 }

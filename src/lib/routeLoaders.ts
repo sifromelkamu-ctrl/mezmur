@@ -27,6 +27,7 @@ export const routeLoaders = {
   search: () => import("../pages/Search"),
   sermonDetail: () => import("../pages/SermonDetail"),
   settings: () => import("../pages/Settings"),
+  telegramImport: () => import("../pages/TelegramImport"),
   youtubeCatalogImport: () => import("../pages/YoutubeCatalogImport"),
   youtubeImport: () => import("../pages/YoutubeImport"),
 } as const;

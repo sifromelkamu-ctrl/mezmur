@@ -13,6 +13,7 @@ import {
   Moon,
   Palette,
   Pencil,
+  Send,
   Sparkles,
   Sun,
   UserCircle2,
@@ -503,6 +504,11 @@ export default function Settings() {
               icon={<Disc3 size={20} />}
               label="Import artist catalog"
               onClick={() => navigate("/admin/youtube-catalog-import")}
+            />
+            <SettingsRow
+              icon={<Send size={20} />}
+              label="Import from Telegram"
+              onClick={() => navigate("/admin/telegram-import")}
             />
             <SettingsRow
               icon={<Library size={20} />}

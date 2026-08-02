@@ -1,9 +1,26 @@
 import { Check, ChevronLeft, ChevronRight, Pencil, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import TextField from "./form/TextField";
-import type { YoutubeCatalogBatchSummary } from "../lib/api";
 
 const HISTORY_PAGE_SIZE = 10;
+
+// Structurally compatible with both YoutubeCatalogBatchSummary and
+// TelegramCatalogBatchSummary (see ../lib/api) — shared by both import
+// pages' history lists. albumType is YouTube-only (its "Concert Album"
+// destination choice); optional here so a Telegram batch, which has no
+// concert concept, just never renders that badge below.
+export interface ImportHistorySummary {
+  id: string;
+  sourceUrl: string;
+  channelName: string | null;
+  label: string | null;
+  status: string;
+  error: string | null;
+  itemCount: number;
+  albumType?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "All statuses" },
@@ -28,7 +45,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const RETRYABLE_STATUSES = new Set(["error", "completed_with_errors"]);
 
-function historyDuration(b: YoutubeCatalogBatchSummary): string {
+function historyDuration(b: ImportHistorySummary): string {
   const ms = new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime();
   if (!Number.isFinite(ms) || ms <= 0) return "—";
   const totalSeconds = Math.round(ms / 1000);
@@ -38,7 +55,7 @@ function historyDuration(b: YoutubeCatalogBatchSummary): string {
 }
 
 interface ImportHistoryPanelProps {
-  history: YoutubeCatalogBatchSummary[];
+  history: ImportHistorySummary[];
   historyTotal: number;
   historyPage: number;
   setHistoryPage: (page: number) => void;
@@ -54,7 +71,7 @@ interface ImportHistoryPanelProps {
   clearCompletedHistory: () => void;
   clearFailedHistory: () => void;
   clearAllHistory: () => void;
-  retryHistoryEntry: (b: YoutubeCatalogBatchSummary) => void;
+  retryHistoryEntry: (b: ImportHistorySummary) => void;
   renameHistoryEntry: (id: string, label: string | null) => void;
 }
 
@@ -85,7 +102,7 @@ export default function ImportHistoryPanel({
 
   const totalPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
-  const startRename = (b: YoutubeCatalogBatchSummary) => {
+  const startRename = (b: ImportHistorySummary) => {
     setRenamingId(b.id);
     setRenameValue(b.label ?? b.channelName ?? "");
   };

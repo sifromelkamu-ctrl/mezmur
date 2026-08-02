@@ -11,7 +11,7 @@ import { cancelItem, resumeBatch, startBatchImport, stopBatch } from "../youtube
 import { extractYoutubePlaylistId, normalizeYoutubeChannelUrl } from "../youtube/validate.js";
 import { normalizeForMatch } from "../artwork/matching.js";
 import { toSafeErrorMessage } from "../youtube/safeError.js";
-import { gradientForSeed } from "./admin.js";
+import { resolveTargetArtist } from "../catalogImport/shared.js";
 
 const router = Router();
 
@@ -42,44 +42,6 @@ const startEnumerationSchema = z
   .refine((v) => (v.artistMode === "existing" ? Boolean(v.artistId) : Boolean(v.artistName)), {
     message: "Choose an existing artist, or provide a name for the new artist",
   });
-
-// Resolves the batch's target artist up front — required, never guessed.
-// "existing" must reference a real catalog artist; "new" hard-blocks on a
-// normalized-name match against any existing catalog artist (case-
-// insensitive, punctuation/diacritic-insensitive) rather than silently
-// creating a likely duplicate — the admin must either pick the existing
-// artist or choose a genuinely different name. Returns null (after writing
-// the response itself) on any validation failure, so callers just return.
-async function resolveTargetArtist(
-  res: import("express").Response,
-  input: { artistMode: "existing" | "new"; artistId?: string; artistName?: string }
-): Promise<{ id: string; name: string } | null> {
-  if (input.artistMode === "existing") {
-    const artist = await prisma.artist.findFirst({ where: { id: input.artistId, ownerId: null } });
-    if (!artist) {
-      res.status(404).json({ error: "Selected artist not found" });
-      return null;
-    }
-    return artist;
-  }
-
-  const name = input.artistName!.trim();
-  const normalized = normalizeForMatch(name);
-  const catalogArtists = await prisma.artist.findMany({ where: { ownerId: null }, select: { id: true, name: true } });
-  const duplicate = catalogArtists.find((a) => normalizeForMatch(a.name) === normalized);
-  if (duplicate) {
-    res.status(409).json({
-      error: `An artist named "${duplicate.name}" already exists — choose it from Existing Artist, or use a different name.`,
-      suggestedArtist: duplicate,
-    });
-    return null;
-  }
-
-  const [gradientFrom, gradientTo] = gradientForSeed(name);
-  // No photo — catalog import never fetches/assigns artwork; the manual
-  // Artwork Editor is the only way to set one afterward.
-  return prisma.artist.create({ data: { name, gradientFrom, gradientTo } });
-}
 
 // POST /api/admin/youtube-import/catalog — validates the input, rights
 // confirmation, and target artist, creates a batch, and enumerates in the

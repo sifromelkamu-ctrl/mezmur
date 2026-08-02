@@ -532,6 +532,66 @@ export interface YoutubeCatalogHistoryPage {
   batches: YoutubeCatalogBatchSummary[];
 }
 
+// Mirrors YoutubeCatalogItem/Batch above — see server/src/routes/telegramImport.ts.
+// A Telegram channel has no Releases/Playlists to auto-detect album grouping
+// from, so albumTitle here starts null on every item and is only ever set by
+// the admin's explicit "Assign to album" action (assignTelegramAlbum below),
+// never by enumeration itself.
+export type TelegramCatalogItemStatus = YoutubeCatalogItemStatus;
+
+export interface TelegramCatalogItem {
+  id: string;
+  messageId: string;
+  title: string;
+  performer: string | null;
+  albumTitle: string | null;
+  kind: "album" | "single";
+  position: number;
+  duration: number | null;
+  selected: boolean;
+  status: TelegramCatalogItemStatus;
+  progress: number;
+  message: string | null;
+  error: string | null;
+  trackId: string | null;
+  trackWasNew: boolean | null;
+  albumWasNew: boolean | null;
+}
+
+export type TelegramCatalogBatchStatus = YoutubeCatalogBatchStatus;
+
+export interface TelegramCatalogBatch {
+  id: string;
+  sourceUrl: string;
+  channelName: string | null;
+  label: string | null;
+  status: TelegramCatalogBatchStatus;
+  error: string | null;
+  createdAt: string;
+  targetArtistId: string | null;
+  allowDuplicates: boolean;
+  items: TelegramCatalogItem[];
+}
+
+export interface TelegramCatalogBatchSummary {
+  id: string;
+  sourceUrl: string;
+  channelName: string | null;
+  label: string | null;
+  status: TelegramCatalogBatchStatus;
+  error: string | null;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TelegramCatalogHistoryPage {
+  total: number;
+  page: number;
+  pageSize: number;
+  batches: TelegramCatalogBatchSummary[];
+}
+
 export const adminApi = {
   uploadTrack: (input: {
     title: string;
@@ -692,6 +752,68 @@ export const adminApi = {
   cancelYoutubeCatalogItem: (batchId: string, itemId: string) =>
     request<{ result: "removed_from_queue" | "aborted" }>(
       `/admin/youtube-import/catalog/${batchId}/items/${itemId}/cancel`,
+      { method: "POST" }
+    ),
+
+  // Telegram channel import — mirrors the YouTube catalog import methods
+  // above; see server/src/routes/telegramImport.ts.
+  startTelegramCatalogEnumeration: (input: {
+    url: string;
+    confirmRights: boolean;
+    artistMode: "existing" | "new";
+    artistId?: string;
+    artistName?: string;
+    allowDuplicates?: boolean;
+  }) => request<{ batchId: string }>("/admin/telegram-import", { method: "POST", body: JSON.stringify(input) }),
+  // Assigns (or, with albumTitle: null, clears) an album name on a checked
+  // subset of enumerated items — no YouTube equivalent, since a Telegram
+  // channel has no Releases/Playlists to auto-detect album grouping from.
+  assignTelegramAlbum: (batchId: string, itemIds: string[], albumTitle: string | null) =>
+    request<void>(`/admin/telegram-import/${batchId}/assign-album`, {
+      method: "POST",
+      body: JSON.stringify({ itemIds, albumTitle }),
+    }),
+  listTelegramCatalogBatches: (params?: { q?: string; status?: string; page?: number; pageSize?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+    const query = qs.toString();
+    return request<TelegramCatalogHistoryPage>(`/admin/telegram-import${query ? `?${query}` : ""}`);
+  },
+  getTelegramCatalogBatch: (batchId: string) => request<TelegramCatalogBatch>(`/admin/telegram-import/${batchId}`),
+  deleteTelegramCatalogBatch: (batchId: string) =>
+    request<void>(`/admin/telegram-import/${batchId}`, { method: "DELETE" }),
+  deleteSelectedTelegramCatalogBatches: (batchIds: string[]) =>
+    request<{ deleted: number }>("/admin/telegram-import/delete-selected", {
+      method: "POST",
+      body: JSON.stringify({ batchIds }),
+    }),
+  clearCompletedTelegramCatalogBatches: () =>
+    request<{ deleted: number }>("/admin/telegram-import/clear-completed", { method: "POST" }),
+  clearFailedTelegramCatalogBatches: () =>
+    request<{ deleted: number }>("/admin/telegram-import/clear-failed", { method: "POST" }),
+  clearAllTelegramCatalogBatches: () =>
+    request<{ deleted: number }>("/admin/telegram-import/clear-all", { method: "POST" }),
+  renameTelegramCatalogBatch: (batchId: string, label: string | null) =>
+    request<{ id: string; label: string | null }>(`/admin/telegram-import/${batchId}/label`, {
+      method: "PATCH",
+      body: JSON.stringify({ label }),
+    }),
+  selectTelegramCatalogItems: (
+    batchId: string,
+    input: { selected: boolean; all?: boolean; albumTitle?: string | null; hasAlbum?: boolean; itemIds?: string[] }
+  ) => request<void>(`/admin/telegram-import/${batchId}/select`, { method: "POST", body: JSON.stringify(input) }),
+  startTelegramCatalogImport: (batchId: string) =>
+    request<{ queued: number }>(`/admin/telegram-import/${batchId}/start`, { method: "POST" }),
+  resumeTelegramCatalogImport: (batchId: string) =>
+    request<{ resumed: number }>(`/admin/telegram-import/${batchId}/resume`, { method: "POST" }),
+  stopTelegramCatalogImport: (batchId: string) =>
+    request<{ stopped: number }>(`/admin/telegram-import/${batchId}/stop`, { method: "POST" }),
+  cancelTelegramCatalogItem: (batchId: string, itemId: string) =>
+    request<{ result: "removed_from_queue" | "aborted" }>(
+      `/admin/telegram-import/${batchId}/items/${itemId}/cancel`,
       { method: "POST" }
     ),
 };
