@@ -44,3 +44,19 @@ services:
         sync: false
       - key: DAILY_VERSE_PUSH_HOUR_UTC
         sync: false
+      # Optional. Telegram channel import — MTProto (teleproto/GramJS)
+      # user-session credentials, so the server can read a public channel's
+      # existing message history (the Bot API can't: a bot only sees
+      # messages posted after it joins). Get api_id/api_hash (free) from
+      # https://my.telegram.org/apps, then run one of the login scripts
+      # locally (never on Render) to produce TELEGRAM_SESSION — see
+      # server/scripts/telegramLogin.ts and the README's Telegram gotcha for
+      # the full walkthrough. Leave unset and Telegram import shows a clear
+      # "isn't configured" error instead of failing silently; every other
+      # part of the app is unaffected.
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_SESSION
+        sync: false
