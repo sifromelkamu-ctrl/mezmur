@@ -6,4 +6,10 @@ node_modules
 # instead of via YTDLP_COOKIES_B64 (see ytdlp.ts) — never committed either way.
 cookies.txt
 
+# In-progress Telegram login state (scripts/telegramLoginStep.ts) — holds a
+# pre-auth session string between the send-code/submit-code/submit-password
+# steps. Deleted automatically once login completes; ignored here in case a
+# run is ever abandoned mid-flow.
+.telegram-login-state.json
+
 /src/generated/prisma
