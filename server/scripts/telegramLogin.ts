@@ -19,7 +19,10 @@
 import "dotenv/config";
 import { createInterface } from "node:readline/promises";
 import { TelegramClient } from "teleproto";
-import { StringSession } from "teleproto/sessions";
+// Node's ESM loader doesn't do directory-index resolution for subpath
+// imports (teleproto has no package.json "exports" map) — the explicit
+// /index.js is required, not optional. See telegram/client.ts.
+import { StringSession } from "teleproto/sessions/index.js";
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
