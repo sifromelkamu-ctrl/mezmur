@@ -288,3 +288,16 @@ export async function resumeAllInterrupted() {
   });
   for (const batch of batches) await resumeBatch(batch.id);
 }
+
+// Self-healing watchdog — see the matching comment in youtube/catalogWorker.ts.
+// Re-syncs every still-"importing" Telegram batch against the DB on a
+// timer, so an item stranded active in Postgres without actually being in
+// this process's queue/inFlight (crash-restart race, etc.) gets re-queued
+// automatically instead of needing a manual server restart to notice.
+const WATCHDOG_INTERVAL_MS = 30_000;
+setInterval(() => {
+  prisma.telegramImportBatch
+    .findMany({ where: { status: "importing" }, select: { id: true } })
+    .then((batches) => Promise.all(batches.map((b) => resumeBatch(b.id))))
+    .catch((err) => console.error("[telegram/worker] watchdog tick failed", err));
+}, WATCHDOG_INTERVAL_MS).unref();

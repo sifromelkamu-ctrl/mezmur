@@ -76,6 +76,16 @@ const cookiesArgs: string[] = (() => {
 // existing behavior for anything android can't resolve. This is a
 // widely-documented community workaround (yt-dlp's own "sign in to confirm
 // you're not a bot" tracking issue), not a fix on this app's side of things.
+//
+// DO NOT drop "android" just because logs show yt-dlp skipping it whenever
+// cookies are present ("does not support cookies") — that skip-and-fall-
+// through-to-web is exactly the point, not dead weight. Tried removing it
+// down to "web" alone once (2026-08-06) on the theory that it was always
+// skipped anyway; caused real "Requested format is not available" failures
+// across a live channel import within the hour. Reverted same-day. If
+// you're looking at this because it seems redundant again, it isn't —
+// leave it as "android,web".
+//
 // NOTE: "tv" and "ios" were tried first and rejected — both make even a
 // bare --dump-json fail locally with "Requested format is not available",
 // a real regression, not a YouTube-side block (reproduced with yt-dlp

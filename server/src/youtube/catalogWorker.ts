@@ -356,3 +356,24 @@ export async function resumeAllInterrupted() {
   });
   for (const batch of batches) await resumeBatch(batch.id);
 }
+
+// Self-healing watchdog. resumeAllInterrupted() above only runs once, at
+// boot — it can't help an item that ends up marked active in Postgres
+// (selected/downloading/etc.) but isn't actually in *this* process's queue
+// or inFlight set while the server keeps running, e.g. a crash-and-restart
+// race, two server instances briefly overlapping during a restart, or any
+// future bug in enqueue timing. Until now the only fix for that was
+// noticing and manually restarting the server — which is what today's
+// "stuck, not started" incidents actually required. This re-syncs every
+// still-"importing" batch against the DB on a timer instead, so an orphaned
+// item gets picked back up automatically within WATCHDOG_INTERVAL_MS. Safe
+// to run on a batch that's genuinely healthy: resumeBatch already excludes
+// anything in `inFlight`, and enqueue() dedupes against the existing queue,
+// so a normally-progressing batch is a no-op each tick.
+const WATCHDOG_INTERVAL_MS = 30_000;
+setInterval(() => {
+  prisma.youtubeImportBatch
+    .findMany({ where: { status: "importing" }, select: { id: true } })
+    .then((batches) => Promise.all(batches.map((b) => resumeBatch(b.id))))
+    .catch((err) => console.error("[catalogWorker] watchdog tick failed", err));
+}, WATCHDOG_INTERVAL_MS).unref();

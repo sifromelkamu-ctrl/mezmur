@@ -6,6 +6,18 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
+    // Pinned so the dev server never silently moves to 5174+ if the port's
+    // busy — an embedded/proxied browser (VS Code's preview, a forwarded
+    // tunnel, etc.) that's pointed at a fixed port would otherwise end up
+    // talking to nothing. hmr.clientPort pins the hot-reload WebSocket to
+    // the same port explicitly, rather than inferring it from
+    // window.location.port, which a proxy/webview can rewrite — a broken
+    // HMR socket fails silently rather than erroring, which reads exactly
+    // like "the page went blank on the next click."
+    strictPort: true,
+    hmr: {
+      clientPort: 5173,
+    },
   },
   build: {
     // No sourcemaps in the deployed bundle — smaller artifact, and this is
