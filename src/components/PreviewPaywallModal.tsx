@@ -36,10 +36,18 @@ export default function PreviewPaywallModal() {
   const startCheckout = async () => {
     setError(null);
     setCheckingOut(true);
+    // Opened synchronously, still inside the click's user-gesture context —
+    // an iOS home-screen PWA (standalone display mode) can silently swallow
+    // a `window.location.href` reassignment issued after the `await` below.
+    // Setting this already-open window's location once the URL is ready
+    // reliably breaks out to Stripe's checkout regardless.
+    const popup = window.open("", "_blank");
     try {
       const { url } = await subscriptionApi.checkout();
-      window.location.href = url;
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
     } catch (err) {
+      popup?.close();
       setError(err instanceof ApiError ? err.message : "Could not start checkout. Please try again.");
       setCheckingOut(false);
     }
@@ -48,10 +56,13 @@ export default function PreviewPaywallModal() {
   const openBillingPortal = async () => {
     setError(null);
     setCheckingOut(true);
+    const popup = window.open("", "_blank");
     try {
       const { url } = await subscriptionApi.portal();
-      window.location.href = url;
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
     } catch (err) {
+      popup?.close();
       setError(err instanceof ApiError ? err.message : "Could not open billing. Please try again.");
       setCheckingOut(false);
     }

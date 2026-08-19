@@ -130,10 +130,19 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
   const startCheckout = async () => {
     setError(null);
     setBusy(true);
+    // Opened synchronously, still inside the click's user-gesture context —
+    // an iOS home-screen PWA (standalone display mode) can silently swallow
+    // a `window.location.href` reassignment issued after the `await` below,
+    // since the browser no longer sees it as tied to a real tap by then.
+    // Setting this already-open window's location once the URL is ready
+    // reliably breaks out to Stripe's checkout regardless.
+    const popup = window.open("", "_blank");
     try {
       const { url } = await subscriptionApi.checkout();
-      window.location.href = url;
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
     } catch (err) {
+      popup?.close();
       setError(err instanceof ApiError ? err.message : "Could not start checkout.");
       setBusy(false);
     }
@@ -142,10 +151,13 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
   const openPortal = async () => {
     setError(null);
     setBusy(true);
+    const popup = window.open("", "_blank");
     try {
       const { url } = await subscriptionApi.portal();
-      window.location.href = url;
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
     } catch (err) {
+      popup?.close();
       setError(err instanceof ApiError ? err.message : "Could not open billing portal.");
       setBusy(false);
     }
