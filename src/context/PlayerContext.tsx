@@ -13,6 +13,13 @@ import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
 import { emitMediaStarted, onMediaStarted } from "../lib/mediaEvents";
 import { recordPlayed, recordPosition } from "../lib/recentlyPlayed";
 import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
+import { useSubscription } from "./useSubscription";
+
+// How much of a track a signed-out visitor or a signed-in user past their
+// free trial with no active subscription gets to hear, per track, before
+// playback pauses itself and the paywall shows — same cutoff for both real
+// <audio> playback and the simulated-timer fallback below.
+const PREVIEW_SECONDS = 30;
 
 interface PlayerContextValue {
   currentTrack: ApiTrack | null;
@@ -21,6 +28,10 @@ interface PlayerContextValue {
   volume: number; // 0-1
   shuffle: boolean;
   repeat: boolean;
+  // True once the current track's playback has been paused at
+  // PREVIEW_SECONDS for lack of full access — the paywall UI watches this
+  // to know when to show itself. Cleared on the next playTrack/jump.
+  previewLimitReached: boolean;
   playTrack: (track: ApiTrack, queue?: ApiTrack[]) => void;
   addToQueue: (track: ApiTrack) => void;
   togglePlay: () => void;
@@ -44,6 +55,7 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 const PlayerProgressContext = createContext<number | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  const { hasFullAccess } = useSubscription();
   const [currentTrack, setCurrentTrack] = useState<ApiTrack | null>(null);
   const [queue, setQueue] = useState<ApiTrack[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,6 +63,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [volume, setVolume] = useState(0.75);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
+  const [previewLimitReached, setPreviewLimitReached] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Kept in sync via the effect below so the timeupdate listener (attached
@@ -97,6 +110,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setQueue(newQueue && newQueue.length ? newQueue : [track]);
     setProgress(0);
     setIsPlaying(true);
+    setPreviewLimitReached(false);
     emitMediaStarted("music");
     tracksApi.recordPlay(track.id).catch(() => {});
     recordPlayed(track.id);
@@ -133,6 +147,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(nextTrack);
       setProgress(0);
       setIsPlaying(true);
+      setPreviewLimitReached(false);
       emitMediaStarted("music");
       tracksApi.recordPlay(nextTrack.id).catch(() => {});
     },
@@ -144,12 +159,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const seek = useCallback(
     (seconds: number) => {
+      // Without this cap, dragging the seek bar past PREVIEW_SECONDS would
+      // bypass the preview limit entirely for anyone without full access.
+      const capped = hasFullAccess ? seconds : Math.min(seconds, PREVIEW_SECONDS);
       if (audioRef.current && hasRealAudio) {
-        audioRef.current.currentTime = seconds;
+        audioRef.current.currentTime = capped;
       }
-      setProgress(seconds);
+      setProgress(capped);
     },
-    [hasRealAudio]
+    [hasRealAudio, hasFullAccess]
   );
 
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
@@ -262,6 +280,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     if (!audio) return;
     const handleTimeUpdate = () => {
+      if (!hasFullAccess && audio.currentTime >= PREVIEW_SECONDS) {
+        audio.pause();
+        audio.currentTime = PREVIEW_SECONDS;
+        setProgress(PREVIEW_SECONDS);
+        setIsPlaying(false);
+        setPreviewLimitReached(true);
+        return;
+      }
       setProgress(audio.currentTime);
       // Throttled to once per ~5s of playback (not every timeupdate tick,
       // which fires several times a second) — powers Home's Continue
@@ -287,7 +313,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [repeat, next]);
+  }, [repeat, next, hasFullAccess]);
 
   // Simulated playback fallback for tracks with no real audio file — most
   // of the catalog, so this needs the same throttled position save the
@@ -301,6 +327,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setProgress((p) => {
           const duration = currentTrack.duration ?? 0;
           const nextP = p + 1;
+          if (!hasFullAccess && nextP >= PREVIEW_SECONDS) {
+            setIsPlaying(false);
+            setPreviewLimitReached(true);
+            return PREVIEW_SECONDS;
+          }
           if (nextP >= duration) {
             if (repeat) {
               recordPosition(currentTrack.id, 0);
@@ -317,7 +348,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [isPlaying, currentTrack, repeat, next, hasRealAudio]);
+  }, [isPlaying, currentTrack, repeat, next, hasRealAudio, hasFullAccess]);
 
   // "No manual refresh required": patches currentTrack/queue the instant an
   // album or track's artwork is saved elsewhere in the app (Mini Player,
@@ -357,6 +388,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       volume,
       shuffle,
       repeat,
+      previewLimitReached,
       playTrack,
       addToQueue,
       togglePlay,
@@ -374,6 +406,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       volume,
       shuffle,
       repeat,
+      previewLimitReached,
       playTrack,
       addToQueue,
       togglePlay,

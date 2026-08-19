@@ -16,6 +16,8 @@ import pushRouter from "./routes/push.js";
 import searchRouter from "./routes/search.js";
 import sermonsRouter from "./routes/sermons.js";
 import singlesRouter from "./routes/singles.js";
+import stripeWebhookRouter from "./routes/stripeWebhook.js";
+import subscriptionRouter from "./routes/subscription.js";
 import telegramImportRouter from "./routes/telegramImport.js";
 import tracksRouter from "./routes/tracks.js";
 import youtubeImportRouter from "./routes/youtubeImport.js";
@@ -44,6 +46,14 @@ process.on("uncaughtException", (err) => {
 const app = express();
 
 app.use(cors());
+
+// Registered before express.json() and with its own raw-body parser: Stripe
+// signs the exact bytes of the request body, so this route must see the
+// untouched raw payload rather than a re-serialized parsed-then-stringified
+// copy — using the app-wide JSON parser here would break signature
+// verification on every event.
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRouter);
+
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -69,6 +79,7 @@ app.use("/api/tracks", tracksRouter);
 app.use("/api/sermons", sermonsRouter);
 app.use("/api/podcasts", podcastsRouter);
 app.use("/api/push", pushRouter);
+app.use("/api/subscription", subscriptionRouter);
 app.use("/api/bible-audio", bibleAudioRouter);
 app.use("/api/featured-banners", featuredBannersRouter);
 app.use("/api/admin", adminRouter);

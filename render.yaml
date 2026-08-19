@@ -60,3 +60,13 @@ services:
         sync: false
       - key: TELEGRAM_SESSION
         sync: false
+      # Subscriptions (Stripe). See server/.env.example for the full setup
+      # walkthrough. Leave unset and playback for expired-trial users stays
+      # limited to short previews with no way to subscribe yet — every other
+      # part of the app is unaffected.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

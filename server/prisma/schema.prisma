@@ -13,6 +13,17 @@ enum Role {
   admin
 }
 
+// Mirrors a Stripe Subscription's own status field (the ones relevant to
+// gating playback) — kept in sync by the Stripe webhook, never written to
+// directly from any other request handler.
+enum SubscriptionStatus {
+  none // never subscribed — trial-or-preview gating applies
+  trialing
+  active
+  past_due
+  canceled
+}
+
 // Mirrors Supabase Auth's auth.users table (id is the same UUID as the
 // Supabase-managed user). The FK constraint to auth.users and the trigger
 // that keeps this table populated on signup live in a hand-written migration
@@ -35,6 +46,25 @@ model Profile {
   lastLoginAt           DateTime?
   role                  Role                  @default(user)
   createdAt             DateTime              @default(now())
+
+  // 30-day free-full-access window from signup — set once by the DB default
+  // below, never extended by application code today (a manual dashboard/SQL
+  // edit is the only current way to comp someone extra trial time). After
+  // this passes with no active subscription, playback is limited to
+  // short previews (see PlayerContext.tsx).
+  trialEndsAt           DateTime              @default(dbgenerated("(now() + interval '30 days')"))
+  subscriptionStatus    SubscriptionStatus    @default(none)
+  // Null until the user's first checkout attempt creates a Stripe customer
+  // (kept even after a subscription lapses, so a returning customer reuses
+  // the same Stripe customer record instead of accumulating duplicates).
+  stripeCustomerId      String?               @unique
+  stripeSubscriptionId  String?               @unique
+  // End of the current paid billing period — while subscriptionStatus is
+  // "active" this is when it next renews; while "canceled" (but not yet
+  // expired) this is when access actually ends, since Stripe keeps a
+  // canceled subscription active through the period already paid for.
+  subscriptionCurrentPeriodEnd DateTime?
+
   artists               Artist[]
   playlists             Playlist[]
   auditLogs             AuditLog[]

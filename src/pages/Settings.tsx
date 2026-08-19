@@ -20,15 +20,17 @@ import {
   Clapperboard,
   X as XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
 import { useLyricsSetting } from "../context/LyricsContext";
 import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, CUSTOM_THEME_ID, useTheme } from "../context/ThemeContext";
+import { useSubscription } from "../context/useSubscription";
 import { LANGUAGES } from "../i18n/translations";
+import { ApiError, subscriptionApi, type ApiSubscriptionState } from "../lib/api";
 
 type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about";
 
@@ -71,6 +73,143 @@ function SectionHeader({ title, onBack }: { title: string; onBack: () => void })
   );
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+}
+
+// Human summary for every combination the subscription status can be in —
+// kept as one pure function rather than scattered ternaries in the JSX
+// below, since there are enough branches (trial vs. paid, several Stripe
+// statuses, the "canceled but still paid through" grace window) that
+// inlining them would be hard to read.
+function describeSubscription(status: ApiSubscriptionState): { title: string; subtitle: string } {
+  if (status.subscriptionStatus === "active" || status.subscriptionStatus === "trialing") {
+    return { title: "Mezmur Premium", subtitle: `Renews ${formatDate(status.subscriptionCurrentPeriodEnd ?? status.trialEndsAt)}` };
+  }
+  if (status.subscriptionStatus === "past_due") {
+    return { title: "Payment needs attention", subtitle: "Your last renewal failed — update your billing to keep full access." };
+  }
+  if (status.subscriptionStatus === "canceled") {
+    return status.hasFullAccess
+      ? { title: "Subscription canceled", subtitle: `Full access continues until ${formatDate(status.subscriptionCurrentPeriodEnd ?? status.trialEndsAt)}` }
+      : { title: "Subscription ended", subtitle: "Resubscribe to unlock full-song playback again." };
+  }
+  // subscriptionStatus === "none"
+  if (status.hasFullAccess) {
+    const daysLeft = Math.max(0, Math.ceil((new Date(status.trialEndsAt).getTime() - Date.now()) / 86_400_000));
+    return { title: "Free trial", subtitle: `${daysLeft} day${daysLeft === 1 ? "" : "s"} left — ends ${formatDate(status.trialEndsAt)}` };
+  }
+  return { title: "Trial ended", subtitle: "Subscribe to keep listening to full songs, not just 30-second previews." };
+}
+
+function SubscriptionSection({ onBack }: { onBack: () => void }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { status, loading, refresh } = useSubscription();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Lands here from Stripe's success_url/cancel_url after a checkout
+  // round-trip (see server/src/routes/subscription.ts) — a webhook may not
+  // have landed yet, so refresh once rather than trusting a stale cache,
+  // then strip the query param so a manual page refresh doesn't re-trigger it.
+  useEffect(() => {
+    if (!searchParams.get("subscription")) return;
+    refresh();
+    setSearchParams(
+      (params) => {
+        params.delete("subscription");
+        return params;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const startCheckout = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const { url } = await subscriptionApi.checkout();
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not start checkout.");
+      setBusy(false);
+    }
+  };
+
+  const openPortal = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const { url } = await subscriptionApi.portal();
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not open billing portal.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-6 py-6 max-w-2xl">
+      <SectionHeader title="Subscription" onBack={onBack} />
+      {!user ? (
+        <div className="bg-elevated rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-sm text-fg-muted">Sign in to see your subscription status.</p>
+          <button
+            onClick={() => navigate("/auth")}
+            className="bg-brand text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform shrink-0"
+          >
+            Log in
+          </button>
+        </div>
+      ) : loading || !status ? (
+        <div className="bg-elevated rounded-lg p-4">
+          <p className="text-sm text-fg-muted">Loading…</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="bg-elevated rounded-lg p-4">
+            {(() => {
+              const { title, subtitle } = describeSubscription(status);
+              return (
+                <>
+                  <p className="font-semibold">{title}</p>
+                  <p className="text-sm text-fg-muted mt-0.5">{subtitle}</p>
+                </>
+              );
+            })()}
+          </div>
+
+          {error && <p className="text-sm text-red-400 px-1">{error}</p>}
+
+          {!status.billingConfigured ? (
+            <p className="text-xs text-fg-subtle px-1">Subscriptions aren't set up yet — check back soon.</p>
+          ) : status.subscriptionStatus === "none" || (status.subscriptionStatus === "canceled" && !status.hasFullAccess) ? (
+            <button
+              onClick={startCheckout}
+              disabled={busy}
+              className="text-black text-sm font-bold px-4 py-3 rounded-full hover:scale-[1.02] transition-transform disabled:opacity-60"
+              style={{ background: "var(--color-gold)" }}
+            >
+              {busy ? "Starting checkout…" : "Subscribe — $3.99/month"}
+            </button>
+          ) : (
+            <button
+              onClick={openPortal}
+              disabled={busy}
+              className="bg-elevated-hover hover:bg-hover-strong transition-colors text-sm font-semibold px-4 py-3 rounded-full disabled:opacity-60"
+            >
+              {busy ? "Opening billing…" : "Manage subscription"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,6 +230,7 @@ export default function Settings() {
   } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { lyricsEnabled, setLyricsEnabled } = useLyricsSetting();
+  const { status: subscriptionStatus } = useSubscription();
   // Lets a caller (e.g. the notification panel's "Go Premium" card) deep-
   // link straight into a section instead of landing on the plain list —
   // passed via navigate("/settings", { state: { section: "subscription" } }).
@@ -196,22 +336,7 @@ export default function Settings() {
       </div>
     );
   } else if (section === "subscription") {
-    content = (
-      <div className="px-6 py-6 max-w-2xl">
-        <SectionHeader title="Subscription" onBack={() => setSection(null)} />
-        <div className="bg-elevated rounded-lg p-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <p className="font-semibold">Mezmur Free</p>
-              <p className="text-sm text-fg-muted">Ad-free listening for the whole catalog, at no cost.</p>
-            </div>
-            <button className="bg-white text-black text-sm font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform shrink-0">
-              {t("upgrade")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    content = <SubscriptionSection onBack={() => setSection(null)} />;
   } else if (section === "appearance") {
     content = (
       <div className="px-6 py-6 max-w-2xl">
@@ -468,7 +593,17 @@ export default function Settings() {
           <SettingsRow
             icon={<Sparkles size={20} />}
             label="Subscription"
-            value="Free"
+            value={
+              !user
+                ? undefined
+                : !subscriptionStatus
+                  ? "…"
+                  : subscriptionStatus.subscriptionStatus === "active" || subscriptionStatus.subscriptionStatus === "trialing"
+                    ? "Premium"
+                    : subscriptionStatus.hasFullAccess
+                      ? "Free trial"
+                      : "Ended"
+            }
             onClick={() => setSection("subscription")}
           />
           <SettingsRow

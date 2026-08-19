@@ -367,6 +367,27 @@ export const pushApi = {
     request<{ subscribed: boolean }>(`/push/subscribed?endpoint=${encodeURIComponent(endpoint)}`),
 };
 
+export type ApiSubscriptionStatus = "none" | "trialing" | "active" | "past_due" | "canceled";
+
+export interface ApiSubscriptionState {
+  subscriptionStatus: ApiSubscriptionStatus;
+  trialEndsAt: string;
+  subscriptionCurrentPeriodEnd: string | null;
+  hasFullAccess: boolean;
+  billingConfigured: boolean;
+}
+
+// Full lifecycle for the 30-day-free-trial-then-paid-subscription gate: a
+// cheap status check the player can poll before allowing full playback, and
+// two calls that just redirect the browser to Stripe's own hosted pages
+// (Checkout to subscribe, Billing Portal to manage/cancel) — no card data
+// ever touches this app directly.
+export const subscriptionApi = {
+  status: () => request<ApiSubscriptionState>("/subscription/status"),
+  checkout: () => request<{ url: string }>("/subscription/checkout", { method: "POST" }),
+  portal: () => request<{ url: string }>("/subscription/portal", { method: "POST" }),
+};
+
 export interface ApiBibleAudio {
   url: string;
   durationSeconds: number | null;

@@ -3,6 +3,7 @@ import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
 import BibleAudioBar from "./components/BibleAudioBar";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
+import PreviewPaywallModal from "./components/PreviewPaywallModal";
 import SplashScreen from "./components/SplashScreen";
 import Topbar from "./components/Topbar";
 import { AuthProvider } from "./context/AuthContext";
@@ -13,6 +14,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { LyricsProvider } from "./context/LyricsContext";
 import { PlayerProvider } from "./context/PlayerContext";
 import { SleepTimerProvider } from "./context/SleepTimerContext";
+import { SubscriptionProvider } from "./context/SubscriptionContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { routeLoaders } from "./lib/routeLoaders";
 // Home is the initial route on every fresh load, so it stays a static
@@ -136,6 +138,7 @@ function AppShell() {
           <MobileNav />
         </div>
       </div>
+      <PreviewPaywallModal />
     </div>
   );
 }
@@ -147,21 +150,23 @@ export default function App() {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <CustomArtistsProvider>
-            <FavoritesProvider>
-              <LyricsProvider>
-                <PlayerProvider>
-                  <BibleAudioProvider>
-                    <SleepTimerProvider>
-                      <HashRouter>
-                        <AppShell />
-                      </HashRouter>
-                    </SleepTimerProvider>
-                  </BibleAudioProvider>
-                </PlayerProvider>
-              </LyricsProvider>
-            </FavoritesProvider>
-          </CustomArtistsProvider>
+          <SubscriptionProvider>
+            <CustomArtistsProvider>
+              <FavoritesProvider>
+                <LyricsProvider>
+                  <PlayerProvider>
+                    <BibleAudioProvider>
+                      <SleepTimerProvider>
+                        <HashRouter>
+                          <AppShell />
+                        </HashRouter>
+                      </SleepTimerProvider>
+                    </BibleAudioProvider>
+                  </PlayerProvider>
+                </LyricsProvider>
+              </FavoritesProvider>
+            </CustomArtistsProvider>
+          </SubscriptionProvider>
         </AuthProvider>
       </LanguageProvider>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
