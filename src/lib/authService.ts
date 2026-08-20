@@ -81,12 +81,6 @@ export const authService = {
     return data;
   },
 
-  async loginWithPhone(phone: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
-    if (error) throw error;
-    return data;
-  },
-
   async sendPasswordResetEmail(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT_URL });
     if (error) throw error;
