@@ -283,26 +283,37 @@ export async function importYoutubeVideo({
 
     if (signal?.aborted) throw new CancelledImportError();
 
-    onProgress?.("processing", 70, "Generating waveform…");
-    const waveform = await generateWaveform(audioPath);
+    // Waveform generation (local ffmpeg decode) and the audio upload (a
+    // Supabase PUT) touch the same audioPath but not each other's output, so
+    // there's no reason to make one wait on the other — was previously
+    // sequential (waveform, then upload) purely because the code was written
+    // top-to-bottom, not because of a real dependency. Running them together
+    // shaves the shorter of the two entirely off every single item's import
+    // time, with no change to CONCURRENCY (still capped at 2 — see
+    // catalogWorker.ts for why raising that isn't safe on this instance's
+    // memory without a plan upgrade).
+    onProgress?.("uploading", 75, "Uploading audio & generating waveform…");
+    const audioStoragePath = `${randomUUID()}.mp3`;
+    const [waveform, audioUrlData] = await Promise.all([
+      generateWaveform(audioPath),
+      (async () => {
+        const audioBuffer = await readFile(audioPath);
+        // audio-tracks' bucket policies only permit writes via a signed
+        // upload token (see routes/admin.ts's upload-track route) — a direct
+        // service-role .upload() gets rejected by row-level security, so we
+        // go through the same signed-URL indirection here.
+        const signedUrl = await createSignedAudioUploadUrl(audioStoragePath);
+        const putRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "audio/mpeg" },
+          body: new Uint8Array(audioBuffer),
+        });
+        if (!putRes.ok) throw new Error(`Audio upload failed with status ${putRes.status}`);
+        return supabaseAdmin.storage.from("audio-tracks").getPublicUrl(audioStoragePath).data;
+      })(),
+    ]);
 
     if (signal?.aborted) throw new CancelledImportError();
-
-    onProgress?.("uploading", 80, "Uploading audio to storage…");
-    const audioBuffer = await readFile(audioPath);
-    const audioStoragePath = `${randomUUID()}.mp3`;
-    // audio-tracks' bucket policies only permit writes via a signed upload
-    // token (see routes/admin.ts's upload-track route) — a direct
-    // service-role .upload() gets rejected by row-level security, so we go
-    // through the same signed-URL indirection here.
-    const signedUrl = await createSignedAudioUploadUrl(audioStoragePath);
-    const putRes = await fetch(signedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "audio/mpeg" },
-      body: new Uint8Array(audioBuffer),
-    });
-    if (!putRes.ok) throw new Error(`Audio upload failed with status ${putRes.status}`);
-    const { data: audioUrlData } = supabaseAdmin.storage.from("audio-tracks").getPublicUrl(audioStoragePath);
 
     let coverUrl: string | undefined;
     if (!skipArtwork) {
