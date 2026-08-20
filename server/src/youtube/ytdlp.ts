@@ -142,17 +142,10 @@ if (pluginArgs.length) {
   console.log(`[yt-dlp] ${PLUGIN_DIR} not found — running without the PO-token plugin (expected outside the Docker image).`);
 }
 
-// TEMPORARY (2026-08-20): diagnosing why every per-video fetch is hitting
-// YouTube's bot-check in production despite valid cookies + the PO-token
-// plugin being loaded — need to see whether the plugin is actually
-// exchanging a token with its sidecar or silently no-op'ing. Remove once
-// diagnosed.
-const DEBUG_ARGS = ["-v"];
-
 // Shared prefix for every yt-dlp invocation in this file — one definition so
 // TAB_ARGS (or any future flag) only needs adding once instead of staying in
 // sync across every spawn() call site by hand.
-const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs, ...DEBUG_ARGS];
+const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs];
 
 // yt-dlp's own JSON output is well-formed UTF-8 by the time it reaches us
 // (see spawnOnce's explicit setEncoding("utf8") below, which never throws —
