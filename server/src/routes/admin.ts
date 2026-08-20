@@ -442,6 +442,40 @@ router.post("/users/:id/free-access", async (req: AuthedRequest, res) => {
   res.json({ user: toUserAccessDTO(updated) });
 });
 
+// --- Contact Us submissions (Settings > Contact Us, see routes/contact.ts
+// for the public submit endpoint) ---
+
+// GET /api/admin/contact-messages - newest first, no pagination (a "write
+// us" inbox, not expected to reach a volume where that matters).
+router.get("/contact-messages", async (_req: AuthedRequest, res) => {
+  const messages = await prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" } });
+  res.json({ messages });
+});
+
+// PATCH /api/admin/contact-messages/:id - toggle read/new so the inbox can
+// show what's actually still unhandled.
+const updateContactMessageSchema = z.object({ status: z.enum(["new", "read"]) });
+router.patch("/contact-messages/:id", async (req: AuthedRequest, res) => {
+  const parsed = updateContactMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const message = await prisma.contactMessage
+    .update({ where: { id: String(req.params.id) }, data: { status: parsed.data.status } })
+    .catch(() => null);
+  if (!message) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+  res.json({ message });
+});
+
+router.delete("/contact-messages/:id", async (req: AuthedRequest, res) => {
+  await prisma.contactMessage.delete({ where: { id: String(req.params.id) } }).catch(() => null);
+  res.status(204).end();
+});
+
 // --- Artwork framing (Universal Artwork System's admin editor) ---
 // Stores only presentation metadata (pan/zoom/rotation/flip) describing how
 // to frame the *existing* photoUrl/coverUrl within a square — never touches

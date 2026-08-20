@@ -388,6 +388,16 @@ export const subscriptionApi = {
   portal: () => request<{ url: string }>("/subscription/portal", { method: "POST" }),
 };
 
+// Settings > Contact Us. No auth required — a prospective user with a
+// question before signing in should still be able to reach out — but the
+// request layer still attaches a bearer token automatically when one
+// exists (see requireAuth/optionalAuth server-side), so a signed-in
+// sender's message still links back to their account.
+export const contactApi = {
+  submit: (input: { name?: string; email: string; subject: string; message: string }) =>
+    request<{ ok: true }>("/contact", { method: "POST", body: JSON.stringify(input) }),
+};
+
 export interface ApiBibleAudio {
   url: string;
   durationSeconds: number | null;
@@ -948,6 +958,27 @@ export const adminFeaturedBannersApi = {
   remove: (id: string) => request<void>(`/admin/featured-banners/${id}`, { method: "DELETE" }),
   reorder: (ids: string[]) =>
     request<void>("/admin/featured-banners/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
+};
+
+export interface ApiContactMessage {
+  id: string;
+  userId: string | null;
+  name: string | null;
+  email: string;
+  subject: string;
+  message: string;
+  status: "new" | "read";
+  createdAt: string;
+}
+
+export const adminContactApi = {
+  list: () => request<{ messages: ApiContactMessage[] }>("/admin/contact-messages"),
+  setStatus: (id: string, status: "new" | "read") =>
+    request<{ message: ApiContactMessage }>(`/admin/contact-messages/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  remove: (id: string) => request<void>(`/admin/contact-messages/${id}`, { method: "DELETE" }),
 };
 
 export function sermonToTrack(sermon: ApiSermon): ApiTrack {

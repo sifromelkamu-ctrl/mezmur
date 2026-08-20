@@ -76,6 +76,7 @@ model Profile {
   importBatches         YoutubeImportBatch[]
   telegramImportBatches TelegramImportBatch[]
   pushSubscriptions     PushSubscription[]
+  contactMessages       ContactMessage[]
 
   @@map("profiles")
 }
@@ -107,6 +108,31 @@ model AuditLog {
 
   @@index([adminId])
   @@map("audit_logs")
+}
+
+enum ContactMessageStatus {
+  new
+  read
+}
+
+// Settings > Contact Us submissions. userId is nullable — the form takes a
+// reply-to email directly rather than requiring login, so a prospective
+// user with a question before signing up can still reach out; onDelete:
+// SetNull keeps the message on record (orphaned, not deleted) if the
+// account it came from is ever removed.
+model ContactMessage {
+  id        String               @id @default(cuid())
+  userId    String?              @db.Uuid
+  profile   Profile?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name      String?
+  email     String
+  subject   String
+  message   String
+  status    ContactMessageStatus @default(new)
+  createdAt DateTime             @default(now())
+
+  @@index([userId])
+  @@map("contact_messages")
 }
 
 model Artist {

@@ -6,6 +6,7 @@
 // separately-authored ones for the same page.
 export const routeLoaders = {
   albumDetail: () => import("../pages/AlbumDetail"),
+  adminContactMessages: () => import("../pages/AdminContactMessages"),
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
   adminUpload: () => import("../pages/AdminUpload"),
