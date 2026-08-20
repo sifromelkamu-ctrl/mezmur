@@ -15,7 +15,9 @@ export const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 // Whether this profile currently has full-catalog access — either an
 // app-level free trial still running (no payment ever required to start
-// one) or a paid Stripe subscription in a state that should grant access.
+// one), an admin-granted comp (see routes/admin.ts's /users/:id/free-
+// access — permanent until an admin revokes it, no time window to check),
+// or a paid Stripe subscription in a state that should grant access.
 // "canceled" still counts while the already-paid-for period hasn't ended
 // yet (Stripe doesn't revoke access early on cancellation); "past_due"
 // does not — a failed renewal charge drops access immediately rather than
@@ -24,6 +26,7 @@ export function hasFullAccess(
   profile: Pick<Profile, "subscriptionStatus" | "trialEndsAt" | "subscriptionCurrentPeriodEnd">
 ): boolean {
   const now = new Date();
+  if (profile.subscriptionStatus === "comped") return true;
   if (profile.subscriptionStatus === "active" || profile.subscriptionStatus === "trialing") return true;
   if (profile.subscriptionStatus === "canceled" && profile.subscriptionCurrentPeriodEnd && profile.subscriptionCurrentPeriodEnd > now) {
     return true;

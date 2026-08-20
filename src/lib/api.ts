@@ -367,7 +367,7 @@ export const pushApi = {
     request<{ subscribed: boolean }>(`/push/subscribed?endpoint=${encodeURIComponent(endpoint)}`),
 };
 
-export type ApiSubscriptionStatus = "none" | "trialing" | "active" | "past_due" | "canceled";
+export type ApiSubscriptionStatus = "none" | "trialing" | "active" | "past_due" | "canceled" | "comped";
 
 export interface ApiSubscriptionState {
   subscriptionStatus: ApiSubscriptionStatus;
@@ -837,7 +837,31 @@ export const adminApi = {
       `/admin/telegram-import/${batchId}/items/${itemId}/cancel`,
       { method: "POST" }
     ),
+
+  // Finds accounts by email/username to grant/revoke free access on (see
+  // setFreeAccess below) — there's no general user-management screen yet,
+  // this is purely a lookup-by-what-you-have-on-hand.
+  searchUsers: (q: string) =>
+    request<{ users: ApiUserAccess[] }>(`/admin/users/search?q=${encodeURIComponent(q)}`),
+  // Grants (enabled: true) or revokes (false) a permanent, non-Stripe
+  // "comped" override — see SubscriptionStatus.comped in schema.prisma.
+  setFreeAccess: (userId: string, enabled: boolean) =>
+    request<{ user: ApiUserAccess }>(`/admin/users/${userId}/free-access`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    }),
 };
+
+export interface ApiUserAccess {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  username: string | null;
+  name: string | null;
+  role: "user" | "artist" | "admin";
+  subscriptionStatus: ApiSubscriptionStatus;
+  trialEndsAt: string;
+}
 
 // Extends ApiTrack with the extra fields the admin "Edit Song" form needs
 // (lyrics, releaseYear) plus the standalone-category flags (only meaningful

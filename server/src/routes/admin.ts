@@ -360,6 +360,88 @@ router.put("/users/:id", async (req: AuthedRequest, res) => {
   }
 });
 
+function toUserAccessDTO(profile: {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  username: string | null;
+  name: string | null;
+  role: string;
+  subscriptionStatus: string;
+  trialEndsAt: Date;
+}) {
+  return {
+    id: profile.id,
+    email: profile.email,
+    phone: profile.phone,
+    username: profile.username,
+    name: profile.name,
+    role: profile.role,
+    subscriptionStatus: profile.subscriptionStatus,
+    trialEndsAt: profile.trialEndsAt,
+  };
+}
+
+// GET /api/admin/users/search?q=... - finds accounts by email/username to
+// grant/revoke free access on (see /users/:id/free-access below). There's
+// no general user-management screen yet — this exists purely to locate a
+// specific account by the one thing an admin is likely to have on hand.
+router.get("/users/search", async (req: AuthedRequest, res) => {
+  const q = String(req.query.q ?? "").trim();
+  if (!q) {
+    res.json({ users: [] });
+    return;
+  }
+  const profiles = await prisma.profile.findMany({
+    where: {
+      OR: [{ email: { contains: q, mode: "insensitive" } }, { username: { contains: q, mode: "insensitive" } }],
+    },
+    take: 20,
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ users: profiles.map(toUserAccessDTO) });
+});
+
+const setFreeAccessSchema = z.object({ enabled: z.boolean() });
+
+// POST /api/admin/users/:id/free-access - grants or revokes a permanent,
+// admin-only "comped" override (no Stripe subscription involved at all —
+// see the SubscriptionStatus.comped comment in schema.prisma). Refuses to
+// touch an account with a real, Stripe-driven status so this can't
+// accidentally clobber someone's actual paid subscription; granting is
+// only meaningful starting from "none" or an existing comp, and revoking
+// just drops back to "none" (ordinary trial-or-preview gating resumes).
+router.post("/users/:id/free-access", async (req: AuthedRequest, res) => {
+  const parsed = setFreeAccessSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const targetId = String(req.params.id);
+  const profile = await prisma.profile.findUnique({ where: { id: targetId } });
+  if (!profile) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (parsed.data.enabled) {
+    if (profile.subscriptionStatus !== "none" && profile.subscriptionStatus !== "comped") {
+      res.status(400).json({ error: "This account already has a real subscription — leave it as-is." });
+      return;
+    }
+    await prisma.profile.update({ where: { id: targetId }, data: { subscriptionStatus: "comped" } });
+    await logAudit(req.userId!, "grant_free_access", { targetId });
+  } else {
+    if (profile.subscriptionStatus === "comped") {
+      await prisma.profile.update({ where: { id: targetId }, data: { subscriptionStatus: "none" } });
+      await logAudit(req.userId!, "revoke_free_access", { targetId });
+    }
+  }
+
+  const updated = await prisma.profile.findUniqueOrThrow({ where: { id: targetId } });
+  res.json({ user: toUserAccessDTO(updated) });
+});
+
 // --- Artwork framing (Universal Artwork System's admin editor) ---
 // Stores only presentation metadata (pan/zoom/rotation/flip) describing how
 // to frame the *existing* photoUrl/coverUrl within a square — never touches

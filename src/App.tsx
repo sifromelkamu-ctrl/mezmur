@@ -29,6 +29,7 @@ const AlbumDetail = lazy(routeLoaders.albumDetail);
 const AdminFeaturedBanners = lazy(routeLoaders.adminFeaturedBanners);
 const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
 const AdminUpload = lazy(routeLoaders.adminUpload);
+const AdminUserAccess = lazy(routeLoaders.adminUserAccess);
 const AllConcerts = lazy(routeLoaders.allConcerts);
 const AllPodcasts = lazy(routeLoaders.allPodcasts);
 const AllSermons = lazy(routeLoaders.allSermons);
@@ -75,6 +76,7 @@ function AppShell() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin/upload" element={<AdminUpload />} />
+        <Route path="/admin/user-access" element={<AdminUserAccess />} />
         <Route path="/admin/library" element={<AdminLibraryManagement />} />
         <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
         <Route path="/admin/youtube-import" element={<YoutubeImport />} />

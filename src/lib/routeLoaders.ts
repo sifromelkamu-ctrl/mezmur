@@ -9,6 +9,7 @@ export const routeLoaders = {
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
   adminUpload: () => import("../pages/AdminUpload"),
+  adminUserAccess: () => import("../pages/AdminUserAccess"),
   allConcerts: () => import("../pages/AllConcerts"),
   allPodcasts: () => import("../pages/AllPodcasts"),
   allSermons: () => import("../pages/AllSermons"),

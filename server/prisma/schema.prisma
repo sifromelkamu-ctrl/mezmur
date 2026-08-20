@@ -15,13 +15,18 @@ enum Role {
 
 // Mirrors a Stripe Subscription's own status field (the ones relevant to
 // gating playback) — kept in sync by the Stripe webhook, never written to
-// directly from any other request handler.
+// directly from any other request handler. The one exception is `comped`:
+// an admin-granted free-access override (see routes/admin.ts's
+// /users/:id/free-access) with no Stripe object behind it at all, so the
+// webhook can never see or overwrite it — it only ever matches profiles by
+// stripeCustomerId, which a comped-only profile never has.
 enum SubscriptionStatus {
   none // never subscribed — trial-or-preview gating applies
   trialing
   active
   past_due
   canceled
+  comped
 }
 
 // Mirrors Supabase Auth's auth.users table (id is the same UUID as the

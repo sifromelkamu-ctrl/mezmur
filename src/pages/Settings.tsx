@@ -83,6 +83,9 @@ function formatDate(iso: string) {
 // statuses, the "canceled but still paid through" grace window) that
 // inlining them would be hard to read.
 function describeSubscription(status: ApiSubscriptionState): { title: string; subtitle: string } {
+  if (status.subscriptionStatus === "comped") {
+    return { title: "Complimentary access", subtitle: "Granted by Mezmur — no billing required." };
+  }
   if (status.subscriptionStatus === "active" || status.subscriptionStatus === "trialing") {
     return { title: "Mezmur Premium", subtitle: `Renews ${formatDate(status.subscriptionCurrentPeriodEnd ?? status.trialEndsAt)}` };
   }
@@ -198,7 +201,8 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
 
           {!status.billingConfigured ? (
             <p className="text-xs text-fg-subtle px-1">Subscriptions aren't set up yet — check back soon.</p>
-          ) : status.subscriptionStatus === "none" || (status.subscriptionStatus === "canceled" && !status.hasFullAccess) ? (
+          ) : status.subscriptionStatus === "comped" ? null : status.subscriptionStatus === "none" ||
+            (status.subscriptionStatus === "canceled" && !status.hasFullAccess) ? (
             <button
               onClick={startCheckout}
               disabled={busy}
@@ -610,11 +614,13 @@ export default function Settings() {
                 ? undefined
                 : !subscriptionStatus
                   ? "…"
-                  : subscriptionStatus.subscriptionStatus === "active" || subscriptionStatus.subscriptionStatus === "trialing"
-                    ? "Premium"
-                    : subscriptionStatus.hasFullAccess
-                      ? "Free trial"
-                      : "Ended"
+                  : subscriptionStatus.subscriptionStatus === "comped"
+                    ? "Complimentary"
+                    : subscriptionStatus.subscriptionStatus === "active" || subscriptionStatus.subscriptionStatus === "trialing"
+                      ? "Premium"
+                      : subscriptionStatus.hasFullAccess
+                        ? "Free trial"
+                        : "Ended"
             }
             onClick={() => setSection("subscription")}
           />
@@ -666,6 +672,11 @@ export default function Settings() {
               icon={<GalleryHorizontal size={20} />}
               label="Home Featured Banner"
               onClick={() => navigate("/admin/featured-banners")}
+            />
+            <SettingsRow
+              icon={<Sparkles size={20} />}
+              label="Free Access"
+              onClick={() => navigate("/admin/user-access")}
             />
           </div>
         )}
