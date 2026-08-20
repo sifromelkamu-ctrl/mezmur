@@ -6,6 +6,7 @@ export type AuthStep =
   | "verify-phone"
   | "login"
   | "forgot-password"
+  | "forgot-email-otp"
   | "forgot-phone-otp"
   | "set-new-password";
 

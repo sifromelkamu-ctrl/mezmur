@@ -1,4 +1,4 @@
-import { Mail, MailCheck, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { useState } from "react";
 import CountryPicker from "../../components/auth/CountryPicker";
 import TextField from "../../components/form/TextField";
@@ -12,16 +12,16 @@ const DEFAULT_COUNTRY: Country = findCountryByCode("ET") ?? COUNTRIES[0];
 type Method = "choose" | "email" | "phone";
 
 interface ForgotPasswordStepProps {
+  onEmailOtpSent: (email: string) => void;
   onPhoneOtpSent: (phone: string) => void;
 }
 
-export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordStepProps) {
+export default function ForgotPasswordStep({ onEmailOtpSent, onPhoneOtpSent }: ForgotPasswordStepProps) {
   const [method, setMethod] = useState<Method>("choose");
   const [country, setCountry] = useState<Country>(() => detectCountryFromLocale() ?? DEFAULT_COUNTRY);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleEmailSubmit(e: React.FormEvent) {
@@ -35,8 +35,8 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
     setSubmitting(true);
     try {
       await authService.sendPasswordResetEmail(email.trim());
-      setEmailSent(true);
       haptics.success();
+      onEmailOtpSent(email.trim());
     } catch (err) {
       setError(friendlyAuthError(err));
       haptics.error();
@@ -77,7 +77,7 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
           <Mail size={20} className="text-brand shrink-0" />
           <div>
             <p className="font-semibold text-sm">Reset via Email</p>
-            <p className="text-xs text-fg-muted">We'll send a secure reset link</p>
+            <p className="text-xs text-fg-muted">We'll send a 6-digit code by email</p>
           </div>
         </button>
         <button
@@ -95,23 +95,9 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
   }
 
   if (method === "email") {
-    if (emailSent) {
-      return (
-        <div className="flex flex-col items-center text-center gap-3 py-8">
-          <div className="w-16 h-16 rounded-full bg-brand/15 flex items-center justify-center auth-success-icon">
-            <MailCheck size={28} className="text-brand" />
-          </div>
-          <h2 className="text-lg font-bold">Check your email</h2>
-          <p className="text-sm text-fg-muted max-w-[30ch]">
-            We sent a password reset link to <span className="text-fg font-medium">{email}</span>. Open it on this
-            device to set a new password.
-          </p>
-        </div>
-      );
-    }
     return (
       <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-        <p className="text-sm text-fg-muted -mt-2">Enter your email and we'll send a reset link.</p>
+        <p className="text-sm text-fg-muted -mt-2">Enter your email and we'll send a verification code.</p>
         <TextField
           type="email"
           required
@@ -127,7 +113,7 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
           disabled={submitting || !email}
           className="mt-1 bg-brand text-black font-bold rounded-full py-3.5 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {submitting ? "Sending..." : "Send Reset Link"}
+          {submitting ? "Sending..." : "Send Code"}
         </button>
       </form>
     );

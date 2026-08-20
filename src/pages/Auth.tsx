@@ -4,6 +4,7 @@ import AuthShell from "../components/auth/AuthShell";
 import { useAuth } from "../context/useAuth";
 import EmailSignUpStep from "./auth/EmailSignUpStep";
 import EntryStep from "./auth/EntryStep";
+import ForgotEmailOtpStep from "./auth/ForgotEmailOtpStep";
 import ForgotPasswordStep from "./auth/ForgotPasswordStep";
 import ForgotPhoneOtpStep from "./auth/ForgotPhoneOtpStep";
 import LoginStep from "./auth/LoginStep";
@@ -21,6 +22,7 @@ const STEP_META: Record<AuthStep, { title: string; subtitle?: string }> = {
   "verify-phone": { title: "" },
   login: { title: "Welcome back", subtitle: "Log in to continue." },
   "forgot-password": { title: "Reset your password", subtitle: "We'll help you get back in." },
+  "forgot-email-otp": { title: "" },
   "forgot-phone-otp": { title: "" },
   "set-new-password": { title: "New password" },
 };
@@ -30,6 +32,7 @@ export default function Auth() {
   const { user, isPasswordRecovery } = useAuth();
   const [step, setStep] = useState<AuthStep>("entry");
   const [pending, setPending] = useState<PendingSignup | null>(null);
+  const [resetEmail, setResetEmail] = useState<string | null>(null);
   const [resetPhone, setResetPhone] = useState<string | null>(null);
 
   // A clicked "reset your password" email link lands here cold (fresh page
@@ -57,7 +60,7 @@ export default function Auth() {
       setStep("email-signup");
     } else if (step === "verify-phone") {
       setStep("phone-signup");
-    } else if (step === "forgot-phone-otp") {
+    } else if (step === "forgot-email-otp" || step === "forgot-phone-otp") {
       setStep("forgot-password");
     } else {
       setStep("entry");
@@ -114,11 +117,19 @@ export default function Auth() {
 
       {step === "forgot-password" && (
         <ForgotPasswordStep
+          onEmailOtpSent={(email) => {
+            setResetEmail(email);
+            setStep("forgot-email-otp");
+          }}
           onPhoneOtpSent={(phone) => {
             setResetPhone(phone);
             setStep("forgot-phone-otp");
           }}
         />
+      )}
+
+      {step === "forgot-email-otp" && resetEmail && (
+        <ForgotEmailOtpStep email={resetEmail} onVerified={() => setStep("set-new-password")} />
       )}
 
       {step === "forgot-phone-otp" && resetPhone && (

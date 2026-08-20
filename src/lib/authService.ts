@@ -102,6 +102,15 @@ export const authService = {
     if (error) throw error;
   },
 
+  // Same 6-digit-code pattern as phone reset (and email signup) rather than
+  // the link Supabase generates by default — verifying establishes a
+  // recovery session directly, same as clicking the link would have.
+  async verifyEmailResetOtp(email: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });
+    if (error) throw error;
+    return data;
+  },
+
   // Phone accounts have no reset-email equivalent — Supabase's own pattern
   // for this is: send an OTP via the passwordless sign-in call, verify it
   // (which establishes a real session for that existing user), then set a
