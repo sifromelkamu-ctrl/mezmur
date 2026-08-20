@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
@@ -72,6 +73,36 @@ function LogOutRow({ onClick }: { onClick: () => void }) {
       </span>
       <span className="flex-1 font-semibold text-sm">Log out</span>
     </button>
+  );
+}
+
+function ConfirmLogoutModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto overscroll-y-contain p-4"
+      style={{
+        paddingTop: "max(1rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="fixed inset-0 bg-black/60" onClick={onCancel} />
+      <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto shadow-2xl">
+        <h3 className="text-base font-bold mb-1.5">Log out?</h3>
+        <p className="text-sm text-fg-muted mb-5">You'll need to log back in to access your account.</p>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-full bg-elevated-hover text-sm font-semibold">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-full bg-accent-red text-white text-sm font-semibold"
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -276,6 +307,7 @@ export default function Settings() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
   const currentLanguage = LANGUAGES.find((l) => l.id === language)?.nativeName ?? "English";
 
   const startEditName = () => {
@@ -680,7 +712,7 @@ export default function Settings() {
             onClick={() => setSection("lyrics")}
           />
           <SettingsRow icon={<Info size={20} />} label="About" onClick={() => setSection("about")} />
-          {user && <LogOutRow onClick={logout} />}
+          {user && <LogOutRow onClick={() => setConfirmingLogout(true)} />}
         </div>
 
         {user?.role === "admin" && (
@@ -722,5 +754,18 @@ export default function Settings() {
     );
   }
 
-  return content;
+  return (
+    <>
+      {content}
+      {confirmingLogout && (
+        <ConfirmLogoutModal
+          onCancel={() => setConfirmingLogout(false)}
+          onConfirm={() => {
+            setConfirmingLogout(false);
+            logout();
+          }}
+        />
+      )}
+    </>
+  );
 }
