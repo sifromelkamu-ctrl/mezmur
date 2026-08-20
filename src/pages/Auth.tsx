@@ -102,7 +102,15 @@ export default function Auth() {
         <VerifyPhoneStep phone={pending.phone} onChangePhone={() => setStep("phone-signup")} />
       )}
 
-      {step === "login" && <LoginStep onForgotPassword={() => setStep("forgot-password")} />}
+      {step === "login" && (
+        <LoginStep
+          onForgotPassword={() => setStep("forgot-password")}
+          onNeedsVerification={(target) => {
+            setPending({ username: "", ...target });
+            setStep(target.phone ? "verify-phone" : "verify-email");
+          }}
+        />
+      )}
 
       {step === "forgot-password" && (
         <ForgotPasswordStep

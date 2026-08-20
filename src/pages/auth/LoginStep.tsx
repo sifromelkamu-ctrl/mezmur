@@ -1,3 +1,4 @@
+import type { AuthError } from "@supabase/supabase-js";
 import { useState } from "react";
 import CountryPicker from "../../components/auth/CountryPicker";
 import PasswordField from "../../components/auth/PasswordField";
@@ -12,9 +13,15 @@ type LoginMethod = "email" | "phone";
 
 interface LoginStepProps {
   onForgotPassword: () => void;
+  // Fires instead of the normal error message when the account exists but
+  // never finished verification (e.g. they closed the app before entering
+  // the code) — routes back to the same code-entry screen signup would
+  // have shown, rather than a dead-end "email not confirmed" error with no
+  // way to actually get verified.
+  onNeedsVerification: (target: { email?: string; phone?: string }) => void;
 }
 
-export default function LoginStep({ onForgotPassword }: LoginStepProps) {
+export default function LoginStep({ onForgotPassword, onNeedsVerification }: LoginStepProps) {
   const [method, setMethod] = useState<LoginMethod>("email");
   const [country, setCountry] = useState<Country>(() => detectCountryFromLocale() ?? DEFAULT_COUNTRY);
   const [email, setEmail] = useState("");
@@ -37,6 +44,15 @@ export default function LoginStep({ onForgotPassword }: LoginStepProps) {
       // Session is now set; AuthContext's SIGNED_IN handler + the top-level
       // Auth orchestrator's user-watch effect take it from here.
     } catch (err) {
+      const code = (err as AuthError)?.code;
+      if (code === "email_not_confirmed") {
+        onNeedsVerification({ email: email.trim() });
+        return;
+      }
+      if (code === "phone_not_confirmed") {
+        onNeedsVerification({ phone: `${country.dialCode}${phone.replace(/\D/g, "")}` });
+        return;
+      }
       setError(friendlyAuthError(err));
       haptics.error();
     } finally {
