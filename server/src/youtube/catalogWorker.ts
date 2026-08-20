@@ -15,13 +15,17 @@ import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 // account activity rather than anonymous datacenter traffic, which is what
 // the bot-check actually keys off. If imports start getting bot-blocked
 // again, drop this back down first before touching anything else.
-// Explicitly set for max throughput over stability — 5 concurrent already
-// measurably strained this machine's network enough to intermittently break
-// concurrent Supabase auth checks (login flakiness), and this is pushed
-// well past that point on purpose. If login/other requests become
-// unreliable during a big import, that's this tradeoff, not a new bug —
-// drop this back down (2 was the last known-stable value) first.
-const CONCURRENCY = 10;
+// Was pushed to 10 for max throughput over stability, with the tradeoff
+// expected to show up as network strain (Supabase auth flakiness during a
+// big import). It showed up somewhere worse instead: 2026-08-20, the first
+// time a catalog import actually ran end-to-end in production (everything
+// before that had been failing earlier in the pipeline), 10 concurrent
+// yt-dlp+ffmpeg processes OOM-killed the whole server outright — this
+// machine's Render plan is a 512Mi instance, nowhere near enough headroom
+// for that many simultaneous downloads/transcodes plus Node/Prisma/the
+// PO-token sidecar. Back to 2, the last known-stable value. Don't raise
+// this again without also raising the instance's memory.
+const CONCURRENCY = 2;
 const queue: string[] = [];
 let activeWorkers = 0;
 
@@ -271,7 +275,18 @@ export async function resumeBatch(batchId: string) {
     select: { id: true },
   });
   const toResume = stuck.filter((i) => !inFlight.has(i.id));
-  if (toResume.length === 0) return 0;
+  if (toResume.length === 0) {
+    // Nothing was actually caught mid-pipeline, but the batch is still
+    // marked "importing" — observed 2026-08-20 after an OOM crash: the
+    // batch reached "importing" while its items were still sitting at
+    // "pending" (selected, never actually started), so this ACTIVE_STATUSES
+    // check alone found nothing and left the batch invisibly stuck forever
+    // with no automatic recovery. startBatchImport is exactly the right
+    // fallback here — it already knows how to (re)queue a batch's selected-
+    // but-not-started items, and is a no-op (returns 0, batch left as-is)
+    // if there's genuinely nothing left to do.
+    return startBatchImport(batchId);
+  }
 
   await prisma.youtubeImportItem.updateMany({
     where: { id: { in: toResume.map((i) => i.id) } },
