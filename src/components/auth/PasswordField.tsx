@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { useState } from "react";
 import TextField from "../form/TextField";
 
@@ -19,6 +19,7 @@ export default function PasswordField({
 
   return (
     <div className="relative">
+      <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
       <TextField
         type={visible ? "text" : "password"}
         required
@@ -26,7 +27,7 @@ export default function PasswordField({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-4 py-2 pr-11 text-base w-full"
+        className="pl-11 pr-11 py-3 text-base w-full"
       />
       <button
         type="button"
