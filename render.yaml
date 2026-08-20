@@ -31,7 +31,8 @@ services:
       # cookies, same as before this var existed).
       - key: YTDLP_COOKIES_B64
         sync: false
-      # Web Push (daily Bible verse notification). Generate once locally:
+      # Web Push (daily Bible verse + twice-daily "Picked for You"
+      # notifications). Generate once locally:
       #   node -e "console.log(require('web-push').generateVAPIDKeys())"
       # and keep it stable — rotating it breaks every existing subscription.
       - key: VAPID_PUBLIC_KEY
@@ -43,6 +44,14 @@ services:
       - key: FRONTEND_URL
         sync: false
       - key: DAILY_VERSE_PUSH_HOUR_UTC
+        sync: false
+      # Optional. "Picked for You" push notifications fire twice a day at
+      # these fixed UTC hours (default 9 and 16 — well clear of the daily
+      # verse push above so no one gets two pushes back to back). See
+      # jobs/pickedForYou.ts.
+      - key: PICKED_FOR_YOU_MORNING_HOUR_UTC
+        sync: false
+      - key: PICKED_FOR_YOU_EVENING_HOUR_UTC
         sync: false
       # Optional. Telegram channel import — MTProto (teleproto/GramJS)
       # user-session credentials, so the server can read a public channel's

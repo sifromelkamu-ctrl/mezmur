@@ -55,6 +55,16 @@ export function dailyVerseIndexForUser(userId: string, date: Date): number {
   return mix32(seed) % MORNING_VERSES.length;
 }
 
+// Same idea as dailyVerseIndexForUser, but "Picked for You" fires twice a
+// day (see jobs/pickedForYou.ts) — `slot` (0 = morning, 1 = evening) is
+// mixed into the seed too, so the two same-day pushes don't repeat the same
+// line for a user, on top of different users still seeing different lines.
+export function pickedForYouIndexForUser(userId: string, date: Date, slot: number, poolSize: number): number {
+  const dayNumber = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 86400000;
+  const seed = (hashString(userId) ^ mix32(dayNumber) ^ mix32(slot + 1)) >>> 0;
+  return mix32(seed) % poolSize;
+}
+
 export interface WebPushSubscription {
   endpoint: string;
   p256dh: string;
