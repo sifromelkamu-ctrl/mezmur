@@ -80,11 +80,22 @@ export async function enumerateYoutubeCatalog(channelUrl: string): Promise<Catal
   let albumSource;
   try {
     albumSource = await listChannelReleases(channelUrl);
-  } catch {
+  } catch (err) {
+    console.error(`[catalog-enumerate] listChannelReleases failed for ${channelUrl}, continuing without a Releases tab:`, err);
     albumSource = { title: null, channel: null, thumbnailUrl: null, thumbnailCandidates: [], entries: [] };
   }
   if (albumSource.entries.length === 0) {
-    albumSource = await listChannelPlaylists(channelUrl);
+    try {
+      albumSource = await listChannelPlaylists(channelUrl);
+    } catch (err) {
+      // Previously unguarded — a channel whose Playlists tab yt-dlp can't
+      // fully enumerate (e.g. one playlist/video with metadata yt-dlp
+      // itself crashes trying to decode) used to fail this function's
+      // entire promise, aborting the whole catalog import instead of just
+      // missing that one tab's albums.
+      console.error(`[catalog-enumerate] listChannelPlaylists failed for ${channelUrl}, continuing without a Playlists tab:`, err);
+      albumSource = { title: null, channel: null, thumbnailUrl: null, thumbnailCandidates: [], entries: [] };
+    }
   }
   channelName = albumSource.channel ?? channelName;
 
@@ -96,8 +107,12 @@ export async function enumerateYoutubeCatalog(channelUrl: string): Promise<Catal
     let videos;
     try {
       videos = await listPlaylistVideos(albumEntry.videoId);
-    } catch {
-      continue; // a single unreadable album (private/deleted) shouldn't fail the whole enumeration
+    } catch (err) {
+      // A single unreadable album (private/deleted, or one yt-dlp can't
+      // extract) shouldn't fail the whole enumeration — skip it and keep
+      // going with the rest of the channel's albums.
+      console.error(`[catalog-enumerate] listPlaylistVideos failed for playlist ${albumEntry.videoId}, skipping this album:`, err);
+      continue;
     }
     const albumCoverUrl = videos.thumbnailUrl;
     const albumCoverCandidates = videos.thumbnailCandidates;
@@ -121,7 +136,8 @@ export async function enumerateYoutubeCatalog(channelUrl: string): Promise<Catal
   try {
     channelVideos = await listChannelVideos(channelUrl);
     channelName = channelVideos.channel ?? channelName;
-  } catch {
+  } catch (err) {
+    console.error(`[catalog-enumerate] listChannelVideos failed for ${channelUrl}, continuing without a Videos tab:`, err);
     channelVideos = { title: null, channel: null, thumbnailUrl: null, thumbnailCandidates: [], entries: [] };
   }
 

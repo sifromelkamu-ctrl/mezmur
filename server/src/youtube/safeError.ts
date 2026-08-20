@@ -19,11 +19,29 @@ const INTERNAL_ERROR_SIGNATURES = [
   /\/usr\/bin\/env/i,
   /^P\d{4}:/, // Prisma error codes, e.g. "P1001: Can't reach database server"
   /\bat\s+\S+\s+\(.*:\d+:\d+\)/, // a stack-trace line that leaked into a message
+  /Traceback \(most recent call last\)/, // an uncaught Python traceback (yt-dlp itself crashed)
 ];
 
 export function isInternalErrorMessage(message: string): boolean {
   const trimmed = message.trim();
   return !trimmed || INTERNAL_ERROR_SIGNATURES.some((re) => re.test(trimmed));
+}
+
+// yt-dlp is a Python program — when it hits a video/playlist entry whose
+// metadata it can't decode as UTF-8, it can crash with an uncaught
+// UnicodeDecodeError and the last line of that traceback (Python's own
+// "'utf-8' codec can't decode byte 0xXX in position N: invalid start byte"
+// wording) ends up as the caught error's message. That's not remotely
+// meaningful to an admin looking at the import screen, so it gets its own
+// specific, honest message rather than falling into the generic
+// "service unavailable" bucket below — the service isn't down, one video's
+// metadata just couldn't be read.
+const ENCODING_ERROR_SIGNATURES = [/UnicodeDecodeError/, /UnicodeEncodeError/, /'[\w.-]+' codec can't (?:decode|encode)/i];
+
+export const METADATA_ENCODING_ERROR = "This video's metadata contains characters that couldn't be read, so it was skipped.";
+
+export function isEncodingErrorMessage(message: string): boolean {
+  return ENCODING_ERROR_SIGNATURES.some((re) => re.test(message));
 }
 
 export const GENERIC_IMPORT_ERROR = "The import service is temporarily unavailable. Please try again in a few minutes.";
@@ -49,6 +67,10 @@ export class CancelledImportError extends Error {
 // through unchanged; only OS/runtime-shaped messages get replaced.
 export function toSafeErrorMessage(err: unknown, fallback: string, context: string): string {
   const raw = err instanceof Error ? err.message : String(err);
+  if (isEncodingErrorMessage(raw)) {
+    console.error(`[${context}] metadata encoding error:`, err);
+    return METADATA_ENCODING_ERROR;
+  }
   if (isInternalErrorMessage(raw)) {
     console.error(`[${context}] internal error:`, err);
     return fallback;

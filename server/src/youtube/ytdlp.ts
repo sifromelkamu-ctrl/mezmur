@@ -131,6 +131,21 @@ if (pluginArgs.length) {
 // sync across every spawn() call site by hand.
 const BASE_ARGS = [...cookiesArgs, ...CLIENT_ARGS, ...TAB_ARGS, ...pluginArgs];
 
+// yt-dlp's own JSON output is well-formed UTF-8 by the time it reaches us
+// (see spawnOnce's explicit setEncoding("utf8") below, which never throws —
+// any genuinely invalid byte from yt-dlp becomes U+FFFD rather than
+// crashing Node), but a title/uploader/channel string can still carry stray
+// replacement characters or unpaired UTF-16 surrogates. An unpaired
+// surrogate is valid inside a JS string but has no UTF-8 representation, so
+// it would otherwise surface later as a Postgres "invalid byte sequence for
+// encoding UTF8" write failure instead of here. This only ever removes
+// actually-broken code units and NFC-normalizes combining sequences — every
+// complete, valid character (Amharic, English, anything else) passes
+// through unchanged.
+function sanitizeUnicode(value: string): string {
+  return value.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�").normalize("NFC");
+}
+
 export interface YoutubeMetadata {
   id: string;
   title: string;
@@ -200,6 +215,13 @@ function spawnOnce(
       return;
     }
     const child = spawn("yt-dlp", fullArgs, { stdio: ["ignore", "pipe", "pipe"] });
+    // Explicit, rather than relying on readline's implicit default: this
+    // guarantees a Buffer->string decode that never throws on an invalid
+    // byte (replaces it with U+FFFD instead), so a malformed byte anywhere
+    // in yt-dlp's own output can only ever produce a stray replacement
+    // character in one line of text, never crash our side of the pipe.
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
     let stdout = "";
     let stderr = "";
     let cancelled = false;
@@ -289,9 +311,9 @@ export async function fetchYoutubeMetadata(url: string, signal?: AbortSignal): P
 
   return {
     id: String(raw.id),
-    title: typeof raw.title === "string" ? raw.title : "Untitled",
-    uploader: typeof raw.uploader === "string" ? raw.uploader : null,
-    channel: typeof raw.channel === "string" ? raw.channel : null,
+    title: typeof raw.title === "string" ? sanitizeUnicode(raw.title) : "Untitled",
+    uploader: typeof raw.uploader === "string" ? sanitizeUnicode(raw.uploader) : null,
+    channel: typeof raw.channel === "string" ? sanitizeUnicode(raw.channel) : null,
     channelUrl:
       typeof raw.channel_url === "string" ? raw.channel_url : typeof raw.uploader_url === "string" ? raw.uploader_url : null,
     duration: typeof raw.duration === "number" ? Math.round(raw.duration) : null,
@@ -349,23 +371,38 @@ export const MAX_PLAYLISTS = 25;
 const MAX_VIDEOS_PER_LIST = 200;
 
 async function runFlatPlaylistDump(url: string, limit: number): Promise<FlatPlaylist> {
-  const args = ["--flat-playlist", "--dump-single-json", "--no-warnings", "--playlist-end", String(limit), url];
+  // --ignore-errors: yt-dlp's own mechanism for exactly this situation — one
+  // entry in a channel/playlist tab that yt-dlp can't extract (malformed
+  // metadata, a byte it can't decode, a private/deleted item, ...) is
+  // dropped from `entries` instead of aborting the whole --dump-single-json
+  // call. Without it, one bad video in a 200-video channel tab took down
+  // enumeration for every other video in that tab too.
+  const args = ["--flat-playlist", "--dump-single-json", "--ignore-errors", "--no-warnings", "--playlist-end", String(limit), url];
   const stdout = await execYtDlp(args, "runFlatPlaylistDump");
   try {
     const raw = JSON.parse(stdout);
     const entries: FlatEntry[] = Array.isArray(raw.entries)
       ? raw.entries
-          .filter((e: Record<string, unknown>) => typeof e.id === "string")
+          // --ignoreerrors leaves a null (or id-less) placeholder where a
+          // failed entry used to be rather than omitting it outright — this
+          // filter already existed for other malformed-entry shapes and
+          // covers that placeholder too.
+          .filter((e: Record<string, unknown> | null) => e != null && typeof e.id === "string")
           .map((e: Record<string, unknown>) => ({
             videoId: String(e.id),
-            title: typeof e.title === "string" ? e.title : "Untitled",
+            title: typeof e.title === "string" ? sanitizeUnicode(e.title) : "Untitled",
             duration: typeof e.duration === "number" ? Math.round(e.duration) : null,
           }))
       : [];
     const thumbnailCandidates = rankedThumbnailUrls(raw.thumbnails);
     return {
-      title: typeof raw.title === "string" ? raw.title : null,
-      channel: typeof raw.channel === "string" ? raw.channel : typeof raw.uploader === "string" ? raw.uploader : null,
+      title: typeof raw.title === "string" ? sanitizeUnicode(raw.title) : null,
+      channel:
+        typeof raw.channel === "string"
+          ? sanitizeUnicode(raw.channel)
+          : typeof raw.uploader === "string"
+            ? sanitizeUnicode(raw.uploader)
+            : null,
       thumbnailUrl: thumbnailCandidates[0] ?? null,
       thumbnailCandidates,
       entries,
