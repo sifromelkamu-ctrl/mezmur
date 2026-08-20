@@ -118,7 +118,23 @@ const TAB_ARGS = ["--extractor-args", "youtubetab:skip=authcheck"];
 // existsSync-gated because that directory only exists inside the Docker
 // image; local dev (Homebrew yt-dlp, no Dockerfile involved) just never
 // passes this flag and runs exactly as before.
-const PLUGIN_DIR = "/opt/bgutil-provider/plugin";
+//
+// --plugin-dirs DIR searches DIR for <package-name>/yt_dlp_plugins/ — one
+// level ABOVE the actual yt_dlp_plugins folder, per yt-dlp's own plugin
+// docs (a package-name directory always sits between the search root and
+// yt_dlp_plugins/, e.g. its docs' own example:
+// "${XDG_CONFIG_HOME}/yt-dlp/plugins/<package name>/yt_dlp_plugins/").
+// This was pointed at .../bgutil-provider/plugin — the folder that
+// directly CONTAINS yt_dlp_plugins/ — one level too deep, so yt-dlp never
+// found it: verbose output showed "Plugin directories: none" and
+// "PO Token Providers: none" in production even with this flag present,
+// silently falling back to cookie-only auth for every request (confirmed
+// 2026-08-20 as the reason per-video fetches were hitting YouTube's bot-
+// check almost every time). Pointing at the repo root instead — one level
+// up, so "plugin" itself is the package-name directory yt-dlp expects —
+// is what the provider's own README's verification output confirms:
+// "PO Token Providers: bgutil:http-1.3.1 (external), ...".
+const PLUGIN_DIR = "/opt/bgutil-provider";
 const pluginArgs: string[] = existsSync(PLUGIN_DIR) ? ["--plugin-dirs", PLUGIN_DIR] : [];
 if (pluginArgs.length) {
   console.log(`[yt-dlp] loaded PO-token plugin from ${PLUGIN_DIR} (expects its server sidecar on localhost:4416)`);
