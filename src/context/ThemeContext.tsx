@@ -24,6 +24,12 @@ export const ACCENT_THEMES: AccentTheme[] = [
   { id: "sapphire", name: "Sapphire Blue", brand: "#2563eb", brandDark: "#1d4ed8", brandGlow: "#60a5fa" },
   { id: "rose", name: "Rose Quartz", brand: "#db2777", brandDark: "#9d174d", brandGlow: "#f9a8d4" },
   { id: "copper", name: "Burnt Copper", brand: "#c2410c", brandDark: "#7c2d12", brandGlow: "#fb923c" },
+  // Promoted from a hand-picked custom color to a named preset — dark/glow
+  // derived the same way a custom pick's are (see resolveAccentTheme's
+  // CUSTOM_THEME_ID branch: shade(base, 0.38, 1.05) / shade(base, 0.72, 0.85))
+  // rather than hand-tuned, so it stays consistent with what choosing this
+  // exact hex via the custom picker would have produced.
+  { id: "ocean-teal", name: "Ocean Teal", brand: "#3f8798", brandDark: "#377b8b", brandGlow: "#9ec7d1" },
 ];
 
 export interface AvatarColorOption {
@@ -57,7 +63,7 @@ const CUSTOM_COLOR_STORAGE_KEY = "mezmur:custom-accent-color";
 const NOW_PLAYING_THEME_STORAGE_KEY = "mezmur:now-playing-theme";
 const NOW_PLAYING_CUSTOM_COLOR_STORAGE_KEY = "mezmur:now-playing-custom-color";
 const DEFAULT_AVATAR_COLOR_ID = "white";
-const DEFAULT_THEME_ID = "emerald";
+const DEFAULT_THEME_ID = "ocean-teal";
 const DEFAULT_CUSTOM_COLOR = "#7c5cff";
 // Now Playing's color is deliberately independent of the app-wide accent
 // (see CUSTOM_THEME_ID's own comment) — picking a Royal Purple accent
@@ -69,9 +75,9 @@ const DEFAULT_NOW_PLAYING_CUSTOM_COLOR = "#1cc4a3";
 // here so switching the default later migrates every install still sitting
 // on the old one forward, rather than leaving them stuck on a color that's
 // no longer meant to be the baseline. "green"/"royal" predate ACCENT_THEMES
-// entirely; "purple" was the default from the 2026 premium rebrand until
-// Deep Emerald replaced it as the new default for everyone.
-const LEGACY_DEFAULT_IDS = new Set(["green", "royal", "purple"]);
+// entirely; "purple" was the default from the 2026 premium rebrand; "emerald"
+// briefly replaced it before Ocean Teal became the default for everyone.
+const LEGACY_DEFAULT_IDS = new Set(["green", "royal", "purple", "emerald"]);
 
 // Selecting this "theme" means the app-wide accent (buttons, glows, Now
 // Playing background, everything else driven by --color-brand) comes from
