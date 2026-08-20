@@ -73,6 +73,12 @@ export const authService = {
     if (error) throw error;
   },
 
+  async verifyEmailSignup(email: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
+    if (error) throw error;
+    return data;
+  },
+
   async verifyPhoneSignup(phone: string, token: string) {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
     if (error) throw error;
