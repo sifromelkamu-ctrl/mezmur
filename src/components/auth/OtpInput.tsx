@@ -50,7 +50,7 @@ export default function OtpInput({ length = 6, value, onChange, disabled }: OtpI
           value={value[i] ?? ""}
           onChange={(e) => setDigit(i, e.target.value.replace(/\D/g, "").slice(-1))}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          className="w-11 h-[52px] bg-panel rounded-lg text-center text-xl font-bold outline-none focus:ring-2 focus:ring-brand transition-shadow disabled:opacity-50"
+          className="w-11 h-[52px] bg-elevated ring-1 ring-border rounded-lg text-center text-xl font-bold outline-none focus:ring-2 focus:ring-brand transition-shadow disabled:opacity-50"
         />
       ))}
     </div>
