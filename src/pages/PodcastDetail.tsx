@@ -2,6 +2,7 @@ import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import HeroTopScrim from "../components/HeroTopScrim";
 import CoverArt from "../components/CoverArt";
 import { usePlayer } from "../context/PlayerContext";
 import { podcastsApi, podcastToTrack, type ApiPodcast } from "../lib/api";
@@ -51,6 +52,7 @@ export default function PodcastDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
+        <HeroTopScrim />
         <BackButton variant="glass" />
         <CoverArt gradient={podcast.gradient} size="xl" />
         <div className="min-w-0">

@@ -2,6 +2,7 @@ import { Check, Clock, Download, GripVertical, Pencil, Play, Shuffle, Trash2, Up
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import HeroTopScrim from "../components/HeroTopScrim";
 import CoverArt from "../components/CoverArt";
 import ArtworkEditor from "../components/ArtworkEditor";
 import TrackRow from "../components/TrackRow";
@@ -153,6 +154,7 @@ export default function AlbumDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
+        <HeroTopScrim />
         <BackButton variant="glass" />
         <div className="relative group">
           <CoverArt

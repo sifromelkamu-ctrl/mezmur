@@ -20,6 +20,7 @@ import defaultAlbumArt from "../assets/default-album-art.jpg";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
 import EqualizerBars from "../components/EqualizerBars";
+import HeroTopScrim from "../components/HeroTopScrim";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
@@ -420,6 +421,7 @@ export default function ArtistDetail() {
           }}
         />
 
+        <HeroTopScrim />
         <BackButton variant="glass" />
         {/* Same reasoning as BackButton's "glass" variant: this floats near
             the true top of the screen inside a hero whose negative margin

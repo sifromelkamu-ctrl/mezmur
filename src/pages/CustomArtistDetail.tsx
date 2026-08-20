@@ -2,6 +2,7 @@ import { Disc3, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import HeroTopScrim from "../components/HeroTopScrim";
 import CoverArt from "../components/CoverArt";
 import TextField from "../components/form/TextField";
 import { useCustomArtists } from "../context/CustomArtistsContext";
@@ -53,6 +54,7 @@ export default function CustomArtistDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 4rem)",
         }}
       >
+        <HeroTopScrim />
         <BackButton variant="glass" />
         <CoverArt gradient={artist.gradient} size="xl" rounded photoUrl={artist.photoUrl} />
         <div className="min-w-0">

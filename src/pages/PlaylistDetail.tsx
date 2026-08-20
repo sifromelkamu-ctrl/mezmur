@@ -2,6 +2,7 @@ import { Clock, Play, Plus, Search as SearchIcon, Shuffle, X } from "lucide-reac
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import HeroTopScrim from "../components/HeroTopScrim";
 import CoverArt from "../components/CoverArt";
 import TrackRow from "../components/TrackRow";
 import TextField from "../components/form/TextField";
@@ -99,6 +100,7 @@ export default function PlaylistDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
+        <HeroTopScrim />
         <BackButton variant="glass" />
         <CoverArt
           gradient={playlist.gradient}
