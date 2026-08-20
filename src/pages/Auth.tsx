@@ -8,7 +8,6 @@ import ForgotEmailOtpStep from "./auth/ForgotEmailOtpStep";
 import ForgotPasswordStep from "./auth/ForgotPasswordStep";
 import ForgotPhoneOtpStep from "./auth/ForgotPhoneOtpStep";
 import LoginStep from "./auth/LoginStep";
-import PhoneSignUpStep from "./auth/PhoneSignUpStep";
 import SetNewPasswordStep from "./auth/SetNewPasswordStep";
 import type { AuthStep, PendingSignup } from "./auth/types";
 import VerifyEmailStep from "./auth/VerifyEmailStep";
@@ -17,7 +16,6 @@ import VerifyPhoneStep from "./auth/VerifyPhoneStep";
 const STEP_META: Record<AuthStep, { title: string; subtitle?: string }> = {
   entry: { title: "" },
   "email-signup": { title: "Create your account", subtitle: "Sign up with your email address." },
-  "phone-signup": { title: "Create your account", subtitle: "Sign up with your phone number." },
   "verify-email": { title: "" },
   "verify-phone": { title: "" },
   login: { title: "Welcome back", subtitle: "Log in to continue." },
@@ -54,12 +52,15 @@ export default function Auth() {
   const meta = STEP_META[step];
 
   function back() {
-    if (step === "email-signup" || step === "phone-signup" || step === "login" || step === "forgot-password") {
+    if (step === "email-signup" || step === "login" || step === "forgot-password") {
       setStep("entry");
     } else if (step === "verify-email") {
       setStep("email-signup");
     } else if (step === "verify-phone") {
-      setStep("phone-signup");
+      // Only reachable via an existing unconfirmed phone account at login
+      // (see onNeedsVerification below) — there's no phone-signup step to
+      // return to, so back goes to where that attempt started.
+      setStep("login");
     } else if (step === "forgot-email-otp" || step === "forgot-phone-otp") {
       setStep("forgot-password");
     } else {
@@ -70,29 +71,14 @@ export default function Auth() {
   return (
     <AuthShell title={meta.title} subtitle={meta.subtitle} onBack={step === "entry" ? undefined : back} stepKey={step}>
       {step === "entry" && (
-        <EntryStep
-          onChooseEmail={() => setStep("email-signup")}
-          onChoosePhone={() => setStep("phone-signup")}
-          onLogin={() => setStep("login")}
-        />
+        <EntryStep onChooseEmail={() => setStep("email-signup")} onLogin={() => setStep("login")} />
       )}
 
       {step === "email-signup" && (
         <EmailSignUpStep
-          onSwitchToPhone={() => setStep("phone-signup")}
           onVerify={(p) => {
             setPending(p);
             setStep("verify-email");
-          }}
-        />
-      )}
-
-      {step === "phone-signup" && (
-        <PhoneSignUpStep
-          onSwitchToEmail={() => setStep("email-signup")}
-          onVerify={(p) => {
-            setPending(p);
-            setStep("verify-phone");
           }}
         />
       )}
@@ -102,7 +88,7 @@ export default function Auth() {
       )}
 
       {step === "verify-phone" && pending?.phone && (
-        <VerifyPhoneStep phone={pending.phone} onChangePhone={() => setStep("phone-signup")} />
+        <VerifyPhoneStep phone={pending.phone} onChangePhone={() => setStep("login")} />
       )}
 
       {step === "login" && (

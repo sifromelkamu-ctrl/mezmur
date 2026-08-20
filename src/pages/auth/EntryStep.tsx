@@ -1,13 +1,12 @@
-import { Mail, Phone } from "lucide-react";
+import { Mail } from "lucide-react";
 import { haptics } from "../../utils/haptics";
 
 interface EntryStepProps {
   onChooseEmail: () => void;
-  onChoosePhone: () => void;
   onLogin: () => void;
 }
 
-export default function EntryStep({ onChooseEmail, onChoosePhone, onLogin }: EntryStepProps) {
+export default function EntryStep({ onChooseEmail, onLogin }: EntryStepProps) {
   return (
     <div className="flex flex-col flex-1">
       <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center py-8">
@@ -31,16 +30,6 @@ export default function EntryStep({ onChooseEmail, onChoosePhone, onLogin }: Ent
         >
           <Mail size={18} />
           Sign up with Email
-        </button>
-        <button
-          onClick={() => {
-            haptics.light();
-            onChoosePhone();
-          }}
-          className="flex items-center justify-center gap-2.5 bg-elevated ring-1 ring-border text-fg font-bold rounded-full py-3.5 text-sm hover:bg-hover active:scale-[0.98] transition-all"
-        >
-          <Phone size={18} />
-          Sign up with Phone
         </button>
 
         <div className="flex items-center gap-3 my-1">

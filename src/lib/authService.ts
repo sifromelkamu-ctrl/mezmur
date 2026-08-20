@@ -49,16 +49,6 @@ export const authService = {
     return data;
   },
 
-  async signUpWithPhone(phone: string, password: string, meta: SignUpMetadata) {
-    const { data, error } = await supabase.auth.signUp({
-      phone,
-      password,
-      options: { data: metadataPayload(meta) },
-    });
-    if (error) throw error;
-    return data;
-  },
-
   async resendEmailVerification(email: string) {
     const { error } = await supabase.auth.resend({
       type: "signup",

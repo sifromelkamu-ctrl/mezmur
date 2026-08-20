@@ -15,11 +15,10 @@ import { haptics } from "../../utils/haptics";
 import type { PendingSignup } from "./types";
 
 interface EmailSignUpStepProps {
-  onSwitchToPhone: () => void;
   onVerify: (pending: PendingSignup) => void;
 }
 
-export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSignUpStepProps) {
+export default function EmailSignUpStep({ onVerify }: EmailSignUpStepProps) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -88,14 +87,6 @@ export default function EmailSignUpStep({ onSwitchToPhone, onVerify }: EmailSign
         className="mt-1 bg-brand text-black font-bold rounded-full py-3 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-50 disabled:hover:scale-100"
       >
         {submitting ? "Creating account..." : "Sign Up"}
-      </button>
-
-      <button
-        type="button"
-        onClick={onSwitchToPhone}
-        className="text-sm text-fg-muted hover:text-fg transition-colors text-center py-1"
-      >
-        Use phone number instead
       </button>
     </form>
   );

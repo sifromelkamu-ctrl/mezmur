@@ -1,8 +1,10 @@
 export type AuthStep =
   | "entry"
   | "email-signup"
-  | "phone-signup"
   | "verify-email"
+  // Signup is email-only, but an existing (pre-dating that change, or
+  // manually created) phone account can still be unconfirmed — LoginStep's
+  // phone_not_confirmed handling routes here to finish verifying it.
   | "verify-phone"
   | "login"
   | "forgot-password"
