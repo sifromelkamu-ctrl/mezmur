@@ -72,7 +72,7 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
       <div className="flex flex-col gap-3">
         <button
           onClick={() => setMethod("email")}
-          className="flex items-center gap-3 bg-panel hover:bg-hover transition-colors rounded-xl px-4 py-3.5 text-left"
+          className="flex items-center gap-3 bg-elevated ring-1 ring-border hover:bg-hover transition-colors rounded-xl px-4 py-3.5 text-left"
         >
           <Mail size={20} className="text-brand shrink-0" />
           <div>
@@ -82,7 +82,7 @@ export default function ForgotPasswordStep({ onPhoneOtpSent }: ForgotPasswordSte
         </button>
         <button
           onClick={() => setMethod("phone")}
-          className="flex items-center gap-3 bg-panel hover:bg-hover transition-colors rounded-xl px-4 py-3.5 text-left"
+          className="flex items-center gap-3 bg-elevated ring-1 ring-border hover:bg-hover transition-colors rounded-xl px-4 py-3.5 text-left"
         >
           <Phone size={20} className="text-brand shrink-0" />
           <div>

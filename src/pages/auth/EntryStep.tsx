@@ -10,40 +10,46 @@ interface EntryStepProps {
 export default function EntryStep({ onChooseEmail, onChoosePhone, onLogin }: EntryStepProps) {
   return (
     <div className="flex flex-col flex-1">
-      <div className="flex-1 flex flex-col items-center justify-center gap-1 text-center py-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center mb-4 shadow-lg shadow-brand/20">
-          <span className="text-2xl font-black text-black">M</span>
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center py-8">
+        <div className="w-20 h-20 rounded-[22px] bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center mb-5 shadow-xl shadow-brand/25">
+          <span className="text-3xl font-black text-black">M</span>
         </div>
-        <h2 className="text-xl font-bold">Welcome to Mezmur</h2>
-        <p className="text-sm text-fg-muted max-w-[26ch]">Ethiopian gospel music, wherever you are.</p>
+        <h2 className="text-2xl font-bold tracking-tight">Welcome to Mezmur</h2>
+        <p className="text-sm text-fg-muted max-w-[28ch]">Ethiopian gospel music, wherever you are.</p>
       </div>
 
       <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide text-center mb-1">
+          Create your account
+        </p>
         <button
           onClick={() => {
             haptics.light();
             onChooseEmail();
           }}
-          className="flex items-center justify-center gap-2.5 bg-brand text-black font-bold rounded-full py-3.5 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform"
+          className="flex items-center justify-center gap-2.5 bg-brand text-black font-bold rounded-full py-3.5 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-brand/20"
         >
           <Mail size={18} />
-          Continue with Email
+          Sign up with Email
         </button>
         <button
           onClick={() => {
             haptics.light();
             onChoosePhone();
           }}
-          className="flex items-center justify-center gap-2.5 bg-panel text-fg font-bold rounded-full py-3.5 text-sm hover:bg-hover active:scale-[0.98] transition-all"
+          className="flex items-center justify-center gap-2.5 bg-elevated ring-1 ring-border text-fg font-bold rounded-full py-3.5 text-sm hover:bg-hover active:scale-[0.98] transition-all"
         >
           <Phone size={18} />
-          Continue with Phone
+          Sign up with Phone
         </button>
 
-        <button
-          onClick={onLogin}
-          className="mt-2 text-sm text-fg-muted hover:text-fg transition-colors text-center py-2"
-        >
+        <div className="flex items-center gap-3 my-1">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs text-fg-subtle">or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <button onClick={onLogin} className="text-sm text-fg-muted hover:text-fg transition-colors text-center py-2">
           Already have an account? <span className="font-semibold text-fg">Log in</span>
         </button>
       </div>

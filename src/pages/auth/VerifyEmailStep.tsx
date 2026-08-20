@@ -107,7 +107,7 @@ export default function VerifyEmailStep({ email, onChangeEmail }: VerifyEmailSte
         <button
           onClick={handleResend}
           disabled={resending || resendCooldown > 0 || success}
-          className="bg-panel hover:bg-hover transition-colors rounded-full py-3 text-sm font-semibold disabled:opacity-50"
+          className="bg-elevated ring-1 ring-border hover:bg-hover transition-colors rounded-full py-3 text-sm font-semibold disabled:opacity-50"
         >
           {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend code"}
         </button>

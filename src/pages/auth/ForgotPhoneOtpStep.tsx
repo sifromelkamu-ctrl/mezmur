@@ -95,7 +95,7 @@ export default function ForgotPhoneOtpStep({ phone, onVerified }: ForgotPhoneOtp
       <button
         onClick={handleResend}
         disabled={resending || resendCooldown > 0}
-        className="bg-panel hover:bg-hover transition-colors rounded-full py-3 text-sm font-semibold disabled:opacity-50 w-full"
+        className="bg-elevated ring-1 ring-border hover:bg-hover transition-colors rounded-full py-3 text-sm font-semibold disabled:opacity-50 w-full"
       >
         {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend code"}
       </button>
