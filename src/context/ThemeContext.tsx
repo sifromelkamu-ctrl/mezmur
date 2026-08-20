@@ -57,7 +57,7 @@ const CUSTOM_COLOR_STORAGE_KEY = "mezmur:custom-accent-color";
 const NOW_PLAYING_THEME_STORAGE_KEY = "mezmur:now-playing-theme";
 const NOW_PLAYING_CUSTOM_COLOR_STORAGE_KEY = "mezmur:now-playing-custom-color";
 const DEFAULT_AVATAR_COLOR_ID = "white";
-const DEFAULT_THEME_ID = "purple";
+const DEFAULT_THEME_ID = "emerald";
 const DEFAULT_CUSTOM_COLOR = "#7c5cff";
 // Now Playing's color is deliberately independent of the app-wide accent
 // (see CUSTOM_THEME_ID's own comment) — picking a Royal Purple accent
@@ -65,12 +65,13 @@ const DEFAULT_CUSTOM_COLOR = "#7c5cff";
 // with this exact hex so an install that never touches the new setting
 // still gets Now Playing's original hand-picked teal look, unchanged.
 const DEFAULT_NOW_PLAYING_CUSTOM_COLOR = "#1cc4a3";
-// The app shipped with "green" (Emerald) as its hardcoded default for a long
-// time, so most existing installs have it saved even though the user never
-// deliberately chose it — the 2026 premium rebrand replaces that default
-// outright rather than leaving old installs stuck on a color that no longer
-// exists in ACCENT_THEMES.
-const LEGACY_DEFAULT_IDS = new Set(["green", "royal"]);
+// Anything that was ever the app-wide *default* (not a deliberate pick) goes
+// here so switching the default later migrates every install still sitting
+// on the old one forward, rather than leaving them stuck on a color that's
+// no longer meant to be the baseline. "green"/"royal" predate ACCENT_THEMES
+// entirely; "purple" was the default from the 2026 premium rebrand until
+// Deep Emerald replaced it as the new default for everyone.
+const LEGACY_DEFAULT_IDS = new Set(["green", "royal", "purple"]);
 
 // Selecting this "theme" means the app-wide accent (buttons, glows, Now
 // Playing background, everything else driven by --color-brand) comes from
@@ -94,7 +95,11 @@ function resolveAccentTheme(themeId: string, customColor: string): AccentTheme {
       brandGlow: shade(customColor, 0.72, 0.85),
     };
   }
-  return ACCENT_THEMES.find((t) => t.id === themeId) ?? ACCENT_THEMES[0];
+  return (
+    ACCENT_THEMES.find((t) => t.id === themeId) ??
+    ACCENT_THEMES.find((t) => t.id === DEFAULT_THEME_ID) ??
+    ACCENT_THEMES[0]
+  );
 }
 
 function applyTheme(theme: AccentTheme) {
