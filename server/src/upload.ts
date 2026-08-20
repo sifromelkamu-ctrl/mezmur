@@ -31,14 +31,16 @@ function extFromMime(mimetype: string): string {
 
 // Uploads an in-memory buffer straight to a Supabase Storage bucket and
 // returns its public URL. This is the cloud-storage integration point for
-// every image upload in the app (artist photos, album/playlist covers).
-export async function uploadImageToStorage(buffer: Buffer, mimetype: string): Promise<string> {
+// every image upload in the app (artist photos, album/playlist covers,
+// Contact Us attachments) — `bucket` defaults to the original "album-art"
+// so every existing caller is unaffected.
+export async function uploadImageToStorage(buffer: Buffer, mimetype: string, bucket = "album-art"): Promise<string> {
   const path = `${randomUUID()}${extFromMime(mimetype)}`;
   const { error } = await supabaseAdmin.storage
-    .from("album-art")
+    .from(bucket)
     .upload(path, buffer, { contentType: mimetype, upsert: false });
   if (error) throw new Error(`Image upload failed: ${error.message}`);
 
-  const { data } = supabaseAdmin.storage.from("album-art").getPublicUrl(path);
+  const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }

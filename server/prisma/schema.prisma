@@ -128,6 +128,10 @@ model ContactMessage {
   email     String
   subject   String
   message   String
+  // Optional screenshot/file, uploaded to the "contact-attachments"
+  // Supabase Storage bucket the same way artist/album art already is (see
+  // uploadImageToStorage) — this column just holds the resulting public URL.
+  attachmentUrl String?
   status    ContactMessageStatus @default(new)
   createdAt DateTime             @default(now())
 

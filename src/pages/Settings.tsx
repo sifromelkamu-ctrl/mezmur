@@ -13,6 +13,7 @@ import {
   Mic2,
   Moon,
   Palette,
+  Paperclip,
   Pencil,
   Send,
   Sparkles,
@@ -279,17 +280,32 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
   );
 }
 
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
 function ContactSection({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = email.trim() && subject.trim() && message.trim() && !submitting;
+
+  const handleAttachmentPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets picking the exact same file again re-trigger onChange
+    if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setError("That image is too large — please pick one under 5MB.");
+      return;
+    }
+    setError(null);
+    setAttachment(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,10 +313,17 @@ function ContactSection({ onBack }: { onBack: () => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      await contactApi.submit({ name: name.trim() || undefined, email: email.trim(), subject: subject.trim(), message: message.trim() });
+      await contactApi.submit({
+        name: name.trim() || undefined,
+        email: email.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
+        attachment: attachment ?? undefined,
+      });
       setSent(true);
       setSubject("");
       setMessage("");
+      setAttachment(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not send your message. Please try again.");
     } finally {
@@ -365,6 +388,26 @@ function ContactSection({ onBack }: { onBack: () => void }) {
             rows={6}
             className="px-4 py-2.5 text-base w-full resize-none"
           />
+          {attachment ? (
+            <div className="flex items-center gap-3 bg-panel rounded-md px-4 py-2.5">
+              <Paperclip size={16} className="text-fg-muted shrink-0" />
+              <span className="flex-1 text-sm truncate">{attachment.name}</span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                aria-label="Remove attachment"
+                className="text-fg-muted hover:text-fg transition-colors shrink-0"
+              >
+                <XIcon size={16} />
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 text-sm font-semibold text-brand hover:underline cursor-pointer w-fit">
+              <Paperclip size={16} />
+              Attach a screenshot
+              <input type="file" accept="image/*" onChange={handleAttachmentPick} className="hidden" />
+            </label>
+          )}
           {error && <p className="text-sm text-accent-red">{error}</p>}
           <button
             type="submit"

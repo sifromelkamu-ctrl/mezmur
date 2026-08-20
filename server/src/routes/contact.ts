@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
+import { upload, uploadImageToStorage } from "../upload.js";
 
 const router = Router();
 
@@ -16,7 +17,10 @@ const submitContactSchema = z.object({
 // requireAuth: a prospective user with a question before signing up should
 // still be able to reach out, so the form takes a reply-to email directly
 // instead of requiring login — userId is just attached when one exists.
-router.post("/", optionalAuth, async (req: AuthedRequest, res) => {
+// multipart/form-data (not JSON) since the attachment is an optional file —
+// every non-file field still arrives in req.body as a plain string, same
+// as every other multer-backed route in this app.
+router.post("/", upload.single("attachment"), optionalAuth, async (req: AuthedRequest, res) => {
   const parsed = submitContactSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
@@ -24,8 +28,18 @@ router.post("/", optionalAuth, async (req: AuthedRequest, res) => {
   }
   const { name, email, subject, message } = parsed.data;
 
+  let attachmentUrl: string | null = null;
+  if (req.file) {
+    try {
+      attachmentUrl = await uploadImageToStorage(req.file.buffer, req.file.mimetype, "contact-attachments");
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Attachment upload failed" });
+      return;
+    }
+  }
+
   await prisma.contactMessage.create({
-    data: { userId: req.userId ?? null, name: name || null, email, subject, message },
+    data: { userId: req.userId ?? null, name: name || null, email, subject, message, attachmentUrl },
   });
 
   res.status(201).json({ ok: true });

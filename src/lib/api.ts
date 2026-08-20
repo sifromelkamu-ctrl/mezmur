@@ -394,8 +394,16 @@ export const subscriptionApi = {
 // exists (see requireAuth/optionalAuth server-side), so a signed-in
 // sender's message still links back to their account.
 export const contactApi = {
-  submit: (input: { name?: string; email: string; subject: string; message: string }) =>
-    request<{ ok: true }>("/contact", { method: "POST", body: JSON.stringify(input) }),
+  // multipart/form-data, not JSON — attachment is an optional image file.
+  submit: (input: { name?: string; email: string; subject: string; message: string; attachment?: File }) => {
+    const body = new FormData();
+    if (input.name) body.append("name", input.name);
+    body.append("email", input.email);
+    body.append("subject", input.subject);
+    body.append("message", input.message);
+    if (input.attachment) body.append("attachment", input.attachment);
+    return postForm<{ ok: true }>("/contact", body);
+  },
 };
 
 export interface ApiBibleAudio {
@@ -967,6 +975,7 @@ export interface ApiContactMessage {
   email: string;
   subject: string;
   message: string;
+  attachmentUrl: string | null;
   status: "new" | "read";
   createdAt: string;
 }

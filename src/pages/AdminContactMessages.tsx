@@ -120,6 +120,16 @@ export default function AdminContactMessages() {
                 </p>
                 <p className="text-sm text-fg whitespace-pre-wrap">{msg.message}</p>
               </button>
+              {msg.attachmentUrl && (
+                <a
+                  href={msg.attachmentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block mt-3 rounded-lg overflow-hidden ring-1 ring-border w-32 h-32"
+                >
+                  <img src={msg.attachmentUrl} alt="Attachment" className="w-full h-full object-cover" />
+                </a>
+              )}
               <div className="flex items-center justify-end gap-3 mt-3 pt-3 border-t border-border">
                 <a
                   href={`mailto:${msg.email}?subject=${encodeURIComponent(`Re: ${msg.subject}`)}`}
