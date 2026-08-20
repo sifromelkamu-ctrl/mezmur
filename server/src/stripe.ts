@@ -13,19 +13,22 @@ export const stripeConfigured = Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ID && 
 
 export const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
-// Whether this profile currently has full-catalog access — either an
-// app-level free trial still running (no payment ever required to start
-// one), an admin-granted comp (see routes/admin.ts's /users/:id/free-
-// access — permanent until an admin revokes it, no time window to check),
-// or a paid Stripe subscription in a state that should grant access.
-// "canceled" still counts while the already-paid-for period hasn't ended
-// yet (Stripe doesn't revoke access early on cancellation); "past_due"
-// does not — a failed renewal charge drops access immediately rather than
-// extending a grace period, kept simple for launch.
+// Whether this profile currently has full-catalog access — an admin
+// account (needs to hear the full catalog to manage it — should never be
+// blocked by its own billing state), an app-level free trial still running
+// (no payment ever required to start one), an admin-granted comp (see
+// routes/admin.ts's /users/:id/free-access — permanent until an admin
+// revokes it, no time window to check), or a paid Stripe subscription in a
+// state that should grant access. "canceled" still counts while the
+// already-paid-for period hasn't ended yet (Stripe doesn't revoke access
+// early on cancellation); "past_due" does not — a failed renewal charge
+// drops access immediately rather than extending a grace period, kept
+// simple for launch.
 export function hasFullAccess(
-  profile: Pick<Profile, "subscriptionStatus" | "trialEndsAt" | "subscriptionCurrentPeriodEnd">
+  profile: Pick<Profile, "role" | "subscriptionStatus" | "trialEndsAt" | "subscriptionCurrentPeriodEnd">
 ): boolean {
   const now = new Date();
+  if (profile.role === "admin") return true;
   if (profile.subscriptionStatus === "comped") return true;
   if (profile.subscriptionStatus === "active" || profile.subscriptionStatus === "trialing") return true;
   if (profile.subscriptionStatus === "canceled" && profile.subscriptionCurrentPeriodEnd && profile.subscriptionCurrentPeriodEnd > now) {

@@ -82,7 +82,10 @@ function formatDate(iso: string) {
 // below, since there are enough branches (trial vs. paid, several Stripe
 // statuses, the "canceled but still paid through" grace window) that
 // inlining them would be hard to read.
-function describeSubscription(status: ApiSubscriptionState): { title: string; subtitle: string } {
+function describeSubscription(status: ApiSubscriptionState, isAdmin: boolean): { title: string; subtitle: string } {
+  if (isAdmin) {
+    return { title: "Admin access", subtitle: "Admins always have full access, regardless of billing." };
+  }
   if (status.subscriptionStatus === "comped") {
     return { title: "Complimentary access", subtitle: "Granted by Mezmur — no billing required." };
   }
@@ -187,7 +190,7 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
         <div className="flex flex-col gap-4">
           <div className="bg-elevated rounded-lg p-4">
             {(() => {
-              const { title, subtitle } = describeSubscription(status);
+              const { title, subtitle } = describeSubscription(status, user?.role === "admin");
               return (
                 <>
                   <p className="font-semibold">{title}</p>
@@ -201,8 +204,8 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
 
           {!status.billingConfigured ? (
             <p className="text-xs text-fg-subtle px-1">Subscriptions aren't set up yet — check back soon.</p>
-          ) : status.subscriptionStatus === "comped" ? null : status.subscriptionStatus === "none" ||
-            (status.subscriptionStatus === "canceled" && !status.hasFullAccess) ? (
+          ) : user?.role === "admin" || status.subscriptionStatus === "comped" ? null : status.subscriptionStatus ===
+              "none" || (status.subscriptionStatus === "canceled" && !status.hasFullAccess) ? (
             <button
               onClick={startCheckout}
               disabled={busy}
@@ -612,15 +615,17 @@ export default function Settings() {
             value={
               !user
                 ? undefined
-                : !subscriptionStatus
-                  ? "…"
-                  : subscriptionStatus.subscriptionStatus === "comped"
-                    ? "Complimentary"
-                    : subscriptionStatus.subscriptionStatus === "active" || subscriptionStatus.subscriptionStatus === "trialing"
-                      ? "Premium"
-                      : subscriptionStatus.hasFullAccess
-                        ? "Free trial"
-                        : "Ended"
+                : user.role === "admin"
+                  ? "Admin"
+                  : !subscriptionStatus
+                    ? "…"
+                    : subscriptionStatus.subscriptionStatus === "comped"
+                      ? "Complimentary"
+                      : subscriptionStatus.subscriptionStatus === "active" || subscriptionStatus.subscriptionStatus === "trialing"
+                        ? "Premium"
+                        : subscriptionStatus.hasFullAccess
+                          ? "Free trial"
+                          : "Ended"
             }
             onClick={() => setSection("subscription")}
           />
