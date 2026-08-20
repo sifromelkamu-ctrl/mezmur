@@ -36,8 +36,27 @@ if (!existsSync(tmpCookiesPath)) {
   process.exit(1);
 }
 
-const b64 = readFileSync(tmpCookiesPath).toString("base64");
+// yt-dlp's --cookies-from-browser dumps the WHOLE browser cookie jar, not
+// just youtube.com's — on a real daily-driver browser profile that's every
+// site ever visited (banking, government, unrelated logins...), which is
+// both a needless secret to be holding in an env var and, at real-world
+// size, big enough to blow past Render's build-time argument-length limit
+// ("argument list too long") once it lands in YTDLP_COOKIES_B64. yt-dlp
+// itself only ever reads youtube.com/google.com auth cookies from this
+// file, so keep exactly those and drop everything else.
+const RELEVANT_DOMAIN = /(youtube\.com|google\.com|googlevideo\.com|ytimg\.com)$/;
+const rawCookies = readFileSync(tmpCookiesPath, "utf8");
 unlinkSync(tmpCookiesPath);
+const trimmedCookies = rawCookies
+  .split("\n")
+  .filter((line) => {
+    if (line.startsWith("#") || !line.trim()) return true;
+    const domain = line.split("\t")[0]?.replace(/^\./, "");
+    return domain ? RELEVANT_DOMAIN.test(domain) : false;
+  })
+  .join("\n");
+
+const b64 = Buffer.from(trimmedCookies, "utf8").toString("base64");
 
 if (!existsSync(envPath)) {
   console.error(`[refresh-cookies] ${envPath} not found — aborting.`);
