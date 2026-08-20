@@ -420,11 +420,11 @@ export default function ArtistDetail() {
           }}
         />
 
-        <BackButton />
+        <BackButton variant="glass" />
         <div className="absolute top-4 right-4">
           <button
             onClick={() => setShowMenu((m) => !m)}
-            className="w-11 h-11 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+            className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             aria-label="More options"
           >
             <MoreHorizontal size={20} />

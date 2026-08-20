@@ -99,7 +99,7 @@ export default function PlaylistDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
-        <BackButton />
+        <BackButton variant="glass" />
         <CoverArt
           gradient={playlist.gradient}
           size="xl"

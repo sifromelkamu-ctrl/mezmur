@@ -18,6 +18,17 @@ export default function Topbar() {
   // / notification bell) in its own light purple palette — same reasoning
   // as Library above.
   const isBible = location.pathname === "/bible";
+  // Every hero-photo detail page (artist/album/playlist/podcast/sermon) has
+  // its own BackButton + overflow menu already, and pulls its hero up over
+  // this bar with a negative top margin so the two never visually double up
+  // — but that overlap is a pixel-perfect trick riding on env(safe-area-
+  // inset-top), which Android's WebView doesn't always report as reliably
+  // as iOS's does. When it under-reports, this bar's own row peeks out as a
+  // separate, cramped strip above the hero instead of being fully covered.
+  // Not rendering it here at all removes the dependency on that trick
+  // matching pixel-for-pixel across platforms, same reasoning as Library/
+  // Bible/Home above.
+  const isHeroDetailPage = /^\/(artist|album|my-artist|playlist|podcast|sermon)\//.test(location.pathname);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { avatarColorId } = useTheme();
@@ -29,7 +40,7 @@ export default function Topbar() {
   // hidden, which looked empty at the top of the page but became a stray
   // translucent bar once scrolled, since `sticky` keeps painting that
   // background even with no content inside it.
-  if (isLibrary || isBible || isHome) return null;
+  if (isLibrary || isBible || isHome || isHeroDetailPage) return null;
 
   const isSettingsPage = location.pathname === "/settings";
 

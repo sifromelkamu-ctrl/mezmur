@@ -53,7 +53,7 @@ export default function CustomArtistDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 4rem)",
         }}
       >
-        <BackButton />
+        <BackButton variant="glass" />
         <CoverArt gradient={artist.gradient} size="xl" rounded photoUrl={artist.photoUrl} />
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-wide">Artist</p>

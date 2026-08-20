@@ -153,7 +153,7 @@ export default function AlbumDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
-        <BackButton />
+        <BackButton variant="glass" />
         <div className="relative group">
           <CoverArt
             gradient={album.gradient}

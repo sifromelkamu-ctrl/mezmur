@@ -51,7 +51,7 @@ export default function SermonDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
-        <BackButton />
+        <BackButton variant="glass" />
         <CoverArt gradient={sermon.gradient} size="xl" />
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-wide">Sermon</p>

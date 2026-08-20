@@ -51,7 +51,7 @@ export default function PodcastDetail() {
           paddingTop: "calc(env(safe-area-inset-top) + 2.5rem)",
         }}
       >
-        <BackButton />
+        <BackButton variant="glass" />
         <CoverArt gradient={podcast.gradient} size="xl" />
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-wide">Podcast</p>
