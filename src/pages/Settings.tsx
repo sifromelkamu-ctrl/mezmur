@@ -87,7 +87,7 @@ function ConfirmLogoutModal({ onCancel, onConfirm }: { onCancel: () => void; onC
     >
       <div className="fixed inset-0 bg-black/60" onClick={onCancel} />
       <div className="relative bg-elevated rounded-2xl p-5 w-full max-w-md my-auto shadow-2xl">
-        <h3 className="text-base font-bold mb-1.5">Log out?</h3>
+        <h3 className="text-base font-bold text-fg mb-1.5">Log out?</h3>
         <p className="text-sm text-fg-muted mb-5">You'll need to log back in to access your account.</p>
         <div className="flex gap-2">
           <button onClick={onCancel} className="flex-1 py-2.5 rounded-full bg-elevated-hover text-sm font-semibold">

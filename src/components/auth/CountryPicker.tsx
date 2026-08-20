@@ -37,7 +37,7 @@ export default function CountryPicker({ value, onChange }: CountryPickerProps) {
           <div className="fixed inset-0 z-[90] flex flex-col bg-black/60 backdrop-blur-sm bg-crossfade">
             <div className="mt-auto sm:m-auto w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl bg-elevated max-h-[80vh] flex flex-col shadow-2xl auth-sheet">
               <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
-                <h3 className="font-bold text-base">Select a country</h3>
+                <h3 className="font-bold text-base text-fg">Select a country</h3>
                 <button
                   onClick={() => setOpen(false)}
                   className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-hover transition-colors"

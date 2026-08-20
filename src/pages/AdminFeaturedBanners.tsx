@@ -85,7 +85,7 @@ function AddBannerModal({ onClose, onAdded }: { onClose: () => void; onAdded: (b
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-bold">Feature an album</h3>
+        <h3 className="text-base font-bold text-fg">Feature an album</h3>
         <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-hover" aria-label="Close">
           <X size={16} />
         </button>
@@ -203,7 +203,7 @@ function EditBannerModal({
   if (confirmDelete) {
     return (
       <ModalShell onClose={() => setConfirmDelete(false)}>
-        <h3 className="text-base font-bold mb-1.5">Remove this banner?</h3>
+        <h3 className="text-base font-bold text-fg mb-1.5">Remove this banner?</h3>
         <p className="text-sm text-fg-muted mb-5">
           This only removes it from the Home carousel — the album itself is not affected.
         </p>
@@ -229,7 +229,7 @@ function EditBannerModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-bold">Edit banner</h3>
+        <h3 className="text-base font-bold text-fg">Edit banner</h3>
         <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-hover" aria-label="Close">
           <X size={16} />
         </button>

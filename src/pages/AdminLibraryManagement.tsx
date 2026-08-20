@@ -95,7 +95,7 @@ function ConfirmDialog({
 }) {
   return (
     <ModalShell onClose={onCancel}>
-      <h3 className="text-base font-bold mb-1.5">{title}</h3>
+      <h3 className="text-base font-bold text-fg mb-1.5">{title}</h3>
       <p className="text-sm text-fg-muted mb-5">{message}</p>
       <div className="flex justify-end gap-2">
         <button
@@ -262,7 +262,7 @@ function EditSongModal({ trackId, artists, albums, onClose, onSaved, onArtistUps
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-base font-bold mb-4">Edit Song</h3>
+      <h3 className="text-base font-bold text-fg mb-4">Edit Song</h3>
       <div className="flex flex-col gap-3">
         <TextField
           type="text"
@@ -576,7 +576,7 @@ function MoveToAlbumModal({ trackIds, defaultArtistId, artists, albums, onClose,
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-base font-bold mb-1">Move {trackIds.length > 1 ? `${trackIds.length} songs` : "song"}</h3>
+      <h3 className="text-base font-bold text-fg mb-1">Move {trackIds.length > 1 ? `${trackIds.length} songs` : "song"}</h3>
       <p className="text-sm text-fg-muted mb-4">
         {step === "artist"
           ? "Choose an artist."
@@ -750,7 +750,7 @@ function MergeAlbumsModal({ sourceAlbum, albums, onClose, onMerged }: MergeAlbum
   if (target) {
     return (
       <ModalShell onClose={onClose}>
-        <h3 className="text-base font-bold mb-1.5">Merge albums?</h3>
+        <h3 className="text-base font-bold text-fg mb-1.5">Merge albums?</h3>
         <p className="text-sm text-fg-muted mb-5">
           All songs in <span className="text-fg font-medium">{sourceAlbum.title}</span> will move into{" "}
           <span className="text-fg font-medium">{target.title}</span>, and{" "}
@@ -779,7 +779,7 @@ function MergeAlbumsModal({ sourceAlbum, albums, onClose, onMerged }: MergeAlbum
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-base font-bold mb-1">Merge "{sourceAlbum.title}" into...</h3>
+      <h3 className="text-base font-bold text-fg mb-1">Merge "{sourceAlbum.title}" into...</h3>
       <p className="text-sm text-fg-muted mb-4">Choose the album to merge its songs into.</p>
       <div className="relative mb-3">
         <SearchIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
@@ -873,7 +873,7 @@ function EditAlbumModal({ album, onClose, onSaved }: EditAlbumModalProps) {
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-base font-bold mb-4">Edit Album</h3>
+      <h3 className="text-base font-bold text-fg mb-4">Edit Album</h3>
       <div className="flex flex-col gap-3">
         <TextField
           type="text"
