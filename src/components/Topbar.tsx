@@ -42,21 +42,17 @@ export default function Topbar() {
   // background even with no content inside it.
   if (isLibrary || isBible || isHome || isHeroDetailPage) return null;
 
-  const isSettingsPage = location.pathname === "/settings";
-
   return (
     <header
-      className={
-        // Settings keeps its original pinned, translucent-blur header —
-        // everywhere else, this used to stay sticky at the top with a
-        // bg-base/80 blur regardless of what page-specific content (e.g. a
-        // detail page's own colorful gradient/photo hero) was scrolling
-        // underneath it, reading as a floating overlay in a slightly
-        // different shade than the page itself. Scrolling away with the
-        // page instead, with no background of its own, removes both the
-        // "always-on-top overlay" feel and the color mismatch.
-        isSettingsPage ? "sticky top-0 z-10 bg-base/80 backdrop-blur-md" : ""
-      }
+      // Every page Topbar still renders on by this point is a plain list/
+      // grid (Search, Artists, All Songs, Settings, ...) — every colorful-
+      // hero detail page (artist/album/playlist/podcast/sermon) opts out
+      // above and renders nothing here at all. So unlike before, there's no
+      // page-specific background this could clash with by staying pinned:
+      // one consistent frosted-glass bar, same "Liquid Glass" treatment as
+      // the bottom nav, rather than plain/transparent everywhere but
+      // Settings.
+      className="sticky top-0 z-10 bg-base/75 backdrop-blur-xl border-b border-fg/8"
     >
       <div className="flex items-center justify-between px-4 py-3 gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
