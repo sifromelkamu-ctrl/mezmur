@@ -421,7 +421,12 @@ export default function ArtistDetail() {
         />
 
         <BackButton variant="glass" />
-        <div className="absolute top-4 right-4">
+        {/* Same reasoning as BackButton's "glass" variant: this floats near
+            the true top of the screen inside a hero whose negative margin
+            cancels the page's ambient safe-area padding, so it needs its
+            own explicit inset to clear the system UI touch zone up there
+            (status bar on Android, Dynamic Island on newer iPhones). */}
+        <div className="absolute top-[calc(env(safe-area-inset-top)+1.25rem)] right-4">
           <button
             onClick={() => setShowMenu((m) => !m)}
             className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg flex items-center justify-center text-white hover:bg-white/20 transition-colors"

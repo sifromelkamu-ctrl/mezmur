@@ -27,10 +27,20 @@ export default function BackButton({ className = "", variant = "dark" }: BackBut
   return (
     <button
       onClick={goBack}
-      className={`absolute top-4 left-4 w-11 h-11 rounded-full flex items-center justify-center text-white transition-colors z-10 ${
+      className={`absolute left-4 w-11 h-11 rounded-full flex items-center justify-center text-white transition-colors z-10 ${
         variant === "glass"
-          ? "bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg hover:bg-white/20"
-          : "bg-black/50 hover:bg-black/70"
+          ? // "glass" only ever sits inside a hero whose own negative top
+            // margin cancels the page's ambient safe-area padding (see e.g.
+            // ArtistDetail's hero div), so top-4 alone would place it a flat
+            // 16px from the true top of the screen — confirmed unclickable
+            // there on both a Dynamic Island iPhone and Android: whatever
+            // system UI (status bar, Dynamic Island) occupies that strip can
+            // intercept touches meant for the page beneath it, even where
+            // it's visually transparent/overlaid. Re-adding the inset here
+            // keeps it floating near the top on both platforms while
+            // guaranteeing it clears that zone entirely.
+            "top-[calc(env(safe-area-inset-top)+1.25rem)] bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg hover:bg-white/20"
+          : "top-4 bg-black/50 hover:bg-black/70"
       } ${className}`}
       aria-label="Go back"
     >
