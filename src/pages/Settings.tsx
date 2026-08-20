@@ -58,6 +58,23 @@ function SettingsRow({
   );
 }
 
+// Unlike SettingsRow, this fires an action directly (no chevron — it
+// doesn't navigate into a subsection) and is styled destructively since
+// it ends the session.
+function LogOutRow({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-hover transition-colors text-left text-accent-red"
+    >
+      <span className="shrink-0">
+        <LogOut size={20} />
+      </span>
+      <span className="flex-1 font-semibold text-sm">Log out</span>
+    </button>
+  );
+}
+
 function SectionHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div className="flex items-center gap-2 mb-6 -ml-2">
@@ -332,13 +349,28 @@ export default function Settings() {
                 <p className="text-xs text-fg-muted mb-1">{user.email ? "Email" : "Phone"}</p>
                 <p className="text-sm truncate">{user.email ?? user.phone}</p>
               </div>
-              <button
-                onClick={logout}
-                className="flex items-center justify-center gap-2 bg-elevated-hover hover:bg-hover-strong transition-colors text-sm font-semibold px-4 py-2.5 rounded-full"
-              >
-                <LogOut size={14} />
-                {t("logOut")}
-              </button>
+              <div>
+                <p className="text-xs text-fg-muted mb-1">Subscription</p>
+                {!subscriptionStatus ? (
+                  <p className="text-sm text-fg-muted">Loading…</p>
+                ) : (
+                  (() => {
+                    const { title, subtitle } = describeSubscription(subscriptionStatus, user.role === "admin");
+                    return (
+                      <button
+                        onClick={() => setSection("subscription")}
+                        className="flex items-center justify-between gap-2 w-full text-left"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{title}</p>
+                          <p className="text-xs text-fg-muted mt-0.5 truncate">{subtitle}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-fg-subtle shrink-0" />
+                      </button>
+                    );
+                  })()
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -648,6 +680,7 @@ export default function Settings() {
             onClick={() => setSection("lyrics")}
           />
           <SettingsRow icon={<Info size={20} />} label="About" onClick={() => setSection("about")} />
+          {user && <LogOutRow onClick={logout} />}
         </div>
 
         {user?.role === "admin" && (
