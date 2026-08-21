@@ -7,6 +7,7 @@
 export const routeLoaders = {
   albumDetail: () => import("../pages/AlbumDetail"),
   adminContactMessages: () => import("../pages/AdminContactMessages"),
+  adminSubmissions: () => import("../pages/AdminSubmissions"),
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
   adminUpload: () => import("../pages/AdminUpload"),
@@ -30,6 +31,7 @@ export const routeLoaders = {
   sermonDetail: () => import("../pages/SermonDetail"),
   settings: () => import("../pages/Settings"),
   telegramImport: () => import("../pages/TelegramImport"),
+  uploadSongs: () => import("../pages/UploadSongs"),
   youtubeCatalogImport: () => import("../pages/YoutubeCatalogImport"),
   youtubeImport: () => import("../pages/YoutubeImport"),
 } as const;

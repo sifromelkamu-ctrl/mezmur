@@ -990,6 +990,86 @@ export const adminContactApi = {
   remove: (id: string) => request<void>(`/admin/contact-messages/${id}`, { method: "DELETE" }),
 };
 
+export type SubmissionType = "single" | "album";
+export type SubmissionStatus = "pending" | "approved" | "rejected";
+
+export interface ApiSubmissionTrack {
+  id: string;
+  title: string;
+  position: number;
+  audioUrl: string;
+  artworkUrl: string | null;
+  createdTrackId: string | null;
+}
+
+export interface ApiSubmission {
+  id: string;
+  userId: string;
+  type: SubmissionType;
+  artistName: string;
+  artistPhotoUrl: string | null;
+  albumTitle: string | null;
+  albumCoverUrl: string | null;
+  status: SubmissionStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdArtistId: string | null;
+  createdAlbumId: string | null;
+  createdAt: string;
+  tracks: ApiSubmissionTrack[];
+  profile?: { email: string | null; name: string | null };
+}
+
+// Settings > Upload Your Songs. Every route requires login (the server-side
+// requireAuth in routes/submissions.ts) — the request layer already
+// attaches a bearer token automatically whenever a session exists.
+export const submissionsApi = {
+  // Mints a one-time signed upload URL for one song's audio (same "browser
+  // uploads straight to Supabase, never through our server" pattern as
+  // adminApi.uploadTrack/putAudioFile) — call once per track, PUT the file
+  // to signedUrl, then pass publicUrl along in submit()'s tracks array.
+  requestAudioUploadUrl: (fileExt?: string) =>
+    request<{ signedUrl: string; publicUrl: string }>("/submissions/upload-audio-url", {
+      method: "POST",
+      body: JSON.stringify({ fileExt }),
+    }),
+  putAudioFile: async (signedUrl: string, file: File) => {
+    const res = await fetch(signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!res.ok) throw new ApiError(res.status, `Audio upload failed with status ${res.status}`);
+  },
+  uploadImage: (file: File) => {
+    const body = new FormData();
+    body.append("image", file);
+    return postForm<{ url: string }>("/submissions/upload-image", body);
+  },
+  submit: (input: {
+    type: SubmissionType;
+    artistName: string;
+    artistPhotoUrl?: string;
+    albumTitle?: string;
+    albumCoverUrl?: string;
+    confirmRights: true;
+    tracks: { title: string; audioUrl: string; artworkUrl?: string }[];
+  }) => request<{ submission: ApiSubmission }>("/submissions", { method: "POST", body: JSON.stringify(input) }),
+  mine: () => request<{ submissions: ApiSubmission[] }>("/submissions/mine"),
+};
+
+export const adminSubmissionsApi = {
+  list: (status?: SubmissionStatus) =>
+    request<{ submissions: ApiSubmission[] }>(`/admin/submissions${status ? `?status=${status}` : ""}`),
+  approve: (id: string) => request<{ submission: ApiSubmission }>(`/admin/submissions/${id}/approve`, { method: "POST" }),
+  reject: (id: string, reviewNote?: string) =>
+    request<{ submission: ApiSubmission }>(`/admin/submissions/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reviewNote }),
+    }),
+  remove: (id: string) => request<void>(`/admin/submissions/${id}`, { method: "DELETE" }),
+};
+
 export function sermonToTrack(sermon: ApiSermon): ApiTrack {
   return {
     id: sermon.id,

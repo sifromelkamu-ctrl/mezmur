@@ -77,6 +77,7 @@ model Profile {
   telegramImportBatches TelegramImportBatch[]
   pushSubscriptions     PushSubscription[]
   contactMessages       ContactMessage[]
+  songSubmissions       SongSubmission[]
 
   @@map("profiles")
 }
@@ -137,6 +138,69 @@ model ContactMessage {
 
   @@index([userId])
   @@map("contact_messages")
+}
+
+enum SongSubmissionType {
+  single
+  album
+}
+
+enum SongSubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+// Settings > Upload Your Songs. A regular (non-admin) user submits a single
+// or an album — with its own artist/album art and one or more tracks — for
+// admin review. Nothing here touches the real catalog (Artist/Album/Track)
+// until an admin approves it (see routes/admin.ts's
+// /submissions/:id/approve), so a submission sitting at "pending" or
+// "rejected" is never visible anywhere a listener would see it.
+model SongSubmission {
+  id         String             @id @default(cuid())
+  userId     String             @db.Uuid
+  profile    Profile            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       SongSubmissionType
+  artistName String
+  // Album-only (see routes/submissions.ts's zod schema — a single never sets
+  // these). On approval, findOrCreateArtist only actually uses this when it
+  // ends up creating a brand-new artist; an existing catalog artist matched
+  // by name keeps whatever photo it already has.
+  artistPhotoUrl String?
+  albumTitle     String?
+  albumCoverUrl  String?
+  status         SongSubmissionStatus @default(pending)
+  reviewNote     String?
+  reviewedAt     DateTime?
+  // Set once approved, so the admin inbox can link straight to what got
+  // created instead of the reviewer having to go search for it by name.
+  createdArtistId String?
+  createdAlbumId  String?
+  createdAt       DateTime             @default(now())
+  tracks          SongSubmissionTrack[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("song_submissions")
+}
+
+model SongSubmissionTrack {
+  id           String         @id @default(cuid())
+  submissionId String
+  submission   SongSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  title        String
+  position     Int
+  audioUrl     String
+  // Single-only — an approved album track's artwork always mirrors its
+  // album's cover ("Album Artwork Is Master Artwork", same rule the rest of
+  // the catalog follows), so only a submitted single ever sets this.
+  artworkUrl     String?
+  createdTrackId String?
+  createdAt      DateTime @default(now())
+
+  @@index([submissionId])
+  @@map("song_submission_tracks")
 }
 
 model Artist {

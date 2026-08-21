@@ -29,15 +29,16 @@ export default function Topbar() {
   // matching pixel-for-pixel across platforms, same reasoning as Library/
   // Bible/Home above.
   const isHeroDetailPage = /^\/(artist|album|my-artist|playlist|podcast|sermon)\//.test(location.pathname);
-  // Every /settings and /admin/* page (including client-state-driven
-  // Settings subsections, which never change the URL away from "/settings")
-  // already renders its own back button + title (see Settings.tsx's
-  // SectionHeader, and every AdminXxx.tsx page's own BackButton/ChevronLeft
-  // header) — this bar staying sticky above that redundant header meant the
-  // page's own back button and title scrolled up and disappeared behind
-  // this one instead, same underlying bug as the hero-detail pages above,
-  // just with a plain (non-photo) header instead of a hero image.
-  const isAdminOrSettingsPage = /^\/(settings|admin)(\/|$)/.test(location.pathname);
+  // Every /settings, /admin/*, and /upload-songs page (including client-
+  // state-driven Settings subsections, which never change the URL away from
+  // "/settings") already renders its own back button + title (see
+  // Settings.tsx's SectionHeader, and every AdminXxx.tsx/UploadSongs.tsx
+  // page's own BackButton/ChevronLeft header) — this bar staying sticky
+  // above that redundant header meant the page's own back button and title
+  // scrolled up and disappeared behind this one instead, same underlying
+  // bug as the hero-detail pages above, just with a plain (non-photo)
+  // header instead of a hero image.
+  const isAdminOrSettingsPage = /^\/(settings|admin|upload-songs)(\/|$)/.test(location.pathname);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { avatarColorId } = useTheme();

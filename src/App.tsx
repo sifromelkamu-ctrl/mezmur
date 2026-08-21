@@ -31,6 +31,7 @@ const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
 const AdminUpload = lazy(routeLoaders.adminUpload);
 const AdminUserAccess = lazy(routeLoaders.adminUserAccess);
 const AdminContactMessages = lazy(routeLoaders.adminContactMessages);
+const AdminSubmissions = lazy(routeLoaders.adminSubmissions);
 const AllConcerts = lazy(routeLoaders.allConcerts);
 const AllPodcasts = lazy(routeLoaders.allPodcasts);
 const AllSermons = lazy(routeLoaders.allSermons);
@@ -50,6 +51,7 @@ const Search = lazy(routeLoaders.search);
 const SermonDetail = lazy(routeLoaders.sermonDetail);
 const Settings = lazy(routeLoaders.settings);
 const TelegramImport = lazy(routeLoaders.telegramImport);
+const UploadSongs = lazy(routeLoaders.uploadSongs);
 const YoutubeCatalogImport = lazy(routeLoaders.youtubeCatalogImport);
 const YoutubeImport = lazy(routeLoaders.youtubeImport);
 
@@ -79,11 +81,13 @@ function AppShell() {
         <Route path="/admin/upload" element={<AdminUpload />} />
         <Route path="/admin/user-access" element={<AdminUserAccess />} />
         <Route path="/admin/contact-messages" element={<AdminContactMessages />} />
+        <Route path="/admin/submissions" element={<AdminSubmissions />} />
         <Route path="/admin/library" element={<AdminLibraryManagement />} />
         <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
         <Route path="/admin/youtube-import" element={<YoutubeImport />} />
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
         <Route path="/admin/telegram-import" element={<TelegramImport />} />
+        <Route path="/upload-songs" element={<UploadSongs />} />
         <Route path="/playlist/:id" element={<PlaylistDetail />} />
         <Route path="/album/:id" element={<AlbumDetail />} />
         {/* Its own dedicated page (not AlbumDetail) — a Concert is still an

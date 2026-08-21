@@ -19,6 +19,7 @@ import { runArtistSpotifySync } from "../spotifySync/sync.js";
 import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../spotifySync/types.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { normalizeForMatch } from "../artwork/matching.js";
+import { findOrCreateArtist, findOrCreateAlbum } from "../catalogImport/shared.js";
 
 const router = Router();
 
@@ -473,6 +474,121 @@ router.patch("/contact-messages/:id", async (req: AuthedRequest, res) => {
 
 router.delete("/contact-messages/:id", async (req: AuthedRequest, res) => {
   await prisma.contactMessage.delete({ where: { id: String(req.params.id) } }).catch(() => null);
+  res.status(204).end();
+});
+
+// --- Song submissions (Settings > Upload Your Songs, see
+// routes/submissions.ts for the public submit endpoint) ---
+
+// GET /api/admin/submissions - newest first, optional ?status= filter.
+router.get("/submissions", async (req: AuthedRequest, res) => {
+  const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const submissions = await prisma.songSubmission.findMany({
+    where: status ? { status: status as never } : undefined,
+    orderBy: { createdAt: "desc" },
+    include: { tracks: { orderBy: { position: "asc" } }, profile: { select: { email: true, name: true } } },
+  });
+  res.json({ submissions });
+});
+
+// POST /api/admin/submissions/:id/approve - creates the real catalog rows
+// (Artist/Album/Track) from a pending submission's already-uploaded files
+// and metadata, then marks it approved. The only path in this file that
+// turns a submission into something a listener can actually see — reuses
+// the same findOrCreateArtist/findOrCreateAlbum matching every catalog-
+// import pipeline goes through, so a submitted artist/album name that
+// matches an existing one is added to it rather than spawning a duplicate.
+router.post("/submissions/:id/approve", async (req: AuthedRequest, res) => {
+  const submission = await prisma.songSubmission.findUnique({
+    where: { id: String(req.params.id) },
+    include: { tracks: { orderBy: { position: "asc" } } },
+  });
+  if (!submission) {
+    res.status(404).json({ error: "Submission not found" });
+    return;
+  }
+  if (submission.status !== "pending") {
+    res.status(400).json({ error: `This submission was already ${submission.status}` });
+    return;
+  }
+
+  const artist = await findOrCreateArtist(
+    submission.artistName,
+    submission.artistPhotoUrl ? async () => submission.artistPhotoUrl! : null
+  );
+
+  let albumId: string | undefined;
+  if (submission.type === "album") {
+    const album = await findOrCreateAlbum(artist.id, submission.albumTitle!);
+    // findOrCreateAlbum never assigns artwork itself (catalog imports don't
+    // have any to give it) — this submission does, so backfill it here, but
+    // only if the matched/created album doesn't already have one, same
+    // never-overwrite-existing-art caution the rest of the app follows.
+    if (!album.coverUrl && submission.albumCoverUrl) {
+      await prisma.album.update({ where: { id: album.id }, data: { coverUrl: submission.albumCoverUrl } });
+    }
+    albumId = album.id;
+  }
+
+  for (const track of submission.tracks) {
+    const created = await prisma.track.create({
+      data: {
+        title: track.title,
+        artistId: artist.id,
+        albumId,
+        trackNumber: albumId ? track.position + 1 : undefined,
+        audioUrl: track.audioUrl,
+        // Album Artwork Is Master Artwork: an album track never gets its own
+        // coverUrl, same rule every other import pipeline follows.
+        coverUrl: albumId ? undefined : (track.artworkUrl ?? undefined),
+        isSingle: submission.type === "single",
+      },
+    });
+    await prisma.songSubmissionTrack.update({ where: { id: track.id }, data: { createdTrackId: created.id } });
+  }
+
+  const updated = await prisma.songSubmission.update({
+    where: { id: submission.id },
+    data: { status: "approved", reviewedAt: new Date(), createdArtistId: artist.id, createdAlbumId: albumId ?? null },
+    include: { tracks: { orderBy: { position: "asc" } } },
+  });
+
+  await logAudit(req.userId!, "approve_song_submission", { submissionId: submission.id, artistId: artist.id, albumId });
+
+  res.json({ submission: updated });
+});
+
+const rejectSubmissionSchema = z.object({ reviewNote: z.string().trim().max(500).optional() });
+
+// POST /api/admin/submissions/:id/reject
+router.post("/submissions/:id/reject", async (req: AuthedRequest, res) => {
+  const parsed = rejectSubmissionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const submission = await prisma.songSubmission.findUnique({ where: { id: String(req.params.id) } });
+  if (!submission) {
+    res.status(404).json({ error: "Submission not found" });
+    return;
+  }
+  if (submission.status !== "pending") {
+    res.status(400).json({ error: `This submission was already ${submission.status}` });
+    return;
+  }
+  const updated = await prisma.songSubmission.update({
+    where: { id: submission.id },
+    data: { status: "rejected", reviewedAt: new Date(), reviewNote: parsed.data.reviewNote ?? null },
+    include: { tracks: { orderBy: { position: "asc" } } },
+  });
+  res.json({ submission: updated });
+});
+
+// DELETE /api/admin/submissions/:id - history cleanup only, same as contact
+// messages' delete: never touches whatever catalog content an approval may
+// have already created (Track/Album/Artist rows have no FK back to this).
+router.delete("/submissions/:id", async (req: AuthedRequest, res) => {
+  await prisma.songSubmission.delete({ where: { id: String(req.params.id) } }).catch(() => null);
   res.status(204).end();
 });
 

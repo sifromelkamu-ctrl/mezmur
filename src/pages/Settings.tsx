@@ -18,6 +18,7 @@ import {
   Send,
   Sparkles,
   Sun,
+  UploadCloud,
   UserCircle2,
   Clapperboard,
   X as XIcon,
@@ -860,6 +861,7 @@ export default function Settings() {
           />
           <SettingsRow icon={<Info size={20} />} label="About" onClick={() => setSection("about")} />
           <SettingsRow icon={<MessageCircle size={20} />} label="Contact Us" onClick={() => setSection("contact")} />
+          <SettingsRow icon={<UploadCloud size={20} />} label="Upload Your Songs" onClick={() => navigate("/upload-songs")} />
           {user && <LogOutRow onClick={() => setConfirmingLogout(true)} />}
         </div>
 
@@ -900,6 +902,11 @@ export default function Settings() {
               icon={<MessageCircle size={20} />}
               label="Contact Messages"
               onClick={() => navigate("/admin/contact-messages")}
+            />
+            <SettingsRow
+              icon={<UploadCloud size={20} />}
+              label="Review Song Submissions"
+              onClick={() => navigate("/admin/submissions")}
             />
           </div>
         )}
