@@ -3,6 +3,43 @@ import { spawn } from "node:child_process";
 const PEAK_COUNT = 200;
 const SAMPLE_RATE = 8000;
 
+// Reads the real duration straight off the downloaded audio file via
+// ffprobe, rather than trusting whatever a source's own metadata reports.
+// Added because Telegram's DocumentAttributeAudio.duration (see
+// telegram/enumerate.ts) turned out to be unreliable in practice — some
+// channels' uploads reported a duration of a few seconds for genuinely
+// 3-5 minute songs (a preview/waveform-sample length, not the track's own),
+// which silently truncated every affected track's progress bar in the
+// player. yt-dlp's own duration (youtube/pipeline.ts) doesn't have this
+// problem — it's computed by YouTube itself from the real file, not
+// self-reported by whoever uploaded it — so this is Telegram-only for now,
+// not applied there.
+export async function getAudioDurationSeconds(filePath: string): Promise<number | null> {
+  try {
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = spawn("ffprobe", [
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filePath,
+      ]);
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (chunk: Buffer) => (out += chunk.toString()));
+      child.stderr.on("data", (chunk: Buffer) => (err += chunk.toString()));
+      child.on("error", reject);
+      child.on("close", (code) => (code === 0 ? resolve(out) : reject(new Error(err || `ffprobe exited with code ${code}`))));
+    });
+    const seconds = Math.round(parseFloat(stdout.trim()));
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+
 // Decodes the audio file to raw mono PCM via ffmpeg and reduces it to a
 // fixed-length array of normalized peak amplitudes (0..1), suitable for
 // drawing a waveform in the UI without shipping the whole file client-side.

@@ -9,7 +9,7 @@ import { similarity } from "../artwork/matching.js";
 import { getTelegramClient } from "./client.js";
 import { downloadTelegramAudio } from "./download.js";
 import { buildTelegramSourceId } from "./enumerate.js";
-import { generateWaveform } from "../youtube/waveform.js";
+import { generateWaveform, getAudioDurationSeconds } from "../youtube/waveform.js";
 import { CancelledImportError } from "../youtube/safeError.js";
 import { createSignedAudioUploadUrl, DuplicateImportError, findOrCreateAlbum, IDENTITY_MIN } from "../catalogImport/shared.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
@@ -113,6 +113,11 @@ export async function importTelegramAudio({
 
     onProgress?.("processing", 70, "Generating waveform…");
     const waveform = await generateWaveform(audioPath);
+    // Telegram's own reported duration (see ImportTelegramItemParams above)
+    // has been observed wildly wrong for some channels (a few seconds for a
+    // genuinely 3-5 minute song) — measuring the actual downloaded file is
+    // the only way to be sure the player's progress bar isn't lying.
+    const realDuration = await getAudioDurationSeconds(audioPath);
 
     if (signal?.aborted) throw new CancelledImportError();
 
@@ -151,7 +156,7 @@ export async function importTelegramAudio({
     const track = await prisma.track.create({
       data: {
         title,
-        duration: duration ?? 0,
+        duration: realDuration ?? duration ?? 0,
         artistId: artist.id,
         albumId: album?.id,
         // No album assigned -> the same "Single" convention YouTube catalog
