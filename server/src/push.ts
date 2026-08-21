@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { prisma } from "./prisma.js";
 import morningVerses from "./data/morningVerses.json" with { type: "json" };
 
 export interface MorningVerseRef {
@@ -92,4 +93,46 @@ export async function sendPush(
     console.error("Push send failed:", err);
     return "error";
   }
+}
+
+export interface PushPayload {
+  title: string;
+  body: string;
+  url: string;
+}
+
+// Shared plumbing for notifyAdminsPush/notifyUserPush below — sends one push
+// to every subscription across a set of users, pruning any the push service
+// reports gone (uninstalled/revoked), same as jobs/pickedForYou.ts. Silently
+// does nothing without VAPID configured or if none of the target users have
+// a subscription — every call site here is a best-effort in-app nudge, not
+// something the action it's attached to (a message/submission being saved)
+// can depend on succeeding.
+async function pushToUsers(userIds: string[], payload: PushPayload): Promise<void> {
+  if (!pushConfigured || userIds.length === 0) return;
+  const subscriptions = await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } });
+  if (subscriptions.length === 0) return;
+
+  const staleEndpoints: string[] = [];
+  for (const sub of subscriptions) {
+    const result = await sendPush(sub, payload);
+    if (result === "gone") staleEndpoints.push(sub.endpoint);
+  }
+  if (staleEndpoints.length > 0) {
+    await prisma.pushSubscription.deleteMany({ where: { endpoint: { in: staleEndpoints } } });
+  }
+}
+
+// Pushes every admin/owner account (role: "admin") — never a single fixed
+// id, so adding another admin automatically includes them with no code
+// change. An admin who's never enabled push on any device just gets
+// nothing here; they still see it in the in-app inbox/queue either way.
+export async function notifyAdminsPush(payload: PushPayload): Promise<void> {
+  const admins = await prisma.profile.findMany({ where: { role: "admin" }, select: { id: true } });
+  await pushToUsers(admins.map((a) => a.id), payload);
+}
+
+// Pushes one specific user across every device they've enabled push on.
+export async function notifyUserPush(userId: string, payload: PushPayload): Promise<void> {
+  await pushToUsers([userId], payload);
 }

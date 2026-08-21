@@ -5,7 +5,7 @@ import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { supabaseAdmin } from "../supabase.js";
 import { upload, uploadImageToStorage } from "../upload.js";
-import { notifyAdmins, sendSubmissionThankYou } from "../email.js";
+import { notifyAdminsPush, notifyUserPush } from "../push.js";
 
 const router = Router();
 
@@ -115,32 +115,23 @@ router.post("/", async (req: AuthedRequest, res) => {
         })),
       },
     },
-    include: { tracks: { orderBy: { position: "asc" } }, profile: { select: { email: true } } },
+    include: { tracks: { orderBy: { position: "asc" } } },
   });
 
   const submittedTitle = type === "album" ? albumTitle! : tracks[0].title;
 
-  // Fire-and-forget — both swallow their own failures (see email.ts), so
+  // Fire-and-forget — both swallow their own failures (see push.ts), so
   // neither can delay or fail the response the submitter is waiting on.
-  void notifyAdmins(`New ${type} submission: ${submittedTitle} — ${artistName}`, [
-    `From: ${submission.profile.email ?? submission.userId}`,
-    `Artist: ${artistName}`,
-    type === "album" && `Album: ${albumTitle}`,
-    `Songs: ${tracks.length}`,
-    submitterNote && `Note from submitter: ${submitterNote}`,
-    "",
-    "Review it in the app: Settings > Review Song Submissions",
-  ]);
-  if (submission.profile.email) {
-    void sendSubmissionThankYou(submission.profile.email, [
-      `Thanks for submitting "${submittedTitle}" by ${artistName} to Mezmur!`,
-      "",
-      "Our team will review it soon, and once it's approved it'll be posted for everyone to enjoy.",
-      "",
-      "You can check its status anytime in the app: Settings > Upload Your Songs.",
-    ]);
-  }
-
+  void notifyAdminsPush({
+    title: "New song submission",
+    body: `${artistName} — ${submittedTitle}${submitterNote ? ` · "${submitterNote}"` : ""}`,
+    url: "/#/admin/submissions",
+  });
+  void notifyUserPush(req.userId!, {
+    title: "Submission received",
+    body: `Thanks for submitting "${submittedTitle}"! We'll review it soon and post it once approved.`,
+    url: "/#/upload-songs",
+  });
   res.status(201).json({ submission });
 });
 

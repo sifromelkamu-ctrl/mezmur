@@ -79,15 +79,3 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      # Optional. Admin/owner email notifications for Contact Us messages
-      # and song submissions (see src/email.ts) — a free Resend account
-      # (https://resend.com) gives you this key with zero domain setup: the
-      # default sender (onboarding@resend.dev, no EMAIL_FROM override
-      # needed) can email any address on the free tier. Leave unset and
-      # these notifications are just silently skipped — Contact Us and
-      # Upload Your Songs still work exactly the same, the admin just has to
-      # check the in-app inbox/queue instead of getting pinged by email.
-      - key: RESEND_API_KEY
-        sync: false
-      - key: EMAIL_FROM
-        sync: false
