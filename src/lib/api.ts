@@ -1010,6 +1010,7 @@ export interface ApiSubmission {
   artistPhotoUrl: string | null;
   albumTitle: string | null;
   albumCoverUrl: string | null;
+  submitterNote: string | null;
   status: SubmissionStatus;
   reviewNote: string | null;
   reviewedAt: string | null;
@@ -1052,6 +1053,7 @@ export const submissionsApi = {
     artistPhotoUrl?: string;
     albumTitle?: string;
     albumCoverUrl?: string;
+    submitterNote?: string;
     confirmRights: true;
     tracks: { title: string; audioUrl: string; artworkUrl?: string }[];
   }) => request<{ submission: ApiSubmission }>("/submissions", { method: "POST", body: JSON.stringify(input) }),

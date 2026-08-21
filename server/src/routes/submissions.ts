@@ -5,7 +5,7 @@ import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { supabaseAdmin } from "../supabase.js";
 import { upload, uploadImageToStorage } from "../upload.js";
-import { notifyAdmins } from "../email.js";
+import { notifyAdmins, sendSubmissionThankYou } from "../email.js";
 
 const router = Router();
 
@@ -74,6 +74,7 @@ const submitSchema = z
     artistPhotoUrl: z.string().url().optional(),
     albumTitle: z.string().trim().min(1).max(200).optional(),
     albumCoverUrl: z.string().url().optional(),
+    submitterNote: z.string().trim().max(1000).optional(),
     confirmRights: z.literal(true, "You must confirm you have the rights to upload this music"),
     tracks: z.array(trackSchema).min(1).max(50),
   })
@@ -94,7 +95,7 @@ router.post("/", async (req: AuthedRequest, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const { type, artistName, artistPhotoUrl, albumTitle, albumCoverUrl, tracks } = parsed.data;
+  const { type, artistName, artistPhotoUrl, albumTitle, albumCoverUrl, submitterNote, tracks } = parsed.data;
 
   const submission = await prisma.songSubmission.create({
     data: {
@@ -104,6 +105,7 @@ router.post("/", async (req: AuthedRequest, res) => {
       artistPhotoUrl: type === "album" ? artistPhotoUrl : undefined,
       albumTitle: type === "album" ? albumTitle : undefined,
       albumCoverUrl: type === "album" ? albumCoverUrl : undefined,
+      submitterNote: submitterNote || undefined,
       tracks: {
         create: tracks.map((t, i) => ({
           title: t.title,
@@ -116,19 +118,28 @@ router.post("/", async (req: AuthedRequest, res) => {
     include: { tracks: { orderBy: { position: "asc" } }, profile: { select: { email: true } } },
   });
 
-  // Fire-and-forget — notifyAdmins swallows its own failures, so this never
-  // delays or fails the response the submitter is waiting on.
-  void notifyAdmins(
-    `New ${type} submission: ${type === "album" ? albumTitle : tracks[0].title} — ${artistName}`,
-    [
-      `From: ${submission.profile.email ?? submission.userId}`,
-      `Artist: ${artistName}`,
-      type === "album" && `Album: ${albumTitle}`,
-      `Songs: ${tracks.length}`,
+  const submittedTitle = type === "album" ? albumTitle! : tracks[0].title;
+
+  // Fire-and-forget — both swallow their own failures (see email.ts), so
+  // neither can delay or fail the response the submitter is waiting on.
+  void notifyAdmins(`New ${type} submission: ${submittedTitle} — ${artistName}`, [
+    `From: ${submission.profile.email ?? submission.userId}`,
+    `Artist: ${artistName}`,
+    type === "album" && `Album: ${albumTitle}`,
+    `Songs: ${tracks.length}`,
+    submitterNote && `Note from submitter: ${submitterNote}`,
+    "",
+    "Review it in the app: Settings > Review Song Submissions",
+  ]);
+  if (submission.profile.email) {
+    void sendSubmissionThankYou(submission.profile.email, [
+      `Thanks for submitting "${submittedTitle}" by ${artistName} to Mezmur!`,
       "",
-      "Review it in the app: Settings > Review Song Submissions",
-    ]
-  );
+      "Our team will review it soon, and once it's approved it'll be posted for everyone to enjoy.",
+      "",
+      "You can check its status anytime in the app: Settings > Upload Your Songs.",
+    ]);
+  }
 
   res.status(201).json({ submission });
 });

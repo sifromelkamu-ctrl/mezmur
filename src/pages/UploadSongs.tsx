@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { ApiError, submissionsApi, type ApiSubmission, type SubmissionType } from "../lib/api";
@@ -129,6 +130,7 @@ export default function UploadSongs() {
   const [albumTitle, setAlbumTitle] = useState("");
   const [albumCover, setAlbumCover] = useState<File | null>(null);
   const [tracks, setTracks] = useState<TrackDraft[]>([emptyTrack()]);
+  const [submitterNote, setSubmitterNote] = useState("");
   const [confirmRights, setConfirmRights] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -193,6 +195,7 @@ export default function UploadSongs() {
     setAlbumTitle("");
     setAlbumCover(null);
     setTracks([emptyTrack()]);
+    setSubmitterNote("");
     setConfirmRights(false);
   };
 
@@ -237,6 +240,7 @@ export default function UploadSongs() {
         artistPhotoUrl,
         albumTitle: type === "album" ? albumTitle.trim() : undefined,
         albumCoverUrl,
+        submitterNote: submitterNote.trim() || undefined,
         confirmRights: true,
         tracks: uploadedTracks,
       });
@@ -457,6 +461,15 @@ export default function UploadSongs() {
             <Plus size={16} /> Add another song
           </button>
         )}
+
+        <TextAreaField
+          placeholder="Anything you'd like the admin to know? (optional)"
+          value={submitterNote}
+          onChange={(e) => setSubmitterNote(e.target.value)}
+          variant="panel"
+          rows={3}
+          className="px-4 py-2.5 text-base w-full resize-none"
+        />
 
         <label className="flex items-start gap-3 text-sm text-fg-muted mt-1">
           <input

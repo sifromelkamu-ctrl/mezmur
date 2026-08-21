@@ -14,32 +14,51 @@ const EMAIL_FROM = process.env.EMAIL_FROM?.trim() || "Mezmur <onboarding@resend.
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 if (!resend) {
-  console.log("[email] RESEND_API_KEY not set — admin email notifications are disabled.");
+  console.log("[email] RESEND_API_KEY not set — email notifications are disabled.");
 }
 
-// Emails every admin/owner account (role: "admin") — never a single fixed
-// address, so adding another admin automatically includes them without a
-// code or env var change. Best-effort only: swallows every failure (missing
-// API key, Resend outage, an admin with no email on file, ...) rather than
-// throwing, since none of this should ever be able to fail the actual
-// action (a message/submission being saved) it's notifying about.
-export async function notifyAdmins(subject: string, bodyLines: (string | null | undefined | false)[]): Promise<void> {
+type BodyLines = (string | null | undefined | false)[];
+
+// Best-effort only: swallows every failure (missing API key, Resend outage,
+// an unverified sending domain rejecting an arbitrary recipient, ...) rather
+// than throwing, since no email here should ever be able to fail the actual
+// action (a message/submission being saved) it's attached to.
+async function sendMail(to: string | string[], subject: string, bodyLines: BodyLines): Promise<void> {
   if (!resend) return;
   try {
-    const admins = await prisma.profile.findMany({
-      where: { role: "admin", email: { not: null } },
-      select: { email: true },
-    });
-    const recipients = admins.map((a) => a.email).filter((e): e is string => Boolean(e));
-    if (recipients.length === 0) return;
-
     await resend.emails.send({
       from: EMAIL_FROM,
-      to: recipients,
+      to,
       subject,
       text: bodyLines.filter((l): l is string => typeof l === "string").join("\n"),
     });
   } catch (err) {
-    console.error("[email] failed to send admin notification:", err);
+    console.error(`[email] failed to send "${subject}" to ${Array.isArray(to) ? to.join(", ") : to}:`, err);
   }
+}
+
+// Emails every admin/owner account (role: "admin") — never a single fixed
+// address, so adding another admin automatically includes them without a
+// code or env var change.
+export async function notifyAdmins(subject: string, bodyLines: BodyLines): Promise<void> {
+  const admins = await prisma.profile.findMany({
+    where: { role: "admin", email: { not: null } },
+    select: { email: true },
+  });
+  const recipients = admins.map((a) => a.email).filter((e): e is string => Boolean(e));
+  if (recipients.length === 0) return;
+  await sendMail(recipients, subject, bodyLines);
+}
+
+// Confirmation email to whoever just submitted a song — separate from
+// notifyAdmins above since this goes to an arbitrary user's address rather
+// than a fixed admin account. NOTE: Resend's zero-setup default sender
+// (onboarding@resend.dev, see EMAIL_FROM above) can only actually deliver
+// to the Resend account's own verified email while no sending domain is
+// verified — this call will silently no-op (via sendMail's own catch) for
+// any other recipient until a real domain is verified with Resend. Admin
+// notifications are unaffected either way, since those go to the admin's
+// own address.
+export async function sendSubmissionThankYou(to: string, bodyLines: BodyLines): Promise<void> {
+  await sendMail(to, "Thanks for your submission — Mezmur", bodyLines);
 }

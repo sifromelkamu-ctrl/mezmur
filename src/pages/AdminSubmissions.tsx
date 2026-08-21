@@ -154,6 +154,9 @@ export default function AdminSubmissions() {
                     {s.type} · {s.tracks.length} song{s.tracks.length === 1 ? "" : "s"} · {s.status}
                     {s.reviewNote ? ` — ${s.reviewNote}` : ""}
                   </p>
+                  {s.submitterNote && (
+                    <p className="text-xs text-fg-muted mt-1 italic normal-case">"{s.submitterNote}"</p>
+                  )}
                 </div>
               </div>
 

@@ -170,6 +170,11 @@ model SongSubmission {
   artistPhotoUrl String?
   albumTitle     String?
   albumCoverUrl  String?
+  // Optional free-text note from the submitter to the admin (e.g. "this is
+  // a re-upload with fixed audio", "please credit as 'ft.'") — shown in the
+  // admin review queue, distinct from reviewNote below which flows the
+  // other direction (admin back to submitter).
+  submitterNote  String?
   status         SongSubmissionStatus @default(pending)
   reviewNote     String?
   reviewedAt     DateTime?
