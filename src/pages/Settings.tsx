@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Disc3,
   Droplet,
+  FolderOpen,
   GalleryHorizontal,
   Globe2,
   Info,
@@ -37,7 +38,7 @@ import { useSubscription } from "../context/useSubscription";
 import { LANGUAGES } from "../i18n/translations";
 import { ApiError, contactApi, subscriptionApi, type ApiSubscriptionState } from "../lib/api";
 
-type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about" | "contact";
+type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about" | "contact" | "importSongs";
 
 function SettingsRow({
   icon,
@@ -810,6 +811,30 @@ export default function Settings() {
     );
   } else if (section === "contact") {
     content = <ContactSection onBack={() => setSection(null)} />;
+  } else if (section === "importSongs") {
+    content = (
+      <div className="px-6 py-6 max-w-2xl">
+        <SectionHeader title="Import Songs" onBack={() => setSection(null)} />
+        <div className="bg-elevated rounded-lg divide-y divide-border overflow-hidden">
+          <SettingsRow icon={<Disc3 size={20} />} label="Bulk upload tracks" onClick={() => navigate("/admin/upload")} />
+          <SettingsRow
+            icon={<Clapperboard size={20} />}
+            label="Import from YouTube"
+            onClick={() => navigate("/admin/youtube-import")}
+          />
+          <SettingsRow
+            icon={<Disc3 size={20} />}
+            label="Import artist catalog"
+            onClick={() => navigate("/admin/youtube-catalog-import")}
+          />
+          <SettingsRow
+            icon={<Send size={20} />}
+            label="Import from Telegram"
+            onClick={() => navigate("/admin/telegram-import")}
+          />
+        </div>
+      </div>
+    );
   } else {
     content = (
       <div className="px-6 py-6 max-w-2xl">
@@ -867,22 +892,7 @@ export default function Settings() {
 
         {user?.role === "admin" && (
           <div className="bg-elevated rounded-lg divide-y divide-border overflow-hidden mt-6">
-            <SettingsRow icon={<Disc3 size={20} />} label="Bulk upload tracks" onClick={() => navigate("/admin/upload")} />
-            <SettingsRow
-              icon={<Clapperboard size={20} />}
-              label="Import from YouTube"
-              onClick={() => navigate("/admin/youtube-import")}
-            />
-            <SettingsRow
-              icon={<Disc3 size={20} />}
-              label="Import artist catalog"
-              onClick={() => navigate("/admin/youtube-catalog-import")}
-            />
-            <SettingsRow
-              icon={<Send size={20} />}
-              label="Import from Telegram"
-              onClick={() => navigate("/admin/telegram-import")}
-            />
+            <SettingsRow icon={<FolderOpen size={20} />} label="Import Songs" onClick={() => setSection("importSongs")} />
             <SettingsRow
               icon={<Library size={20} />}
               label="Library Management"
