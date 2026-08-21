@@ -29,6 +29,15 @@ export default function Topbar() {
   // matching pixel-for-pixel across platforms, same reasoning as Library/
   // Bible/Home above.
   const isHeroDetailPage = /^\/(artist|album|my-artist|playlist|podcast|sermon)\//.test(location.pathname);
+  // Every /settings and /admin/* page (including client-state-driven
+  // Settings subsections, which never change the URL away from "/settings")
+  // already renders its own back button + title (see Settings.tsx's
+  // SectionHeader, and every AdminXxx.tsx page's own BackButton/ChevronLeft
+  // header) — this bar staying sticky above that redundant header meant the
+  // page's own back button and title scrolled up and disappeared behind
+  // this one instead, same underlying bug as the hero-detail pages above,
+  // just with a plain (non-photo) header instead of a hero image.
+  const isAdminOrSettingsPage = /^\/(settings|admin)(\/|$)/.test(location.pathname);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { avatarColorId } = useTheme();
@@ -40,7 +49,7 @@ export default function Topbar() {
   // hidden, which looked empty at the top of the page but became a stray
   // translucent bar once scrolled, since `sticky` keeps painting that
   // background even with no content inside it.
-  if (isLibrary || isBible || isHome || isHeroDetailPage) return null;
+  if (isLibrary || isBible || isHome || isHeroDetailPage || isAdminOrSettingsPage) return null;
 
   return (
     <header
@@ -53,9 +62,17 @@ export default function Topbar() {
       // the bottom nav, rather than plain/transparent everywhere but
       // Settings.
       className="sticky top-0 z-10 bg-base/75 backdrop-blur-xl border-b border-fg/8"
+      // main's own paddingTop (env(safe-area-inset-top), see App.tsx) is
+      // just padding, not a clip boundary — scrolled-past rows pass right
+      // through it and stay visible there since this header's sticky box
+      // only starts at the bottom edge of that padding. Pulling the header
+      // up by the same inset (and re-padding its own content down by it)
+      // extends its frosted background to cover that strip too, so nothing
+      // scrolls through above it anymore.
+      style={{ marginTop: "calc(-1 * env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="flex items-center justify-between px-4 py-3 gap-3">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex items-center justify-between px-4 py-1 gap-2 overflow-x-auto overscroll-x-contain no-scrollbar flex-nowrap">
+        <div className="flex items-center gap-3 shrink-0">
           {!isSearchPage && !isHome && (
             <button
               onClick={() => navigate("/")}
@@ -63,15 +80,14 @@ export default function Topbar() {
               aria-label={t("home")}
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
                 style={{ backgroundColor: avatarColor.background }}
               >
-                <span className="font-bold text-xs" style={{ color: avatarColor.text }}>
+                <span className="font-bold text-[10px]" style={{ color: avatarColor.text }}>
                   M
                 </span>
               </div>
-              {/* text-lg (1.125rem) + 9% = 1.226rem */}
-              <span className="font-abyssinica font-bold text-[1.226rem] tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent">
+              <span className="font-abyssinica font-bold text-base tracking-tight bg-gradient-to-r from-gold to-gold-dark bg-clip-text text-transparent">
                 መዝሙር
               </span>
             </button>
@@ -84,17 +100,17 @@ export default function Topbar() {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => navigate("/settings")}
-              className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${
                 location.pathname === "/settings" ? "text-brand bg-hover" : "text-fg-muted hover:text-fg hover:bg-hover"
               }`}
               aria-label={t("settings")}
             >
-              <Settings size={20} />
+              <Settings size={16} />
             </button>
             {!user && (
               <button
                 onClick={() => navigate("/auth")}
-                className="bg-white text-black text-sm font-bold rounded-full px-5 py-2 hover:scale-105 transition-transform"
+                className="bg-white text-black text-xs font-bold rounded-full px-4 py-1.5 hover:scale-105 transition-transform"
               >
                 {t("logIn")}
               </button>
@@ -106,8 +122,8 @@ export default function Topbar() {
           settings/login buttons left too little space and clipped the
           placeholder text. */}
       {isSearchPage && (
-        <div className="relative px-4 pb-3">
-          <Search size={18} className="absolute left-7 top-1/2 -translate-y-1/2 text-fg-subtle" />
+        <div className="relative px-4 pb-2">
+          <Search size={16} className="absolute left-7 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <TextField
             type="text"
             value={searchParams.get("q") ?? ""}
