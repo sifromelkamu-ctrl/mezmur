@@ -11,6 +11,9 @@ import { StringSession } from "teleproto/sessions/index.js";
 // the running server forever after, exactly like YTDLP_COOKIES_B64 is for
 // yt-dlp — no interactive login happens inside the Express process itself.
 let clientPromise: Promise<TelegramClient> | undefined;
+// Guards reconnect attempts the same way clientPromise guards the initial
+// connect — see the .connected check below for why this needs its own lock.
+let reconnectPromise: Promise<boolean> | undefined;
 
 export class TelegramNotConfiguredError extends Error {
   constructor() {
@@ -26,21 +29,6 @@ export async function getTelegramClient(): Promise<TelegramClient> {
   const apiHash = process.env.TELEGRAM_API_HASH?.trim();
   const session = process.env.TELEGRAM_SESSION?.trim();
   if (!apiId || !apiHash || !session) {
-    // TEMP DIAGNOSTIC (2026-08-21): env vars are confirmed present via a
-    // Render one-off job, yet this branch is still firing intermittently
-    // under concurrent import load — logging PID/uptime/raw lengths to find
-    // out whether this is actually a different process than expected.
-    console.error("[telegram-diag] NotConfigured branch hit", {
-      pid: process.pid,
-      uptimeSec: process.uptime(),
-      rawApiId: process.env.TELEGRAM_API_ID,
-      rawApiIdLen: process.env.TELEGRAM_API_ID?.length,
-      rawHashLen: process.env.TELEGRAM_API_HASH?.length,
-      rawSessionLen: process.env.TELEGRAM_SESSION?.length,
-      computedApiId: apiId,
-      hasApiHash: Boolean(apiHash),
-      hasSession: Boolean(session),
-    });
     throw new TelegramNotConfiguredError();
   }
 
@@ -71,7 +59,24 @@ export async function getTelegramClient(): Promise<TelegramClient> {
   // connect) means a dropped connection self-heals on the very next import
   // attempt instead of silently failing until someone notices and restarts.
   if (!client.connected) {
-    await client.connect();
+    // MUST be serialized: with CONCURRENCY items processing in parallel
+    // (see telegram/worker.ts), several of them can all notice the same
+    // dropped connection within the same tick and each independently call
+    // client.connect() on this one client object at once. That opened
+    // multiple overlapping sockets under a single session — from a single
+    // process, no second server involved — which is exactly what Telegram's
+    // own "concurrent usage from multiple connections" security check
+    // detects, and it responds by permanently invalidating the session
+    // (confirmed: this happened twice, requiring a full fresh login each
+    // time). Only the first caller to notice actually reconnects; every
+    // other concurrent caller awaits that same in-flight attempt instead of
+    // starting its own.
+    if (!reconnectPromise) {
+      reconnectPromise = client.connect().finally(() => {
+        reconnectPromise = undefined;
+      });
+    }
+    await reconnectPromise;
   }
   return client;
 }
