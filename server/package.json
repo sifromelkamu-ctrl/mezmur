@@ -26,6 +26,7 @@
     "express-rate-limit": "^8.5.2",
     "multer": "^2.2.0",
     "pg": "^8.22.0",
+    "resend": "^6.21.0",
     "stripe": "^22.5.0",
     "teleproto": "^1.228.4",
     "web-push": "^3.6.7",

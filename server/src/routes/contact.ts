@@ -3,6 +3,7 @@ import { z } from "zod";
 import { optionalAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { upload, uploadImageToStorage } from "../upload.js";
+import { notifyAdmins } from "../email.js";
 
 const router = Router();
 
@@ -41,6 +42,15 @@ router.post("/", upload.single("attachment"), optionalAuth, async (req: AuthedRe
   await prisma.contactMessage.create({
     data: { userId: req.userId ?? null, name: name || null, email, subject, message, attachmentUrl },
   });
+
+  // Fire-and-forget — notifyAdmins swallows its own failures, so this never
+  // delays or fails the response the sender is waiting on.
+  void notifyAdmins(`New Contact Us message: ${subject}`, [
+    `From: ${name || "(no name)"} <${email}>`,
+    attachmentUrl && `Attachment: ${attachmentUrl}`,
+    "",
+    message,
+  ]);
 
   res.status(201).json({ ok: true });
 });

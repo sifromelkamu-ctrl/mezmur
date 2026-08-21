@@ -5,6 +5,7 @@ import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { supabaseAdmin } from "../supabase.js";
 import { upload, uploadImageToStorage } from "../upload.js";
+import { notifyAdmins } from "../email.js";
 
 const router = Router();
 
@@ -112,8 +113,22 @@ router.post("/", async (req: AuthedRequest, res) => {
         })),
       },
     },
-    include: { tracks: { orderBy: { position: "asc" } } },
+    include: { tracks: { orderBy: { position: "asc" } }, profile: { select: { email: true } } },
   });
+
+  // Fire-and-forget — notifyAdmins swallows its own failures, so this never
+  // delays or fails the response the submitter is waiting on.
+  void notifyAdmins(
+    `New ${type} submission: ${type === "album" ? albumTitle : tracks[0].title} — ${artistName}`,
+    [
+      `From: ${submission.profile.email ?? submission.userId}`,
+      `Artist: ${artistName}`,
+      type === "album" && `Album: ${albumTitle}`,
+      `Songs: ${tracks.length}`,
+      "",
+      "Review it in the app: Settings > Review Song Submissions",
+    ]
+  );
 
   res.status(201).json({ submission });
 });
