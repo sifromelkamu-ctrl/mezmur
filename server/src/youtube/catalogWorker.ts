@@ -23,9 +23,11 @@ import type { YoutubeImportItemStatus } from "../generated/prisma/enums.js";
 // yt-dlp+ffmpeg processes OOM-killed the whole server outright — this
 // machine's Render plan is a 512Mi instance, nowhere near enough headroom
 // for that many simultaneous downloads/transcodes plus Node/Prisma/the
-// PO-token sidecar. Back to 2, the last known-stable value. Don't raise
-// this again without also raising the instance's memory.
-const CONCURRENCY = 2;
+// PO-token sidecar. Dropped to 2 (the last known-stable value), then raised
+// to 4 same-day at the user's explicit request/acceptance of the OOM risk on
+// this same 512Mi plan (no memory upgrade paired with this change) — if the
+// server OOMs again, drop this back to 2 first before touching anything else.
+const CONCURRENCY = 4;
 const queue: string[] = [];
 let activeWorkers = 0;
 
