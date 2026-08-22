@@ -135,6 +135,14 @@ model ContactMessage {
   attachmentUrl String?
   status    ContactMessageStatus @default(new)
   createdAt DateTime             @default(now())
+  // In-app admin reply (Settings > Contact Us > admin inbox). Only ever
+  // deliverable in-app when userId is set — a guest sender (no account) has
+  // no session to push to or "Your messages" list to show it in, so the
+  // admin UI falls back to the existing mailto: link for those. One reply
+  // per message, not a full thread — matches SongSubmission.reviewNote's
+  // same one-shot-note shape rather than building a two-way conversation.
+  adminReply String?
+  repliedAt  DateTime?
 
   @@index([userId])
   @@map("contact_messages")

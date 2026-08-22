@@ -1,4 +1,4 @@
-import { ChevronLeft, Loader2, Mail, Trash2 } from "lucide-react";
+import { ChevronLeft, Loader2, Mail, Reply, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
@@ -25,6 +25,8 @@ export default function AdminContactMessages() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ApiContactMessage | null>(null);
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -40,6 +42,29 @@ export default function AdminContactMessages() {
       const nextStatus = msg.status === "new" ? "read" : "new";
       const { message } = await adminContactApi.setStatus(msg.id, nextStatus);
       setMessages((prev) => prev.map((m) => (m.id === message.id ? message : m)));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const startReply = (msg: ApiContactMessage) => {
+    setReplyingId(msg.id);
+    setReplyText(msg.adminReply ?? "");
+  };
+
+  const cancelReply = () => {
+    setReplyingId(null);
+    setReplyText("");
+  };
+
+  const sendReply = async (msg: ApiContactMessage) => {
+    const reply = replyText.trim();
+    if (!reply) return;
+    setBusyId(msg.id);
+    try {
+      const { message } = await adminContactApi.reply(msg.id, reply);
+      setMessages((prev) => prev.map((m) => (m.id === message.id ? message : m)));
+      cancelReply();
     } finally {
       setBusyId(null);
     }
@@ -130,21 +155,67 @@ export default function AdminContactMessages() {
                   <img src={msg.attachmentUrl} alt="Attachment" className="w-full h-full object-cover" />
                 </a>
               )}
-              <div className="flex items-center justify-end gap-3 mt-3 pt-3 border-t border-border">
-                <a
-                  href={`mailto:${msg.email}?subject=${encodeURIComponent(`Re: ${msg.subject}`)}`}
-                  className="text-xs font-semibold text-brand hover:underline"
-                >
-                  Reply by email
-                </a>
-                <button
-                  onClick={() => setConfirmDelete(msg)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors"
-                  aria-label={`Delete message from ${msg.email}`}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+
+              {msg.adminReply && replyingId !== msg.id && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs font-semibold text-fg-muted mb-1">Your reply</p>
+                  <p className="text-sm text-fg whitespace-pre-wrap">{msg.adminReply}</p>
+                </div>
+              )}
+
+              {replyingId === msg.id ? (
+                <div className="mt-3 pt-3 border-t border-border flex flex-col gap-2">
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Write a reply — they'll get a push notification with it"
+                    rows={3}
+                    className="w-full bg-panel rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-border"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={cancelReply}
+                      className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-elevated-hover hover:bg-hover-strong transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => sendReply(msg)}
+                      disabled={!replyText.trim() || busyId === msg.id}
+                      className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand text-black disabled:opacity-50"
+                    >
+                      Send reply
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-end gap-3 mt-3 pt-3 border-t border-border">
+                  {msg.userId ? (
+                    <button
+                      onClick={() => startReply(msg)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                    >
+                      <Reply size={13} />
+                      {msg.adminReply ? "Edit reply" : "Reply in-app"}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-fg-subtle italic">No account — email only</span>
+                  )}
+                  <a
+                    href={`mailto:${msg.email}?subject=${encodeURIComponent(`Re: ${msg.subject}`)}`}
+                    className="text-xs font-semibold text-brand hover:underline"
+                  >
+                    Reply by email
+                  </a>
+                  <button
+                    onClick={() => setConfirmDelete(msg)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-fg-muted hover:text-accent-red hover:bg-elevated-hover transition-colors"
+                    aria-label={`Delete message from ${msg.email}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

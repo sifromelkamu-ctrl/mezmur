@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { optionalAuth, type AuthedRequest } from "../middleware/auth.js";
+import { optionalAuth, requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { upload, uploadImageToStorage } from "../upload.js";
 import { notifyAdminsPush } from "../push.js";
@@ -53,6 +53,18 @@ router.post("/", upload.single("attachment"), optionalAuth, async (req: AuthedRe
   });
 
   res.status(201).json({ ok: true });
+});
+
+// GET /api/contact/mine — lets a logged-in user see their own messages and
+// any admin reply. requireAuth (unlike the public submit route above): a
+// guest sender has no account to scope this list to, so there's nothing to
+// look up for them — the admin inbox falls back to emailing those directly.
+router.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
+  const messages = await prisma.contactMessage.findMany({
+    where: { userId: req.userId! },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ messages });
 });
 
 export default router;

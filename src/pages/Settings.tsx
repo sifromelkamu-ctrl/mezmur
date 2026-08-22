@@ -9,6 +9,7 @@ import {
   Globe2,
   Info,
   Library,
+  Loader2,
   LogOut,
   MessageCircle,
   Mic2,
@@ -36,7 +37,7 @@ import { useLyricsSetting } from "../context/LyricsContext";
 import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, CUSTOM_THEME_ID, useTheme } from "../context/ThemeContext";
 import { useSubscription } from "../context/useSubscription";
 import { LANGUAGES } from "../i18n/translations";
-import { ApiError, contactApi, subscriptionApi, type ApiSubscriptionState } from "../lib/api";
+import { ApiError, contactApi, subscriptionApi, type ApiContactMessage, type ApiSubscriptionState } from "../lib/api";
 
 type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about" | "contact" | "importSongs";
 
@@ -295,6 +296,25 @@ function ContactSection({ onBack }: { onBack: () => void }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [mine, setMine] = useState<ApiContactMessage[]>([]);
+  const [loadingMine, setLoadingMine] = useState(true);
+
+  const loadMine = () => {
+    if (!user) {
+      setLoadingMine(false);
+      return;
+    }
+    contactApi
+      .mine()
+      .then((r) => setMine(r.messages))
+      .finally(() => setLoadingMine(false));
+  };
+
+  useEffect(() => {
+    loadMine();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const canSubmit = email.trim() && subject.trim() && message.trim() && !submitting;
 
   const handleAttachmentPick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,6 +346,7 @@ function ContactSection({ onBack }: { onBack: () => void }) {
       setSubject("");
       setMessage("");
       setAttachment(null);
+      loadMine();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not send your message. Please try again.");
     } finally {
@@ -419,6 +440,38 @@ function ContactSection({ onBack }: { onBack: () => void }) {
             {submitting ? "Sending…" : "Send message"}
           </button>
         </form>
+      )}
+
+      {user && (
+        <div className="mt-8">
+          <h2 className="text-sm font-bold text-fg-muted uppercase tracking-wide mb-3">Your messages</h2>
+          {loadingMine ? (
+            <div className="flex items-center justify-center py-8 text-fg-muted">
+              <Loader2 size={20} className="animate-spin" />
+            </div>
+          ) : mine.length === 0 ? (
+            <p className="text-sm text-fg-muted">Nothing sent yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {mine.map((m) => (
+                <div key={m.id} className="bg-elevated rounded-lg p-3.5">
+                  <p className="text-sm font-semibold truncate">{m.subject}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">
+                    {new Date(m.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </p>
+                  {m.adminReply ? (
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <p className="text-xs font-semibold text-brand mb-1">Reply</p>
+                      <p className="text-sm text-fg whitespace-pre-wrap">{m.adminReply}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-fg-subtle mt-1.5">Awaiting a reply</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -20,6 +20,7 @@ import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../
 import { Prisma } from "../generated/prisma/client.js";
 import { normalizeForMatch } from "../artwork/matching.js";
 import { findOrCreateArtist, findOrCreateAlbum } from "../catalogImport/shared.js";
+import { notifyUserPush } from "../push.js";
 
 const router = Router();
 
@@ -475,6 +476,38 @@ router.patch("/contact-messages/:id", async (req: AuthedRequest, res) => {
 router.delete("/contact-messages/:id", async (req: AuthedRequest, res) => {
   await prisma.contactMessage.delete({ where: { id: String(req.params.id) } }).catch(() => null);
   res.status(204).end();
+});
+
+// PATCH /api/admin/contact-messages/:id/reply - in-app reply, only ever
+// actually deliverable when the message has a userId (a guest sender has no
+// session to push to or "Your messages" list to show it in — the admin UI
+// falls back to the existing mailto: link for those). Still saves the reply
+// text either way, mainly so the admin has a record of what was said.
+const replyContactMessageSchema = z.object({ reply: z.string().trim().min(1).max(5000) });
+router.patch("/contact-messages/:id/reply", async (req: AuthedRequest, res) => {
+  const parsed = replyContactMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const message = await prisma.contactMessage.update({
+    where: { id: String(req.params.id) },
+    data: { adminReply: parsed.data.reply, repliedAt: new Date(), status: "read" },
+  }).catch(() => null);
+  if (!message) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+
+  if (message.userId) {
+    void notifyUserPush(message.userId, {
+      title: "Reply to your message",
+      body: parsed.data.reply.slice(0, 140),
+      url: "/#/settings",
+    });
+  }
+
+  res.json({ message });
 });
 
 // --- Song submissions (Settings > Upload Your Songs, see

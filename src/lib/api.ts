@@ -404,6 +404,8 @@ export const contactApi = {
     if (input.attachment) body.append("attachment", input.attachment);
     return postForm<{ ok: true }>("/contact", body);
   },
+  // Requires login — a guest sender has no account to scope this to.
+  mine: () => request<{ messages: ApiContactMessage[] }>("/contact/mine"),
 };
 
 export interface ApiBibleAudio {
@@ -978,6 +980,8 @@ export interface ApiContactMessage {
   attachmentUrl: string | null;
   status: "new" | "read";
   createdAt: string;
+  adminReply: string | null;
+  repliedAt: string | null;
 }
 
 export const adminContactApi = {
@@ -986,6 +990,13 @@ export const adminContactApi = {
     request<{ message: ApiContactMessage }>(`/admin/contact-messages/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+  // In-app reply — only actually delivered (pushed) to the sender when the
+  // message has a userId; still saved either way as a record either way.
+  reply: (id: string, reply: string) =>
+    request<{ message: ApiContactMessage }>(`/admin/contact-messages/${id}/reply`, {
+      method: "PATCH",
+      body: JSON.stringify({ reply }),
     }),
   remove: (id: string) => request<void>(`/admin/contact-messages/${id}`, { method: "DELETE" }),
 };
