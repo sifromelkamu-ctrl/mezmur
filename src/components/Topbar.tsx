@@ -38,7 +38,7 @@ export default function Topbar() {
   // scrolled up and disappeared behind this one instead, same underlying
   // bug as the hero-detail pages above, just with a plain (non-photo)
   // header instead of a hero image.
-  const isAdminOrSettingsPage = /^\/(settings|admin|upload-songs)(\/|$)/.test(location.pathname);
+  const isAdminOrSettingsPage = /^\/(settings|admin|upload-songs|contact)(\/|$)/.test(location.pathname);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { avatarColorId } = useTheme();

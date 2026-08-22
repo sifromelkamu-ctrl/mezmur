@@ -402,10 +402,14 @@ export const contactApi = {
     body.append("subject", input.subject);
     body.append("message", input.message);
     if (input.attachment) body.append("attachment", input.attachment);
-    return postForm<{ ok: true }>("/contact", body);
+    return postForm<{ id: string }>("/contact", body);
   },
   // Requires login — a guest sender has no account to scope this to.
   mine: () => request<{ messages: ApiContactMessage[] }>("/contact/mine"),
+  // Continuing an existing conversation — also requires login (only the
+  // thread's own owner can post to it; see routes/contact.ts).
+  reply: (id: string, body: string) =>
+    request<{ message: ApiContactMessage }>(`/contact/${id}/reply`, { method: "POST", body: JSON.stringify({ body }) }),
 };
 
 export interface ApiBibleAudio {
@@ -970,6 +974,14 @@ export const adminFeaturedBannersApi = {
     request<void>("/admin/featured-banners/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
 };
 
+export interface ApiContactMessageReply {
+  id: string;
+  messageId: string;
+  sender: "user" | "admin";
+  body: string;
+  createdAt: string;
+}
+
 export interface ApiContactMessage {
   id: string;
   userId: string | null;
@@ -980,8 +992,7 @@ export interface ApiContactMessage {
   attachmentUrl: string | null;
   status: "new" | "read";
   createdAt: string;
-  adminReply: string | null;
-  repliedAt: string | null;
+  replies: ApiContactMessageReply[];
 }
 
 export const adminContactApi = {
@@ -991,11 +1002,12 @@ export const adminContactApi = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
-  // In-app reply — only actually delivered (pushed) to the sender when the
-  // message has a userId; still saved either way as a record either way.
+  // In-app reply, appended to the conversation — only actually delivered
+  // (pushed) to the sender when the thread has a userId; still saved either
+  // way as a record.
   reply: (id: string, reply: string) =>
     request<{ message: ApiContactMessage }>(`/admin/contact-messages/${id}/reply`, {
-      method: "PATCH",
+      method: "POST",
       body: JSON.stringify({ reply }),
     }),
   remove: (id: string) => request<void>(`/admin/contact-messages/${id}`, { method: "DELETE" }),

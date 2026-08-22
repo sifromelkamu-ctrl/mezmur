@@ -19,6 +19,7 @@ export const routeLoaders = {
   allSongs: () => import("../pages/AllSongs"),
   artistDetail: () => import("../pages/ArtistDetail"),
   concertDetail: () => import("../pages/ConcertDetail"),
+  contactUs: () => import("../pages/ContactUs"),
   artists: () => import("../pages/Artists"),
   auth: () => import("../pages/Auth"),
   bible: () => import("../pages/Bible"),

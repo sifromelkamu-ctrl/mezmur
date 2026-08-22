@@ -121,6 +121,10 @@ enum ContactMessageStatus {
 // user with a question before signing up can still reach out; onDelete:
 // SetNull keeps the message on record (orphaned, not deleted) if the
 // account it came from is ever removed.
+// The thread/conversation itself — subject line, original sender info, and
+// whatever the very first message said. Every message after the first
+// (either side) lives in ContactMessageReply instead; see that model for
+// why the first message isn't stored there too.
 model ContactMessage {
   id        String               @id @default(cuid())
   userId    String?              @db.Uuid
@@ -132,20 +136,40 @@ model ContactMessage {
   // Optional screenshot/file, uploaded to the "contact-attachments"
   // Supabase Storage bucket the same way artist/album art already is (see
   // uploadImageToStorage) — this column just holds the resulting public URL.
+  // Reply-level attachments aren't supported (yet) — keeping the composer
+  // for an ongoing conversation to plain text is a deliberate scope call,
+  // not an oversight.
   attachmentUrl String?
   status    ContactMessageStatus @default(new)
   createdAt DateTime             @default(now())
-  // In-app admin reply (Settings > Contact Us > admin inbox). Only ever
-  // deliverable in-app when userId is set — a guest sender (no account) has
-  // no session to push to or "Your messages" list to show it in, so the
-  // admin UI falls back to the existing mailto: link for those. One reply
-  // per message, not a full thread — matches SongSubmission.reviewNote's
-  // same one-shot-note shape rather than building a two-way conversation.
-  adminReply String?
-  repliedAt  DateTime?
+  replies   ContactMessageReply[]
 
   @@index([userId])
   @@map("contact_messages")
+}
+
+enum ContactMessageSender {
+  user
+  admin
+}
+
+// One row per message after a thread's first (see ContactMessage.message
+// for that one) — this is what turns Contact Us from "one message, one
+// reply" into a real back-and-forth conversation, either side can keep
+// adding to. Kept as a child table rather than folding the first message
+// in here too, so ContactMessage stays a single, editable-free-and-clear
+// row for the thread's own metadata (subject/status/sender identity), with
+// no ambiguity about which reply — if any — was "the real first message."
+model ContactMessageReply {
+  id        String               @id @default(cuid())
+  messageId String
+  message   ContactMessage       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  sender    ContactMessageSender
+  body      String
+  createdAt DateTime             @default(now())
+
+  @@index([messageId])
+  @@map("contact_message_replies")
 }
 
 enum SongSubmissionType {

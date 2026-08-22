@@ -39,6 +39,7 @@ const AllSingles = lazy(routeLoaders.allSingles);
 const AllSongs = lazy(routeLoaders.allSongs);
 const ArtistDetail = lazy(routeLoaders.artistDetail);
 const ConcertDetail = lazy(routeLoaders.concertDetail);
+const ContactUs = lazy(routeLoaders.contactUs);
 const Artists = lazy(routeLoaders.artists);
 const Auth = lazy(routeLoaders.auth);
 const Bible = lazy(routeLoaders.bible);
@@ -88,6 +89,7 @@ function AppShell() {
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />
         <Route path="/admin/telegram-import" element={<TelegramImport />} />
         <Route path="/upload-songs" element={<UploadSongs />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="/playlist/:id" element={<PlaylistDetail />} />
         <Route path="/album/:id" element={<AlbumDetail />} />
         {/* Its own dedicated page (not AlbumDetail) — a Concert is still an

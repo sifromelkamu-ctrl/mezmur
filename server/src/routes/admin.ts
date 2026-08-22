@@ -450,7 +450,10 @@ router.post("/users/:id/free-access", async (req: AuthedRequest, res) => {
 // GET /api/admin/contact-messages - newest first, no pagination (a "write
 // us" inbox, not expected to reach a volume where that matters).
 router.get("/contact-messages", async (_req: AuthedRequest, res) => {
-  const messages = await prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" } });
+  const messages = await prisma.contactMessage.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { replies: { orderBy: { createdAt: "asc" } } },
+  });
   res.json({ messages });
 });
 
@@ -478,35 +481,43 @@ router.delete("/contact-messages/:id", async (req: AuthedRequest, res) => {
   res.status(204).end();
 });
 
-// PATCH /api/admin/contact-messages/:id/reply - in-app reply, only ever
-// actually deliverable when the message has a userId (a guest sender has no
-// session to push to or "Your messages" list to show it in — the admin UI
-// falls back to the existing mailto: link for those). Still saves the reply
-// text either way, mainly so the admin has a record of what was said.
+// POST /api/admin/contact-messages/:id/reply - in-app reply, appended to the
+// conversation same as a follow-up from the sender (see routes/contact.ts's
+// identically-shaped :id/reply). Only ever actually deliverable in-app when
+// the thread has a userId (a guest sender has no session to push to or
+// "Your messages" list to show it in — the admin UI falls back to the
+// existing mailto: link for those); the reply is still saved either way, as
+// a record of what was said.
 const replyContactMessageSchema = z.object({ reply: z.string().trim().min(1).max(5000) });
-router.patch("/contact-messages/:id/reply", async (req: AuthedRequest, res) => {
+router.post("/contact-messages/:id/reply", async (req: AuthedRequest, res) => {
   const parsed = replyContactMessageSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  const message = await prisma.contactMessage.update({
-    where: { id: String(req.params.id) },
-    data: { adminReply: parsed.data.reply, repliedAt: new Date(), status: "read" },
-  }).catch(() => null);
-  if (!message) {
-    res.status(404).json({ error: "Message not found" });
+  const existing = await prisma.contactMessage.findUnique({ where: { id: String(req.params.id) } });
+  if (!existing) {
+    res.status(404).json({ error: "Conversation not found" });
     return;
   }
 
-  if (message.userId) {
-    void notifyUserPush(message.userId, {
+  await prisma.contactMessage.update({
+    where: { id: existing.id },
+    data: { status: "read", replies: { create: { sender: "admin", body: parsed.data.reply } } },
+  });
+
+  if (existing.userId) {
+    void notifyUserPush(existing.userId, {
       title: "Reply to your message",
       body: parsed.data.reply.slice(0, 140),
       url: "/#/settings",
     });
   }
 
+  const message = await prisma.contactMessage.findUniqueOrThrow({
+    where: { id: existing.id },
+    include: { replies: { orderBy: { createdAt: "asc" } } },
+  });
   res.json({ message });
 });
 

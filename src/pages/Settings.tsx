@@ -9,13 +9,11 @@ import {
   Globe2,
   Info,
   Library,
-  Loader2,
   LogOut,
   MessageCircle,
   Mic2,
   Moon,
   Palette,
-  Paperclip,
   Pencil,
   Send,
   Sparkles,
@@ -29,7 +27,6 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { useAuth } from "../context/useAuth";
 import { useLanguage } from "../context/LanguageContext";
@@ -37,9 +34,9 @@ import { useLyricsSetting } from "../context/LyricsContext";
 import { ACCENT_THEMES, AVATAR_COLOR_OPTIONS, CUSTOM_THEME_ID, useTheme } from "../context/ThemeContext";
 import { useSubscription } from "../context/useSubscription";
 import { LANGUAGES } from "../i18n/translations";
-import { ApiError, contactApi, subscriptionApi, type ApiContactMessage, type ApiSubscriptionState } from "../lib/api";
+import { ApiError, subscriptionApi, type ApiSubscriptionState } from "../lib/api";
 
-type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about" | "contact" | "importSongs";
+type Section = "account" | "subscription" | "appearance" | "language" | "lyrics" | "about" | "importSongs";
 
 function SettingsRow({
   icon,
@@ -276,200 +273,6 @@ function SubscriptionSection({ onBack }: { onBack: () => void }) {
             >
               {busy ? "Opening billing…" : "Manage subscription"}
             </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-
-function ContactSection({ onBack }: { onBack: () => void }) {
-  const { user } = useAuth();
-  const [name, setName] = useState(user?.name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [mine, setMine] = useState<ApiContactMessage[]>([]);
-  const [loadingMine, setLoadingMine] = useState(true);
-
-  const loadMine = () => {
-    if (!user) {
-      setLoadingMine(false);
-      return;
-    }
-    contactApi
-      .mine()
-      .then((r) => setMine(r.messages))
-      .finally(() => setLoadingMine(false));
-  };
-
-  useEffect(() => {
-    loadMine();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  const canSubmit = email.trim() && subject.trim() && message.trim() && !submitting;
-
-  const handleAttachmentPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // lets picking the exact same file again re-trigger onChange
-    if (!file) return;
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      setError("That image is too large — please pick one under 5MB.");
-      return;
-    }
-    setError(null);
-    setAttachment(file);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await contactApi.submit({
-        name: name.trim() || undefined,
-        email: email.trim(),
-        subject: subject.trim(),
-        message: message.trim(),
-        attachment: attachment ?? undefined,
-      });
-      setSent(true);
-      setSubject("");
-      setMessage("");
-      setAttachment(null);
-      loadMine();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not send your message. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="px-6 py-6 max-w-2xl">
-      <SectionHeader title="Contact Us" onBack={onBack} />
-      {sent ? (
-        <div className="bg-elevated rounded-lg p-4 flex flex-col items-center text-center gap-2 py-8">
-          <span className="w-12 h-12 rounded-full bg-brand/15 flex items-center justify-center text-brand mb-1">
-            <Check size={22} />
-          </span>
-          <p className="font-semibold">Message sent</p>
-          <p className="text-sm text-fg-muted max-w-[32ch]">
-            Thanks for reaching out — we'll get back to you at {email.trim()}.
-          </p>
-          <button
-            onClick={() => setSent(false)}
-            className="mt-3 text-sm font-semibold text-brand hover:underline"
-          >
-            Send another message
-          </button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <p className="text-sm text-fg-muted -mt-2 mb-1">Have a question or found a problem? Write us below.</p>
-          <TextField
-            type="text"
-            placeholder="Your name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            variant="panel"
-            className="px-4 py-2.5 text-base w-full"
-          />
-          <TextField
-            type="email"
-            required
-            placeholder="Your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            variant="panel"
-            className="px-4 py-2.5 text-base w-full"
-          />
-          <TextField
-            type="text"
-            required
-            placeholder="Subject"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            variant="panel"
-            className="px-4 py-2.5 text-base w-full"
-          />
-          <TextAreaField
-            required
-            placeholder="Your message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            variant="panel"
-            rows={6}
-            className="px-4 py-2.5 text-base w-full resize-none"
-          />
-          {attachment ? (
-            <div className="flex items-center gap-3 bg-panel rounded-md px-4 py-2.5">
-              <Paperclip size={16} className="text-fg-muted shrink-0" />
-              <span className="flex-1 text-sm truncate">{attachment.name}</span>
-              <button
-                type="button"
-                onClick={() => setAttachment(null)}
-                aria-label="Remove attachment"
-                className="text-fg-muted hover:text-fg transition-colors shrink-0"
-              >
-                <XIcon size={16} />
-              </button>
-            </div>
-          ) : (
-            <label className="flex items-center gap-2 text-sm font-semibold text-brand hover:underline cursor-pointer w-fit">
-              <Paperclip size={16} />
-              Attach a screenshot
-              <input type="file" accept="image/*" onChange={handleAttachmentPick} className="hidden" />
-            </label>
-          )}
-          {error && <p className="text-sm text-accent-red">{error}</p>}
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="mt-1 bg-brand text-black font-bold rounded-full py-3.5 text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-50 disabled:hover:scale-100"
-          >
-            {submitting ? "Sending…" : "Send message"}
-          </button>
-        </form>
-      )}
-
-      {user && (
-        <div className="mt-8">
-          <h2 className="text-sm font-bold text-fg-muted uppercase tracking-wide mb-3">Your messages</h2>
-          {loadingMine ? (
-            <div className="flex items-center justify-center py-8 text-fg-muted">
-              <Loader2 size={20} className="animate-spin" />
-            </div>
-          ) : mine.length === 0 ? (
-            <p className="text-sm text-fg-muted">Nothing sent yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {mine.map((m) => (
-                <div key={m.id} className="bg-elevated rounded-lg p-3.5">
-                  <p className="text-sm font-semibold truncate">{m.subject}</p>
-                  <p className="text-xs text-fg-muted mt-0.5">
-                    {new Date(m.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </p>
-                  {m.adminReply ? (
-                    <div className="mt-2 pt-2 border-t border-border">
-                      <p className="text-xs font-semibold text-brand mb-1">Reply</p>
-                      <p className="text-sm text-fg whitespace-pre-wrap">{m.adminReply}</p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-fg-subtle mt-1.5">Awaiting a reply</p>
-                  )}
-                </div>
-              ))}
-            </div>
           )}
         </div>
       )}
@@ -862,8 +665,6 @@ export default function Settings() {
         </div>
       </div>
     );
-  } else if (section === "contact") {
-    content = <ContactSection onBack={() => setSection(null)} />;
   } else if (section === "importSongs") {
     content = (
       <div className="px-6 py-6 max-w-2xl">
@@ -938,7 +739,7 @@ export default function Settings() {
             onClick={() => setSection("lyrics")}
           />
           <SettingsRow icon={<Info size={20} />} label="About" onClick={() => setSection("about")} />
-          <SettingsRow icon={<MessageCircle size={20} />} label="Contact Us" onClick={() => setSection("contact")} />
+          <SettingsRow icon={<MessageCircle size={20} />} label="Contact Us" onClick={() => navigate("/contact")} />
           <SettingsRow icon={<UploadCloud size={20} />} label="Upload Your Songs" onClick={() => navigate("/upload-songs")} />
           {user && <LogOutRow onClick={() => setConfirmingLogout(true)} />}
         </div>
