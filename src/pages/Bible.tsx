@@ -1055,14 +1055,14 @@ export default function Bible() {
                 className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
                 style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
               >
-                <div className="flex items-center gap-2 p-2.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                <div className="flex items-center gap-2 py-3 px-2.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
                   {/* One continuous scrollable strip — highlight colors up
                       front, always visible, followed by every action, so the
-                      whole toolbar reads and scrolls as a single row. Sized
-                      70% taller than the original ship (28px swatches/15px
-                      icons) per explicit request — every dimension here
-                      scales together so the bar reads as proportionally
-                      bigger, not just padded. */}
+                      whole toolbar reads and scrolls as a single row. Taller
+                      than the original ship by 70% (vertical padding + the
+                      swatch/cancel-button diameters, which are height by
+                      construction) — icon and text size deliberately left at
+                      their original size, only the bar's height grows. */}
                   <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
                     {HIGHLIGHT_COLORS.map((c) => (
                       <button
@@ -1077,9 +1077,9 @@ export default function Bible() {
                     <div className="w-px h-8 bg-border shrink-0 mx-1.5" />
                     <button
                       onClick={handleToggleFavorite}
-                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      <Heart size={26} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
+                      <Heart size={15} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
                       Save
                     </button>
                     {selectedVerses.size === 1 &&
@@ -1093,40 +1093,40 @@ export default function Bible() {
                               setEditingNoteVerse(soleVerse);
                               setNoteDraft(annotations[soleKey]?.note ?? "");
                             }}
-                            className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                           >
-                            <StickyNote size={26} />
+                            <StickyNote size={15} />
                             {hasNote ? "Edit note" : "Note"}
                           </button>
                         );
                       })()}
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      {justCopied ? <Check size={26} className="text-gold" /> : <Copy size={26} />}
+                      {justCopied ? <Check size={15} className="text-gold" /> : <Copy size={15} />}
                       {justCopied ? "Copied" : "Copy"}
                     </button>
                     <button
                       onClick={handleShareSelected}
-                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      {justShared ? <Check size={26} className="text-gold" /> : <Share2 size={26} />}
+                      {justShared ? <Check size={15} className="text-gold" /> : <Share2 size={15} />}
                       {justShared ? "Shared" : "Share"}
                     </button>
                     <button
                       onClick={handleImageSelected}
                       disabled={generatingImage}
-                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
                     >
-                      {generatingImage ? <Loader2 size={26} className="animate-spin" /> : <ImageIcon size={26} />}
+                      {generatingImage ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
                       Image
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
-                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      <Columns2 size={26} />
+                      <Columns2 size={15} />
                       Compare
                     </button>
                   </div>
@@ -1135,7 +1135,7 @@ export default function Bible() {
                     aria-label="Cancel selection"
                     className="w-14 h-14 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
                   >
-                    <X size={27} />
+                    <X size={16} />
                   </button>
                 </div>
                 {showCompare && bookSlug && chapter && book && (
