@@ -38,7 +38,7 @@ const MIN_FLING_SPEED = 0.02; // px/ms
 const MAX_FLING_SPEED = 3.5; // px/ms, clamps spurious huge deltas
 
 function neutralFrame(): ArtworkFrame {
-  return { x: 0.5, y: 0.42, zoom: 1, rotation: 0, flipH: false, flipV: false };
+  return { x: 0.5, y: 0.36, zoom: 1, rotation: 0, flipH: false, flipV: false };
 }
 
 // Keeps the natural-image point currently under (px, py) — coordinates
@@ -143,6 +143,20 @@ export default function ArtworkEditor({ photoUrl, initialFrame, onSave, onClose,
     img.onload = () => {
       if (cancelled) return;
       setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = () => {
+      // A CORS-mode load can fail even when the plain <img> tag showing this
+      // artwork elsewhere loads fine (missing/misconfigured bucket CORS
+      // policy, a transient network blip, etc.) — retry once without
+      // crossOrigin so the editor's zoom floor still gets real dimensions
+      // instead of silently staying unenforced (see clampFrame above).
+      if (cancelled) return;
+      const plain = new Image();
+      plain.onload = () => {
+        if (cancelled) return;
+        setNatural({ w: plain.naturalWidth, h: plain.naturalHeight });
+      };
+      plain.src = photoUrl;
     };
     img.src = photoUrl;
 

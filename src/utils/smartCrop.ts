@@ -36,7 +36,7 @@ function analyze(img: HTMLImageElement): SmartFrame {
     x: clampFocal(0.5, visibleFractionX),
     // Nudged up slightly where there's slack — the one bias that holds for
     // most artwork: subjects/titles skew upper-frame more often than lower.
-    y: clampFocal(0.42, visibleFractionY),
+    y: clampFocal(0.36, visibleFractionY),
     zoom,
   });
 
@@ -83,9 +83,12 @@ function analyze(img: HTMLImageElement): SmartFrame {
   const rawY = sumY / sumWeight / sh;
   // Blend toward the upper-frame bias rather than fully trusting the raw
   // centroid — keeps the result stable for busy/textured backgrounds that
-  // don't actually have a single clear subject.
+  // don't actually have a single clear subject. Weighted harder toward the
+  // bias on the y-axis than x: logos/title text/mic stands routinely pull
+  // the raw energy centroid down toward the lower third, well past where a
+  // human curator would actually center the crop.
   const x = rawX * 0.8 + 0.5 * 0.2;
-  const y = rawY * 0.8 + 0.42 * 0.2;
+  const y = rawY * 0.65 + 0.36 * 0.35;
 
   return {
     x: clampFocal(x, visibleFractionX),

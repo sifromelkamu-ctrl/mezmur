@@ -17,7 +17,7 @@ export function useSmartFrame(photoUrl: string | undefined): ArtworkFrame | null
       if (cancelled) return;
       setFrame({
         x: result?.x ?? 0.5,
-        y: result?.y ?? 0.42,
+        y: result?.y ?? 0.36,
         zoom: result?.zoom ?? 1,
         rotation: 0,
         flipH: false,
