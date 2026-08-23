@@ -300,7 +300,6 @@ export default function CoverArt({
         <ArtworkEditor
           photoUrl={photoUrl}
           initialFrame={artworkFrame}
-          allowFreeform={allowFreeformCrop}
           onClose={() => setEditing(false)}
           onSave={async (frame) => {
             await adminApi.setArtworkFrame(entityType, entityId, frame);
