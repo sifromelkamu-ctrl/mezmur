@@ -35,6 +35,7 @@ import NotificationsPanel from "../components/home/NotificationsPanel";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
 import { MORNING_VERSES } from "../data/morningVerses";
+import { BOTTOM_RESERVE_PX } from "../lib/layout";
 import { isDailyVerseSubscribed, pushSupported, subscribeToDailyVerse, unsubscribeFromDailyVerse } from "../lib/pushNotifications";
 import {
   getAllAnnotations,
@@ -1036,28 +1037,49 @@ export default function Bible() {
             });
             const sortedSelection = [...selectedVerses].sort((a, b) => a - b);
             return (
-              <div className="sticky bottom-4 z-20">
-                <div className="flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+              // `fixed`, not `sticky`: this used to sit inside <main>'s own
+              // scroll box, and since <main> spans the full viewport height
+              // (the persistent PlayerBar/MobileNav band overlays it via its
+              // own `fixed` positioning rather than sharing layout space —
+              // see App.tsx), a sticky-bottom offset here resolved against
+              // the bottom of that full-height box, not the visible screen.
+              // It only ever "stuck" once scrolled nearly to the end of a
+              // chapter, and then landed hidden behind the nav band instead
+              // of above it — everywhere else it just sat in normal flow,
+              // wherever the selected verse happened to be. Anchoring to the
+              // real viewport bottom, offset by BOTTOM_RESERVE_PX (the same
+              // reserved height <main>'s own pb-48 and the virtualized list
+              // pages already use to clear that band), keeps it in the same
+              // place on screen regardless of scroll position or selection.
+              <div
+                className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
+                style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
+              >
+                <div className="flex items-center gap-2 p-2.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
                   {/* One continuous scrollable strip — highlight colors up
                       front, always visible, followed by every action, so the
-                      whole toolbar reads and scrolls as a single row. */}
-                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+                      whole toolbar reads and scrolls as a single row. Sized
+                      70% taller than the original ship (28px swatches/15px
+                      icons) per explicit request — every dimension here
+                      scales together so the bar reads as proportionally
+                      bigger, not just padded. */}
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
                     {HIGHLIGHT_COLORS.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => handleApplyHighlight(c.id)}
                         aria-label={`Highlight ${c.id}`}
-                        className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
+                        className={`w-12 h-12 shrink-0 rounded-full ${c.swatch} transition-transform ${
                           activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
                         }`}
                       />
                     ))}
-                    <div className="w-px h-5 bg-border shrink-0 mx-1" />
+                    <div className="w-px h-8 bg-border shrink-0 mx-1.5" />
                     <button
                       onClick={handleToggleFavorite}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      <Heart size={15} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
+                      <Heart size={26} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
                       Save
                     </button>
                     {selectedVerses.size === 1 &&
@@ -1071,49 +1093,49 @@ export default function Bible() {
                               setEditingNoteVerse(soleVerse);
                               setNoteDraft(annotations[soleKey]?.note ?? "");
                             }}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                            className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                           >
-                            <StickyNote size={15} />
+                            <StickyNote size={26} />
                             {hasNote ? "Edit note" : "Note"}
                           </button>
                         );
                       })()}
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      {justCopied ? <Check size={15} className="text-gold" /> : <Copy size={15} />}
+                      {justCopied ? <Check size={26} className="text-gold" /> : <Copy size={26} />}
                       {justCopied ? "Copied" : "Copy"}
                     </button>
                     <button
                       onClick={handleShareSelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      {justShared ? <Check size={15} className="text-gold" /> : <Share2 size={15} />}
+                      {justShared ? <Check size={26} className="text-gold" /> : <Share2 size={26} />}
                       {justShared ? "Shared" : "Share"}
                     </button>
                     <button
                       onClick={handleImageSelected}
                       disabled={generatingImage}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
+                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
                     >
-                      {generatingImage ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+                      {generatingImage ? <Loader2 size={26} className="animate-spin" /> : <ImageIcon size={26} />}
                       Image
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2.5 text-xl font-semibold text-fg-muted hover:text-fg px-5 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
-                      <Columns2 size={15} />
+                      <Columns2 size={26} />
                       Compare
                     </button>
                   </div>
                   <button
                     onClick={() => setSelectedVerses(new Set())}
                     aria-label="Cancel selection"
-                    className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
+                    className="w-14 h-14 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
                   >
-                    <X size={16} />
+                    <X size={27} />
                   </button>
                 </div>
                 {showCompare && bookSlug && chapter && book && (
