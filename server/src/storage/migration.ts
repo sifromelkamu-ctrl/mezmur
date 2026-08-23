@@ -166,17 +166,19 @@ export async function discoverPendingMedia(): Promise<{ discovered: number }> {
     });
   }
 
-  let discovered = 0;
-  for (const item of found) {
-    const result = await prisma.mediaMigrationJob.upsert({
-      where: { mediaKind_entityId: { mediaKind: item.mediaKind, entityId: item.entityId } },
-      update: {},
-      create: { ...item, status: "pending" },
-    });
-    if (result.createdAt.getTime() === result.updatedAt.getTime()) discovered++;
-  }
+  // createMany + skipDuplicates rather than a per-item upsert loop: one
+  // round-trip instead of N, and `count` is the DB's own authoritative
+  // count of rows actually inserted — no reliance on comparing
+  // createdAt/updatedAt timestamps to infer "was this genuinely new" (that
+  // comparison turned out unreliable: Prisma doesn't necessarily touch
+  // updatedAt on a no-op `update: {}`, so a second scan with nothing new to
+  // find was miscounting every already-tracked file as freshly discovered).
+  const result = await prisma.mediaMigrationJob.createMany({
+    data: found.map((item) => ({ ...item, status: "pending" as const })),
+    skipDuplicates: true,
+  });
 
-  return { discovered };
+  return { discovered: result.count };
 }
 
 async function updateEntityStorageKey(mediaKind: MediaKind, entityId: string, key: string, publicUrl: string): Promise<void> {
