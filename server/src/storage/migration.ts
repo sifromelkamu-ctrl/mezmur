@@ -1,6 +1,7 @@
+import { Readable } from "node:stream";
 import { prisma } from "../prisma.js";
-import { headObject, publicArtworkUrl, putArtworkObject, putAudioObject, r2Configured } from "./r2.js";
-import type { MediaKind } from "../generated/prisma/enums.js";
+import { headObject, publicArtworkUrl, r2Configured, streamToBucket } from "./r2.js";
+import type { MediaKind, MediaMigrationStatus } from "../generated/prisma/enums.js";
 
 // Supabase Storage -> Cloudflare R2, server-to-server. Runs entirely inside
 // this already-deployed Render process — never the admin's own machine as a
@@ -9,36 +10,65 @@ import type { MediaKind } from "../generated/prisma/enums.js";
 // table, not in memory, so "resume" is just "run another batch of pending
 // jobs" — a server restart, a deploy, or the admin's browser/Mac
 // disconnecting mid-run loses nothing, because nothing important was ever
-// held only in this process's memory to begin with.
+// held only in this process's memory to begin with. The file bytes
+// themselves are never fully materialized in this process's memory either
+// — see migrateOne below, which streams Supabase's response body directly
+// into R2 via streamToBucket rather than buffering.
 
 // Kept intentionally small and sequential by default — this Render instance
 // is 512MB total (see catalogWorker.ts's own concurrency comment for the
 // exact OOM incident that taught that lesson the hard way). A batch of N
-// jobs still only ever holds MIGRATION_CONCURRENCY files' bytes in memory
-// at once, never all of N.
+// jobs still only ever holds MIGRATION_CONCURRENCY files' bytes in flight
+// at once, never all of N — and even that per-file footprint is now a
+// streamed pipe, not a full in-memory buffer.
 const MIGRATION_CONCURRENCY = Math.max(1, Number(process.env.MEDIA_MIGRATION_CONCURRENCY) || 1);
+
+// A batch larger than this is refused until at least one job has actually
+// reached "verified" — the small-test-before-full-migration gate. 5 is
+// generous for "a small test" while still being nowhere near "the full
+// catalog" by accident.
+const TEST_GATE_THRESHOLD = 5;
+
+// Temporary-failure retry policy — a genuinely transient blip (a dropped
+// connection, a momentary 5xx from Supabase) gets a few fast-ish retries
+// within the same job attempt; only after all of them fail does the job
+// become "failed" for real, surfaced to the admin dashboard's manual retry.
+const RETRY_ATTEMPTS = 4;
+const RETRY_BASE_DELAY_MS = 1000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface MigrationProgress {
   running: boolean;
   currentBatchSize: number;
   processedInBatch: number;
+  bytesTransferredInBatch: number;
+  batchStartedAt: string | null;
+  // { mediaKind, entityId } for every job an active worker is on right now
+  // — a real "current file" signal even with MIGRATION_CONCURRENCY > 1.
+  inFlight: { mediaKind: MediaKind; entityId: string }[];
   lastError: string | null;
-  startedAt: string | null;
 }
 
-// Single in-memory flag so two /run calls can't race each other into
+// Single in-memory object so two /run calls can't race each other into
 // double-processing the same batch — NOT the source of truth for what's
 // migrated (the DB is), just a "don't start a second run while one's
-// already going" guard. Safe to lose on restart: a run that was
-// interrupted mid-batch just leaves its in-flight job(s) at "processing",
-// which a later /run picks back up (see runBatch's own pending+processing
-// query) rather than skipping them.
+// already going" guard plus a live progress readout. Safe to lose on
+// restart: a run that was interrupted mid-batch just leaves its in-flight
+// job(s) at "transferring"/"retrying", which the next /run picks back up
+// (see runMigrationBatch's own query) rather than skipping them — this
+// object resets to idle, but no migration state is lost, because none of
+// it lived only here.
 let progress: MigrationProgress = {
   running: false,
   currentBatchSize: 0,
   processedInBatch: 0,
+  bytesTransferredInBatch: 0,
+  batchStartedAt: null,
+  inFlight: [],
   lastError: null,
-  startedAt: null,
 };
 
 export function getMigrationProgress(): MigrationProgress {
@@ -60,7 +90,10 @@ function extFromUrl(url: string, fallback: string): string {
 // Enumerates every existing media file still on Supabase (audioStorageKey /
 // coverStorageKey / photoStorageKey null, but a legacy *Url set) and
 // upserts one MediaMigrationJob per file — pure bookkeeping, touches no
-// actual files. Safe to call repeatedly (e.g. after new content gets
+// actual files (no HEAD/GET against Supabase or R2 either — file sizes are
+// learned lazily, the first time a job actually runs, rather than a slow
+// full-catalog HEAD sweep up front; see runMigrationBatch's own size
+// bookkeeping). Safe to call repeatedly (e.g. after new content gets
 // imported): existing jobs for already-covered entities are left alone via
 // the (mediaKind, entityId) unique constraint, so this only ever adds rows
 // for genuinely new media, never duplicates or resets progress on old ones.
@@ -170,75 +203,141 @@ async function updateEntityStorageKey(mediaKind: MediaKind, entityId: string, ke
   }
 }
 
-// Migrates exactly one job: download from Supabase (still fully intact and
-// untouched afterward — this never deletes or modifies the source), upload
-// to the correct R2 bucket, HEAD-verify the size landed right, then flip
-// this entity's row over to the R2 key. Never throws — always resolves,
-// recording success or failure on the job row itself, so a batch loop can
-// keep going through the rest of a batch even when one file fails.
-async function migrateOne(job: { id: string; mediaKind: MediaKind; entityId: string; sourceUrl: string; destinationKey: string; retryCount: number }): Promise<void> {
-  await prisma.mediaMigrationJob.update({ where: { id: job.id }, data: { status: "processing" } });
-  try {
-    const res = await fetch(job.sourceUrl);
-    if (!res.ok) throw new Error(`Source fetch failed: HTTP ${res.status}`);
-    const contentType = res.headers.get("content-type") ?? (job.mediaKind === "track_audio" ? "audio/mpeg" : "image/jpeg");
-    const buffer = Buffer.from(await res.arrayBuffer());
+async function setStatus(id: string, status: MediaMigrationStatus, extra?: Record<string, unknown>) {
+  await prisma.mediaMigrationJob.update({ where: { id }, data: { status, ...extra } });
+}
 
-    let publicUrl = "";
-    if (job.mediaKind === "track_audio") {
-      await putAudioObject(job.destinationKey, buffer, contentType);
-    } else {
-      await putArtworkObject(job.destinationKey, buffer, contentType);
-      publicUrl = publicArtworkUrl(job.destinationKey);
+// One attempt: fetch from Supabase, stream straight into R2 (never fully
+// buffered — see streamToBucket), HEAD-verify the byte count landed right.
+// Throws on any failure; the retry loop in migrateOne is what decides
+// whether that's worth trying again.
+async function attemptTransfer(job: {
+  mediaKind: MediaKind;
+  sourceUrl: string;
+  destinationKey: string;
+}): Promise<{ bytes: number; publicUrl: string }> {
+  const res = await fetch(job.sourceUrl);
+  if (!res.ok || !res.body) throw new Error(`Source fetch failed: HTTP ${res.status}`);
+  const contentType = res.headers.get("content-type") ?? (job.mediaKind === "track_audio" ? "audio/mpeg" : "image/jpeg");
+  const declaredLength = Number(res.headers.get("content-length")) || undefined;
+
+  const bucket = job.mediaKind === "track_audio" ? "audio" : "artwork";
+  // Readable.fromWeb bridges undici's Web ReadableStream (what Node's own
+  // fetch returns) into the Node stream @aws-sdk/lib-storage's Upload
+  // expects — the bytes flow Supabase -> this pipe -> R2 without ever
+  // sitting fully in a Buffer in between.
+  await streamToBucket(bucket, job.destinationKey, Readable.fromWeb(res.body as never), contentType);
+
+  const info = await headObject(bucket, job.destinationKey);
+  if (!info) throw new Error("Verification failed: R2 reports the object missing after upload");
+  if (declaredLength && info.sizeBytes !== declaredLength) {
+    throw new Error(`Verification failed: source reported ${declaredLength} bytes, R2 has ${info.sizeBytes}`);
+  }
+
+  const publicUrl = job.mediaKind === "track_audio" ? "" : publicArtworkUrl(job.destinationKey);
+  return { bytes: info.sizeBytes, publicUrl };
+}
+
+// Migrates exactly one job, retrying transient failures with exponential
+// backoff before giving up for real (see RETRY_ATTEMPTS/RETRY_BASE_DELAY_MS
+// above). Never throws — always resolves, recording success or failure on
+// the job row itself, so a batch loop can keep going through the rest of a
+// batch even when one file's every attempt fails.
+async function migrateOne(job: {
+  id: string;
+  mediaKind: MediaKind;
+  entityId: string;
+  sourceUrl: string;
+  destinationKey: string;
+}): Promise<{ ok: boolean; bytes: number }> {
+  progress.inFlight.push({ mediaKind: job.mediaKind, entityId: job.entityId });
+  await setStatus(job.id, "transferring");
+
+  let lastError = "unknown error";
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      const { bytes, publicUrl } = await attemptTransfer(job);
+      await updateEntityStorageKey(job.mediaKind, job.entityId, job.destinationKey, publicUrl);
+      await setStatus(job.id, "verified", { fileSize: bytes, migratedAt: new Date(), verifiedAt: new Date(), errorMessage: null });
+      progress.inFlight = progress.inFlight.filter((f) => !(f.mediaKind === job.mediaKind && f.entityId === job.entityId));
+      return { ok: true, bytes };
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      if (attempt < RETRY_ATTEMPTS) {
+        await setStatus(job.id, "retrying", { errorMessage: lastError, retryCount: { increment: 1 } });
+        await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+      }
     }
+  }
 
-    const info = await headObject(job.mediaKind === "track_audio" ? "audio" : "artwork", job.destinationKey);
-    if (!info || info.sizeBytes !== buffer.length) {
-      throw new Error(`Verification failed: expected ${buffer.length} bytes, R2 reports ${info?.sizeBytes ?? "missing"}`);
+  await setStatus(job.id, "failed", { errorMessage: lastError, retryCount: { increment: 1 } });
+  progress.inFlight = progress.inFlight.filter((f) => !(f.mediaKind === job.mediaKind && f.entityId === job.entityId));
+  return { ok: false, bytes: 0 };
+}
+
+// Validation only, deliberately split out from runMigrationBatch below so
+// the admin route can await just this fast part (no file transfer, one
+// cheap count query at most) and return a real error immediately — a batch
+// itself can take minutes, so the route never awaits that part, which used
+// to mean even an instant validation failure (already running, test gate
+// not satisfied) silently only showed up in server logs, never in the
+// response the admin actually saw.
+//
+// Enforces the small-test-first rule: refuses a batch above
+// TEST_GATE_THRESHOLD until at least one job has ever actually reached
+// "verified" — see routes/adminMediaMigration.ts's /test for the intended
+// way to satisfy this gate deliberately, rather than the admin having to
+// know the magic threshold number themselves.
+export async function assertCanStartBatch(batchSize: number): Promise<void> {
+  if (!r2Configured) throw new Error("R2 is not configured — cannot migrate until R2_* env vars are set");
+  if (progress.running) throw new Error("A migration batch is already running");
+  if (batchSize > TEST_GATE_THRESHOLD) {
+    const verifiedCount = await prisma.mediaMigrationJob.count({ where: { status: "verified" } });
+    if (verifiedCount === 0) {
+      throw new Error(
+        `Run a small test first (${TEST_GATE_THRESHOLD} files or fewer) — no job has been verified yet, so a larger batch is refused.`
+      );
     }
-
-    await updateEntityStorageKey(job.mediaKind, job.entityId, job.destinationKey, publicUrl);
-    await prisma.mediaMigrationJob.update({
-      where: { id: job.id },
-      data: { status: "verified", fileSize: buffer.length, migratedAt: new Date(), verifiedAt: new Date(), errorMessage: null },
-    });
-  } catch (err) {
-    await prisma.mediaMigrationJob.update({
-      where: { id: job.id },
-      data: {
-        status: "failed",
-        errorMessage: err instanceof Error ? err.message : String(err),
-        retryCount: { increment: 1 },
-      },
-    });
   }
 }
 
-// Runs one bounded batch (pending jobs, plus any orphaned "processing" ones
-// left behind by an interrupted previous run — see the module-level comment
-// on `progress`) and returns once the whole batch is done. Callers that want
-// this to run in the background (the admin route) should NOT await this
-// directly on the request — kick it off and let the client poll
-// getMigrationProgress() instead, since a real batch can take minutes.
+// Runs one bounded batch (pending jobs, plus any orphaned transferring/
+// retrying ones left behind by an interrupted previous run) and returns
+// once the whole batch is done. Callers that want this to run in the
+// background (the admin route) should call assertCanStartBatch first,
+// await that, then fire this off WITHOUT awaiting it, and let the client
+// poll getMigrationProgress() instead — a real batch can take minutes.
 export async function runMigrationBatch(batchSize: number): Promise<void> {
-  if (!r2Configured) throw new Error("R2 is not configured — cannot migrate until R2_* env vars are set");
-  if (progress.running) throw new Error("A migration batch is already running");
+  await assertCanStartBatch(batchSize);
+  // Flips synchronously (no await between the check above resolving and
+  // this line) so a request that arrives immediately after sees
+  // progress.running already true, rather than both racing past the check.
+  progress.running = true;
 
   const jobs = await prisma.mediaMigrationJob.findMany({
-    where: { status: { in: ["pending", "processing"] } },
+    where: { status: { in: ["pending", "transferring", "retrying"] } },
     orderBy: { createdAt: "asc" },
     take: batchSize,
   });
 
-  progress = { running: true, currentBatchSize: jobs.length, processedInBatch: 0, lastError: null, startedAt: new Date().toISOString() };
+  progress = {
+    running: true,
+    currentBatchSize: jobs.length,
+    processedInBatch: 0,
+    bytesTransferredInBatch: 0,
+    batchStartedAt: new Date().toISOString(),
+    inFlight: [],
+    lastError: null,
+  };
 
   try {
     let cursor = 0;
     async function worker() {
       while (cursor < jobs.length) {
         const job = jobs[cursor++];
-        await migrateOne(job);
+        const result = await migrateOne(job);
         progress.processedInBatch++;
+        if (result.ok) progress.bytesTransferredInBatch += result.bytes;
       }
     }
     await Promise.all(Array.from({ length: Math.min(MIGRATION_CONCURRENCY, jobs.length) }, worker));
@@ -265,5 +364,24 @@ export async function getMigrationSummary() {
   const byStatus: Record<string, number> = {};
   for (const c of counts) byStatus[c.status] = c._count;
   const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
-  return { total, byStatus, progress };
+
+  // Estimated total bytes across every job, not just this batch — exact for
+  // jobs already migrated (their real fileSize), extrapolated for the rest
+  // from the average size observed so far. Deliberately not a precise
+  // up-front figure: getting one would mean a HEAD request per file during
+  // discovery (thousands of round-trips before a "read-only scan" could
+  // even finish), which isn't worth it just to firm up one progress number.
+  const sizeStats = await prisma.mediaMigrationJob.aggregate({
+    where: { fileSize: { not: null } },
+    _sum: { fileSize: true },
+    _avg: { fileSize: true },
+    _count: { fileSize: true },
+  });
+  const knownBytes = sizeStats._sum.fileSize ?? 0;
+  const knownCount = sizeStats._count.fileSize;
+  const avgBytes = sizeStats._avg.fileSize ?? 0;
+  const unknownCount = total - knownCount;
+  const estimatedTotalBytes = knownCount > 0 ? Math.round(knownBytes + avgBytes * unknownCount) : null;
+
+  return { total, byStatus, progress, bytesMigratedSoFar: knownBytes, estimatedTotalBytes };
 }

@@ -1106,7 +1106,7 @@ export const adminSubmissionsApi = {
   remove: (id: string) => request<void>(`/admin/submissions/${id}`, { method: "DELETE" }),
 };
 
-export type MediaMigrationStatus = "pending" | "processing" | "completed" | "failed" | "skipped" | "verified";
+export type MediaMigrationStatus = "pending" | "transferring" | "completed" | "failed" | "skipped" | "verified" | "retrying";
 
 export interface ApiMediaMigrationJob {
   id: string;
@@ -1128,18 +1128,28 @@ export interface ApiMediaMigrationStatus {
   r2Configured: boolean;
   total: number;
   byStatus: Partial<Record<MediaMigrationStatus, number>>;
+  bytesMigratedSoFar: number;
+  // null until at least one file has actually been transferred — see the
+  // server's own comment on why this is an estimate, not an exact figure,
+  // for anything not yet migrated.
+  estimatedTotalBytes: number | null;
   progress: {
     running: boolean;
     currentBatchSize: number;
     processedInBatch: number;
+    bytesTransferredInBatch: number;
+    batchStartedAt: string | null;
+    inFlight: { mediaKind: string; entityId: string }[];
     lastError: string | null;
-    startedAt: string | null;
   };
 }
 
 // Settings > Admin > Media Migration (Supabase Storage -> Cloudflare R2).
 export const adminMediaMigrationApi = {
   status: () => request<ApiMediaMigrationStatus>("/admin/media-migration/status"),
+  // Always exactly 1 file — the small-test-first step. Must succeed before
+  // /run will accept a batch bigger than a handful of files.
+  test: () => request<{ started: true; batchSize: number }>("/admin/media-migration/test", { method: "POST" }),
   discover: () => request<{ discovered: number }>("/admin/media-migration/discover", { method: "POST" }),
   run: (batchSize?: number) =>
     request<{ started: true; batchSize: number }>("/admin/media-migration/run", {

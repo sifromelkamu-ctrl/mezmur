@@ -758,11 +758,20 @@ enum MediaKind {
 
 enum MediaMigrationStatus {
   pending
-  processing
+  // A transfer currently in flight (streaming Supabase -> R2).
+  transferring
+  // Legacy/unused — every success path goes straight to "verified" (the
+  // upload is HEAD-checked against the source size before the job is ever
+  // marked done), so nothing sets this anymore. Left in place rather than
+  // dropped since Postgres enum values can't be removed without recreating
+  // the type, and this one costs nothing sitting unused.
   completed
   failed
   skipped
   verified
+  // A failed transfer currently in its automatic exponential-backoff retry
+  // loop — distinct from a genuinely terminal "failed" (retries exhausted).
+  retrying
 }
 
 model MediaMigrationJob {

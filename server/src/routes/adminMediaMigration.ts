@@ -1,9 +1,10 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { z } from "zod";
 import { isAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { r2Configured } from "../storage/r2.js";
 import {
+  assertCanStartBatch,
   discoverPendingMedia,
   getMigrationSummary,
   resetFailedJobs,
@@ -36,29 +37,48 @@ router.post("/discover", async (_req: AuthedRequest, res) => {
 
 const runSchema = z.object({ batchSize: z.number().int().min(1).max(500).optional() });
 
+// Shared by /run and /test below — validates fast (awaited, so a real error
+// like "already running" or "test gate not satisfied" actually reaches the
+// admin instead of only ever landing in server logs), then fires the actual
+// (possibly minutes-long) transfer loop without awaiting it.
+async function startBatch(res: Response, batchSize: number) {
+  try {
+    await assertCanStartBatch(batchSize);
+  } catch (err) {
+    res.status(409).json({ error: err instanceof Error ? err.message : "Could not start" });
+    return;
+  }
+  runMigrationBatch(batchSize).catch((err) => {
+    console.error("[media-migration] batch failed:", err);
+  });
+  res.status(202).json({ started: true, batchSize });
+}
+
+// POST /api/admin/media-migration/test — the small-test-migration step
+// (requirement F): always exactly 1 file, regardless of what batchSize the
+// client might otherwise send. This is what's meant to satisfy the
+// small-test-first gate below — deliberately its own endpoint rather than
+// just "call /run with batchSize: 1", so the dashboard can offer one
+// unambiguous "run the test" action instead of the admin having to
+// remember the right number.
+router.post("/test", async (_req: AuthedRequest, res) => {
+  await startBatch(res, 1);
+});
+
 // POST /api/admin/media-migration/run — starts one batch and returns
 // immediately; the batch itself keeps running on this server regardless of
 // whether the admin's browser stays open (see storage/migration.ts). Poll
-// /status for progress. Refuses to start a second batch on top of one
-// already running (runMigrationBatch throws; caught here as a 409) rather
-// than letting two batches race each other over the same pending jobs.
+// /status for progress. Refuses a batch above a small threshold until at
+// least one job has ever reached "verified" (i.e. until /test has actually
+// succeeded once) — see assertCanStartBatch.
 router.post("/run", async (req: AuthedRequest, res) => {
   const parsed = runSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
     return;
   }
-  if (!r2Configured) {
-    res.status(400).json({ error: "R2 is not configured yet — see the required R2_* environment variables" });
-    return;
-  }
   const batchSize = parsed.data.batchSize ?? (Number(process.env.MEDIA_MIGRATION_BATCH_SIZE) || 50);
-
-  runMigrationBatch(batchSize).catch((err) => {
-    console.error("[media-migration] batch failed to start:", err);
-  });
-
-  res.status(202).json({ started: true, batchSize });
+  await startBatch(res, batchSize);
 });
 
 // POST /api/admin/media-migration/retry-failed — resets every failed job

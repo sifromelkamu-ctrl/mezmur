@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Readable } from "node:stream";
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -9,6 +10,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Upload } from "@aws-sdk/lib-storage";
 
 // Cloudflare R2 speaks the S3 API, so the official AWS SDK works against it
 // unmodified — just point `endpoint` at the account's R2 endpoint instead of
@@ -153,6 +155,36 @@ export async function putAudioObject(key: string, body: Buffer, contentType = "a
 
 export async function putArtworkObject(key: string, body: Buffer, contentType: string): Promise<void> {
   await requireClient().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType }));
+}
+
+// True streaming transfer — the migration worker's own upload path (see
+// storage/migration.ts), deliberately separate from the small in-memory
+// put*Object() helpers above (those stay Buffer-based on purpose: every
+// caller of those already has a small, already-buffered multer upload in
+// hand, e.g. a 5MB image). This one exists specifically so a 50MB audio
+// file being copied Supabase -> R2 is never fully materialized in this
+// process's memory at once: `body` is the live HTTP response stream from
+// the Supabase fetch, piped straight through to R2. @aws-sdk/lib-storage's
+// Upload handles the chunking itself — a simple single PUT for a small
+// object, a real multipart upload for a large one — so this same call
+// works correctly across the whole size range without the caller having to
+// decide which.
+export async function streamToBucket(
+  bucket: "audio" | "artwork",
+  key: string,
+  body: Readable,
+  contentType: string
+): Promise<void> {
+  const upload = new Upload({
+    client: requireClient(),
+    params: { Bucket: bucket === "audio" ? R2_AUDIO_BUCKET_NAME : R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType },
+    // Conservative part size (S3/R2 minimum is 5MB) — keeps peak memory for
+    // one in-flight upload low and predictable rather than defaulting to
+    // whatever the SDK's own default queue/part-size tuning picks.
+    partSize: 8 * 1024 * 1024,
+    queueSize: 1,
+  });
+  await upload.done();
 }
 
 export interface ObjectInfo {

@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronLeft, Loader2, RefreshCw, Search, UploadCloud } from "lucide-react";
+import { AlertCircle, ChevronLeft, FlaskConical, Loader2, RefreshCw, Search, UploadCloud } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TextField from "../components/form/TextField";
@@ -15,6 +15,13 @@ const MEDIA_KIND_LABEL: Record<string, string> = {
   playlist_cover: "Playlist cover",
 };
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function StatCard({ label, value, tone }: { label: string; value: number; tone?: "brand" | "red" | "muted" }) {
   const color = tone === "brand" ? "text-brand" : tone === "red" ? "text-accent-red" : "text-fg";
   return (
@@ -26,9 +33,10 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
 }
 
 // Settings > Admin > Media Migration — Supabase Storage -> Cloudflare R2.
-// No CLI needed: discover, run a batch, watch it progress, retry failures,
-// all from here. Nothing here ever touches or deletes a Supabase original —
-// see server/src/storage/migration.ts for the full safety reasoning.
+// No CLI needed: discover, run a small test, watch a batch progress live
+// (bytes + speed, not just a file count), retry failures, all from here.
+// Nothing here ever touches or deletes a Supabase original — see
+// server/src/storage/migration.ts for the full safety reasoning.
 export default function AdminMediaMigration() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -100,6 +108,16 @@ export default function AdminMediaMigration() {
   const done = (byStatus.verified ?? 0) + (byStatus.completed ?? 0) + (byStatus.skipped ?? 0);
   const total = status?.total ?? 0;
   const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  const hasPassedTest = (byStatus.verified ?? 0) > 0;
+  const running = status?.progress.running ?? false;
+
+  let speedLabel: string | null = null;
+  if (running && status?.progress.batchStartedAt) {
+    const elapsedSec = (Date.now() - new Date(status.progress.batchStartedAt).getTime()) / 1000;
+    if (elapsedSec > 1 && status.progress.bytesTransferredInBatch > 0) {
+      speedLabel = `${formatBytes(status.progress.bytesTransferredInBatch / elapsedSec)}/s`;
+    }
+  }
 
   return (
     <div className="px-6 py-6 max-w-2xl pb-24">
@@ -113,7 +131,7 @@ export default function AdminMediaMigration() {
         </button>
         <div className="min-w-0">
           <h1 className="text-2xl font-bold truncate">Media Migration</h1>
-          <p className="text-sm text-fg-muted mt-0.5">Supabase Storage → Cloudflare R2</p>
+          <p className="text-sm text-fg-muted mt-0.5">Supabase Storage → Cloudflare R2 · server-to-server</p>
         </div>
       </div>
 
@@ -141,23 +159,39 @@ export default function AdminMediaMigration() {
           </div>
 
           {total > 0 && (
-            <div className="mb-6">
+            <div className="mb-4">
               <div className="h-2 rounded-full bg-elevated overflow-hidden">
                 <div className="h-full bg-brand transition-all" style={{ width: `${percent}%` }} />
               </div>
               <p className="text-xs text-fg-muted mt-1.5">
-                {percent}% migrated · {byStatus.processing ?? 0} in progress right now
+                {percent}% migrated
+                {status?.estimatedTotalBytes != null && (
+                  <> · {formatBytes(status.bytesMigratedSoFar)} of ~{formatBytes(status.estimatedTotalBytes)} (estimated)</>
+                )}
               </p>
             </div>
           )}
 
-          {status?.progress.running && (
-            <div className="bg-brand/10 ring-1 ring-brand/25 rounded-lg p-3.5 mb-4 flex items-center gap-3">
-              <Loader2 size={18} className="animate-spin text-brand shrink-0" />
-              <p className="text-sm">
-                Batch running — {status.progress.processedInBatch} / {status.progress.currentBatchSize} done. This
-                keeps running on the server even if you close this page.
+          {running && (
+            <div className="bg-brand/10 ring-1 ring-brand/25 rounded-lg p-3.5 mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Loader2 size={18} className="animate-spin text-brand shrink-0" />
+                <p className="text-sm">
+                  Batch running — {status!.progress.processedInBatch} / {status!.progress.currentBatchSize} done. Keeps
+                  running on the server even if you close this page.
+                </p>
+              </div>
+              <p className="text-xs text-fg-muted">
+                {formatBytes(status!.progress.bytesTransferredInBatch)} transferred{speedLabel ? ` · ${speedLabel}` : ""}
               </p>
+              {status!.progress.inFlight.length > 0 && (
+                <p className="text-xs text-fg-subtle mt-1 truncate">
+                  Now transferring:{" "}
+                  {status!.progress.inFlight
+                    .map((f) => `${MEDIA_KIND_LABEL[f.mediaKind] ?? f.mediaKind} (${f.entityId.slice(0, 8)}…)`)
+                    .join(", ")}
+                </p>
+              )}
             </div>
           )}
 
@@ -166,34 +200,50 @@ export default function AdminMediaMigration() {
           <div className="flex flex-col gap-3 mb-6">
             <button
               onClick={() => runAction(() => adminMediaMigrationApi.discover())}
-              disabled={busy}
+              disabled={busy || running}
               className="flex items-center justify-center gap-2 bg-elevated hover:bg-elevated-hover rounded-full py-3 text-sm font-semibold transition-colors disabled:opacity-50"
             >
               <Search size={16} /> Scan for media to migrate
             </button>
 
-            <div className="flex items-center gap-2 bg-elevated rounded-lg p-2.5">
-              <TextField
-                type="number"
-                value={batchSize}
-                onChange={(e) => setBatchSize(e.target.value)}
-                placeholder="Batch size"
-                variant="panel"
-                className="w-24 px-3 py-2 text-sm shrink-0"
-              />
+            {!hasPassedTest ? (
               <button
-                onClick={() => runAction(() => adminMediaMigrationApi.run(Number(batchSize) || undefined))}
-                disabled={busy || status?.progress.running || !status?.r2Configured || (byStatus.pending ?? 0) === 0}
-                className="flex-1 flex items-center justify-center gap-2 bg-brand text-black rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
+                onClick={() => runAction(() => adminMediaMigrationApi.test())}
+                disabled={busy || running || !status?.r2Configured || (byStatus.pending ?? 0) === 0}
+                className="flex items-center justify-center gap-2 bg-brand text-black rounded-full py-3 text-sm font-semibold disabled:opacity-50"
               >
-                <UploadCloud size={16} /> Migrate next batch
+                <FlaskConical size={16} /> Run test (1 file)
               </button>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-elevated rounded-lg p-2.5">
+                <TextField
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(e.target.value)}
+                  placeholder="Batch size"
+                  variant="panel"
+                  className="w-24 px-3 py-2 text-sm shrink-0"
+                />
+                <button
+                  onClick={() => runAction(() => adminMediaMigrationApi.run(Number(batchSize) || undefined))}
+                  disabled={busy || running || !status?.r2Configured || (byStatus.pending ?? 0) === 0}
+                  className="flex-1 flex items-center justify-center gap-2 bg-brand text-black rounded-full py-2.5 text-sm font-semibold disabled:opacity-50"
+                >
+                  <UploadCloud size={16} /> Migrate next batch
+                </button>
+              </div>
+            )}
+            {!hasPassedTest && (byStatus.pending ?? 0) > 0 && (
+              <p className="text-xs text-fg-subtle -mt-1.5">
+                A test file has to succeed before a larger batch is allowed — this migrates exactly one, then unlocks
+                normal batches.
+              </p>
+            )}
 
             {(byStatus.failed ?? 0) > 0 && (
               <button
                 onClick={() => runAction(() => adminMediaMigrationApi.retryFailed())}
-                disabled={busy}
+                disabled={busy || running}
                 className="flex items-center justify-center gap-2 bg-elevated hover:bg-elevated-hover rounded-full py-3 text-sm font-semibold transition-colors disabled:opacity-50"
               >
                 <RefreshCw size={16} /> Retry {byStatus.failed} failed file{byStatus.failed === 1 ? "" : "s"}
