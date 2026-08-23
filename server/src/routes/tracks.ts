@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import { toTrackDTO } from "./artists.js";
+import { createAudioPlaybackUrl, r2Configured } from "../storage/r2.js";
 
 const router = Router();
 
@@ -106,6 +107,39 @@ router.patch("/:id", requireAuth, async (req: AuthedRequest, res) => {
     include: { artist: true, album: true },
   });
   res.json(toTrackDTO(updated));
+});
+
+// GET /api/tracks/:id/stream-url - mints the actual URL to play, checked
+// server-side rather than handed out with every track in GET /api/tracks
+// (which used to include a permanent public audioUrl reachable by anyone,
+// logged in or not — see Track.audioStorageKey's doc comment in
+// schema.prisma for the full reasoning). requireAuth alone already closes
+// the "completely anonymous scraping" gap; any authenticated user — not
+// just ones with an active subscription — still gets a URL back, so the
+// existing preview behavior (PlayerContext stopping playback at
+// PREVIEW_SECONDS) keeps working unchanged. For R2-hosted audio the URL
+// itself also expires in a few hours instead of being permanent, whether or
+// not the requester has full access.
+router.get("/:id/stream-url", requireAuth, async (req: AuthedRequest, res) => {
+  const track = await prisma.track.findUnique({ where: { id: String(req.params.id) } });
+  if (!track) {
+    res.status(404).json({ error: "Track not found" });
+    return;
+  }
+  if (track.audioStorageKey) {
+    if (!r2Configured) {
+      res.status(500).json({ error: "Storage is not configured" });
+      return;
+    }
+    const url = await createAudioPlaybackUrl(track.audioStorageKey);
+    res.json({ url });
+    return;
+  }
+  if (track.audioUrl) {
+    res.json({ url: track.audioUrl });
+    return;
+  }
+  res.status(404).json({ error: "This track has no audio" });
 });
 
 // POST /api/tracks/:id/play - record a play (increments the global play count)

@@ -1,9 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "../prisma.js";
-import { supabaseAdmin } from "../supabase.js";
 import { toTrackDTO } from "../routes/artists.js";
 import { similarity } from "../artwork/matching.js";
 import { normalizeYoutubeChannelUrl } from "./validate.js";
@@ -18,13 +16,14 @@ import {
 import { generateWaveform } from "./waveform.js";
 import { CancelledImportError } from "./safeError.js";
 import {
-  createSignedAudioUploadUrl,
+  createAudioUploadTarget,
   DuplicateImportError,
   findExistingArtist,
   findOrCreateAlbum,
   findOrCreateArtist,
   IDENTITY_MIN,
   importImageFromUrl,
+  resolveAudioUploadResult,
 } from "../catalogImport/shared.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
 
@@ -293,25 +292,23 @@ export async function importYoutubeVideo({
     // catalogWorker.ts for why raising that isn't safe on this instance's
     // memory without a plan upgrade).
     onProgress?.("uploading", 75, "Uploading audio & generating waveform…");
-    const audioStoragePath = `${randomUUID()}.mp3`;
-    const [waveform, audioUrlData] = await Promise.all([
+    // createAudioUploadTarget picks Supabase or R2 (see catalogImport/shared.ts)
+    // — this call site neither knows nor cares which; it just PUTs to
+    // whatever signedUrl it got back, same as always.
+    const uploadTarget = await createAudioUploadTarget(".mp3");
+    const [waveform] = await Promise.all([
       generateWaveform(audioPath),
       (async () => {
         const audioBuffer = await readFile(audioPath);
-        // audio-tracks' bucket policies only permit writes via a signed
-        // upload token (see routes/admin.ts's upload-track route) — a direct
-        // service-role .upload() gets rejected by row-level security, so we
-        // go through the same signed-URL indirection here.
-        const signedUrl = await createSignedAudioUploadUrl(audioStoragePath);
-        const putRes = await fetch(signedUrl, {
+        const putRes = await fetch(uploadTarget.signedUrl, {
           method: "PUT",
           headers: { "Content-Type": "audio/mpeg" },
           body: new Uint8Array(audioBuffer),
         });
         if (!putRes.ok) throw new Error(`Audio upload failed with status ${putRes.status}`);
-        return supabaseAdmin.storage.from("audio-tracks").getPublicUrl(audioStoragePath).data;
       })(),
     ]);
+    const audioUploadResult = resolveAudioUploadResult(uploadTarget);
 
     if (signal?.aborted) throw new CancelledImportError();
 
@@ -371,7 +368,8 @@ export async function importYoutubeVideo({
         isSingle: Boolean(isSingle),
         isConcertSong: Boolean(standaloneConcertSong),
         trackNumber,
-        audioUrl: audioUrlData.publicUrl,
+        audioUrl: audioUploadResult.audioUrl,
+        audioStorageKey: audioUploadResult.audioStorageKey,
         coverUrl: coverUrl ?? album?.coverUrl ?? undefined,
         sourceUrl: metadata.webpageUrl,
         sourceId: sourceIdForTrack,

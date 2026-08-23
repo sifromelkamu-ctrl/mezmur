@@ -147,7 +147,13 @@ export interface ApiTrack {
   duration: number;
   language: string | null;
   genre?: string;
+  // A permanent URL only for legacy Supabase-hosted audio — an R2-hosted
+  // track has none (see server's Track.audioStorageKey doc comment), so
+  // this can be undefined even when the track genuinely has playable audio.
+  // Always check hasAudio, not just this, before deciding a track is
+  // unplayable — see PlayerContext.tsx's loadTrackSrc.
   audioUrl?: string;
+  hasAudio?: boolean;
   coverUrl?: string;
   moods?: string[];
   playCount?: number;
@@ -433,6 +439,11 @@ export const tracksApi = {
   recordPlay: (id: string) => request<void>(`/tracks/${id}/play`, { method: "POST" }),
   update: (id: string, input: TrackMetadataInput) =>
     request<ApiTrack>(`/tracks/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  // Requires login — see the server route's own comment for why. Called
+  // right before actually playing a track, never cached: an R2-hosted
+  // track's URL is short-lived by design, so a stale one just needs a fresh
+  // call here rather than ever being reused.
+  getStreamUrl: (id: string) => request<{ url: string }>(`/tracks/${id}/stream-url`),
 };
 
 export const sermonsApi = {
@@ -1093,6 +1104,53 @@ export const adminSubmissionsApi = {
       body: JSON.stringify({ reviewNote }),
     }),
   remove: (id: string) => request<void>(`/admin/submissions/${id}`, { method: "DELETE" }),
+};
+
+export type MediaMigrationStatus = "pending" | "processing" | "completed" | "failed" | "skipped" | "verified";
+
+export interface ApiMediaMigrationJob {
+  id: string;
+  mediaKind: "track_audio" | "track_cover" | "album_cover" | "artist_photo" | "playlist_cover";
+  entityId: string;
+  sourceUrl: string;
+  destinationKey: string;
+  status: MediaMigrationStatus;
+  fileSize: number | null;
+  errorMessage: string | null;
+  retryCount: number;
+  migratedAt: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiMediaMigrationStatus {
+  r2Configured: boolean;
+  total: number;
+  byStatus: Partial<Record<MediaMigrationStatus, number>>;
+  progress: {
+    running: boolean;
+    currentBatchSize: number;
+    processedInBatch: number;
+    lastError: string | null;
+    startedAt: string | null;
+  };
+}
+
+// Settings > Admin > Media Migration (Supabase Storage -> Cloudflare R2).
+export const adminMediaMigrationApi = {
+  status: () => request<ApiMediaMigrationStatus>("/admin/media-migration/status"),
+  discover: () => request<{ discovered: number }>("/admin/media-migration/discover", { method: "POST" }),
+  run: (batchSize?: number) =>
+    request<{ started: true; batchSize: number }>("/admin/media-migration/run", {
+      method: "POST",
+      body: JSON.stringify({ batchSize }),
+    }),
+  retryFailed: () => request<{ reset: number }>("/admin/media-migration/retry-failed", { method: "POST" }),
+  jobs: (status?: MediaMigrationStatus) =>
+    request<{ jobs: ApiMediaMigrationJob[]; total: number }>(
+      `/admin/media-migration/jobs${status ? `?status=${status}` : ""}`
+    ),
 };
 
 export function sermonToTrack(sermon: ApiSermon): ApiTrack {

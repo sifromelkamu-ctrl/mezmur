@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import adminRouter from "./routes/admin.js";
 import adminFeaturedBannersRouter from "./routes/adminFeaturedBanners.js";
+import adminMediaMigrationRouter from "./routes/adminMediaMigration.js";
 import adminLibraryRouter from "./routes/adminLibrary.js";
 import albumsRouter from "./routes/albums.js";
 import artistsRouter from "./routes/artists.js";
@@ -90,6 +91,7 @@ app.use("/api/featured-banners", featuredBannersRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/admin/library", adminLibraryRouter);
 app.use("/api/admin/featured-banners", adminFeaturedBannersRouter);
+app.use("/api/admin/media-migration", adminMediaMigrationRouter);
 app.use("/api/admin/youtube-import", youtubeImportRouter);
 app.use("/api/admin/telegram-import", telegramImportRouter);
 

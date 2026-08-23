@@ -753,6 +753,11 @@ export default function Settings() {
               onClick={() => navigate("/admin/library")}
             />
             <SettingsRow
+              icon={<UploadCloud size={20} />}
+              label="Media Migration"
+              onClick={() => navigate("/admin/media-migration")}
+            />
+            <SettingsRow
               icon={<GalleryHorizontal size={20} />}
               label="Home Featured Banner"
               onClick={() => navigate("/admin/featured-banners")}

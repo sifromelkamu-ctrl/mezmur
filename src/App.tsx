@@ -28,6 +28,7 @@ import Home from "./pages/Home";
 const AlbumDetail = lazy(routeLoaders.albumDetail);
 const AdminFeaturedBanners = lazy(routeLoaders.adminFeaturedBanners);
 const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
+const AdminMediaMigration = lazy(routeLoaders.adminMediaMigration);
 const AdminUpload = lazy(routeLoaders.adminUpload);
 const AdminUserAccess = lazy(routeLoaders.adminUserAccess);
 const AdminContactMessages = lazy(routeLoaders.adminContactMessages);
@@ -84,6 +85,7 @@ function AppShell() {
         <Route path="/admin/contact-messages" element={<AdminContactMessages />} />
         <Route path="/admin/submissions" element={<AdminSubmissions />} />
         <Route path="/admin/library" element={<AdminLibraryManagement />} />
+        <Route path="/admin/media-migration" element={<AdminMediaMigration />} />
         <Route path="/admin/featured-banners" element={<AdminFeaturedBanners />} />
         <Route path="/admin/youtube-import" element={<YoutubeImport />} />
         <Route path="/admin/youtube-catalog-import" element={<YoutubeCatalogImport />} />

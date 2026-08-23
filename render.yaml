@@ -79,3 +79,24 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Optional. Cloudflare R2 (see server/.env.example for the full setup
+      # walkthrough). Every new audio/artwork upload keeps going to Supabase
+      # Storage exactly as before until all five R2_* values below are set.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_AUDIO_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: R2_MEDIA_DOMAIN
+        sync: false
+      - key: MEDIA_MIGRATION_BATCH_SIZE
+        sync: false
+      - key: MEDIA_MIGRATION_CONCURRENCY
+        sync: false

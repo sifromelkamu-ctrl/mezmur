@@ -100,6 +100,7 @@ function toTrackDTO(track: {
   playCount?: number;
   trackNumber?: number | null;
   discNumber?: number | null;
+  audioStorageKey?: string | null;
   artistId: string | null;
   // Plain-text fallback for artistName when this Single has no linked Artist
   // (see Track.artistNameOverride) — never read when artist is set.
@@ -132,7 +133,14 @@ function toTrackDTO(track: {
     duration: track.duration,
     language: track.language,
     genre: track.genre ?? undefined,
+    // audioUrl is only ever a legacy, permanent Supabase URL now — an R2-
+    // hosted track deliberately has none (see Track.audioStorageKey's doc
+    // comment in schema.prisma), so the client must fetch a fresh signed URL
+    // from GET /api/tracks/:id/play instead. hasAudio tells it whether that
+    // call is worth making at all, without ever exposing the private R2 key
+    // itself in this response.
     audioUrl: track.audioUrl ?? undefined,
+    hasAudio: Boolean(track.audioUrl || track.audioStorageKey),
     coverUrl: coverUrl ?? undefined,
     moods: track.moods ?? [],
     playCount: track.playCount ?? 0,

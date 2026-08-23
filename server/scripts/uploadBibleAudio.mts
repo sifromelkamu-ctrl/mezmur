@@ -1,10 +1,17 @@
 // One-off migration script: uploads the local Amharic chapter-audio mp3s
-// (~2.8GB, 1173 files across 66 books) to a public Supabase Storage bucket
-// so the app can stream them instead of bundling them as static assets.
-// Run with: npx tsx scripts/uploadBibleAudio.mts
+// (~2.8GB, 1173 files across 66 books) to a public bucket so the app can
+// stream them instead of bundling them as static assets. Run with:
+// npx tsx scripts/uploadBibleAudio.mts
 //
 // Safe to re-run: it lists each book's already-uploaded chapters first and
 // skips them, so an interrupted run can just be started again.
+//
+// Goes to Cloudflare R2's public bucket once R2_* env vars are set (see
+// storage/r2.ts) — Bible audio was never subscription-gated content, so it
+// belongs in the public bucket alongside artwork, not the private one
+// signed playback URLs protect (see Track.audioStorageKey's doc comment in
+// schema.prisma). Falls back to the original Supabase bucket until then,
+// same as every other upload path in the app.
 import "dotenv/config";
 import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
@@ -12,6 +19,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { supabaseAdmin } from "../src/supabase.js";
+import { listPublicObjectKeys, putArtworkObject, r2Configured } from "../src/storage/r2.js";
 
 const BUCKET = "bible-audio";
 
@@ -85,6 +93,9 @@ async function concatMp3(filePaths: string[]): Promise<Buffer> {
 }
 
 async function ensureBucket() {
+  // R2 buckets are created once, manually, in the Cloudflare dashboard (see
+  // the migration setup steps) — nothing to do here in that case.
+  if (r2Configured) return;
   const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
   if (error) throw new Error(`listBuckets failed: ${error.message}`);
   if (buckets.some((b) => b.name === BUCKET)) return;
@@ -103,8 +114,11 @@ async function processBook(slug: string, bookDir: string, files: string[]) {
   // page, which silently truncated this for Psalms (150 chapters) — the
   // script then thought everything past the 100th was never uploaded and
   // tried to re-upload it, hitting "resource already exists" conflicts.
-  const { data: existing } = await supabaseAdmin.storage.from(BUCKET).list(slug, { limit: 1000 });
-  const already = new Set((existing ?? []).map((f) => f.name));
+  // listPublicObjectKeys already paginates fully on the R2 side, so no
+  // equivalent limit is needed there.
+  const already = r2Configured
+    ? new Set((await listPublicObjectKeys(`${BUCKET}/${slug}/`)).map((k) => k.slice(`${BUCKET}/${slug}/`.length)))
+    : new Set(((await supabaseAdmin.storage.from(BUCKET).list(slug, { limit: 1000 })).data ?? []).map((f) => f.name));
 
   // Groups source files by their real target chapter — for every book but
   // Psalms this is a trivial one-file-per-target grouping; for Psalms a
@@ -128,13 +142,23 @@ async function processBook(slug: string, bookDir: string, files: string[]) {
     const paths = group.map((g) => path.join(bookDir, g.file));
     const buffer = group.length === 1 ? await readFile(paths[0]) : await concatMp3(paths);
 
-    const { error } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(`${slug}/${destName}`, buffer, { contentType: "audio/mpeg", upsert: false });
-    if (error) {
-      console.error(`FAILED ${slug}/${destName}: ${error.message}`);
-      counts.failed++;
-      continue;
+    if (r2Configured) {
+      try {
+        await putArtworkObject(`${BUCKET}/${slug}/${destName}`, buffer, "audio/mpeg");
+      } catch (err) {
+        console.error(`FAILED ${slug}/${destName}: ${err instanceof Error ? err.message : err}`);
+        counts.failed++;
+        continue;
+      }
+    } else {
+      const { error } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(`${slug}/${destName}`, buffer, { contentType: "audio/mpeg", upsert: false });
+      if (error) {
+        console.error(`FAILED ${slug}/${destName}: ${error.message}`);
+        counts.failed++;
+        continue;
+      }
     }
     counts.uploaded++;
     console.log(`Uploaded ${slug}/${destName} (${counts.uploaded} done, ${counts.skipped} skipped, ${counts.failed} failed)`);

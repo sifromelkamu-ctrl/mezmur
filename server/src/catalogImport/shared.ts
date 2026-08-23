@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import type { Response } from "express";
 import { prisma } from "../prisma.js";
 import { supabaseAdmin } from "../supabase.js";
 import { uploadImageToStorage } from "../upload.js";
 import { gradientForSeed } from "../routes/admin.js";
 import { normalizeForMatch, similarity } from "../artwork/matching.js";
+import { createAudioUploadUrl, r2Configured } from "../storage/r2.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
 
 // Source-agnostic pieces of the catalog-import pipeline, shared between
@@ -32,20 +34,57 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// createSignedUploadUrl has been observed to intermittently fail with a
-// spurious "row-level security policy" error under sustained back-to-back
-// use (a fresh call with identical arguments in isolation succeeds every
-// time) — this retries with exponential backoff before giving up for real,
-// so a run of transient blips doesn't fail an otherwise-successful import.
-export async function createSignedAudioUploadUrl(path: string, attempts = 7): Promise<string> {
+// Where a freshly-minted audio upload target should end up — the single
+// choke point every audio-uploading call site (admin's quick upload, song
+// submissions, the YouTube and Telegram import pipelines) goes through, so
+// "Supabase vs R2" is decided in exactly one place rather than four. None of
+// these four know or care which provider they got; they PUT to `signedUrl`
+// same as always, then pass this same object to resolveAudioUploadResult
+// once the upload finishes to get back whatever the Track row should save.
+export interface AudioUploadTarget {
+  signedUrl: string;
+  provider: "r2" | "supabase";
+  key: string;
+}
+
+// createSignedUploadUrl (the Supabase path below) has been observed to
+// intermittently fail with a spurious "row-level security policy" error
+// under sustained back-to-back use (a fresh call with identical arguments in
+// isolation succeeds every time) — retried with exponential backoff before
+// giving up for real, so a run of transient blips doesn't fail an otherwise-
+// successful import. R2's presigned PUT URLs are generated locally (no
+// network round-trip, nothing to retry) so this only applies to the
+// Supabase branch.
+export async function createAudioUploadTarget(fileExt = ".mp3", attempts = 7): Promise<AudioUploadTarget> {
+  const ext = fileExt.startsWith(".") ? fileExt : `.${fileExt}`;
+
+  if (r2Configured) {
+    const key = `audio/tracks/${randomUUID()}${ext}`;
+    const signedUrl = await createAudioUploadUrl(key);
+    return { signedUrl, provider: "r2", key };
+  }
+
+  const path = `${randomUUID()}${ext}`;
   let lastError = "unknown error";
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const { data, error } = await supabaseAdmin.storage.from("audio-tracks").createSignedUploadUrl(path);
-    if (!error && data) return data.signedUrl;
+    if (!error && data) return { signedUrl: data.signedUrl, provider: "supabase", key: path };
     lastError = error?.message ?? lastError;
     if (attempt < attempts) await sleep(Math.min(30_000, 1000 * 2 ** attempt));
   }
   throw new Error(`Could not create upload URL: ${lastError}`);
+}
+
+// Resolves a target into what the Track row should actually save, once the
+// upload itself has completed. R2: audioStorageKey only — audioUrl stays
+// null forever, since R2 audio has no permanent public URL by design; real
+// playback always goes through the signed GET.../:id/play endpoint instead
+// (see routes/tracks.ts). Supabase: audioUrl only, exactly as it's always
+// worked, via the same getPublicUrl call this replaced.
+export function resolveAudioUploadResult(target: AudioUploadTarget): { audioUrl?: string; audioStorageKey?: string } {
+  if (target.provider === "r2") return { audioStorageKey: target.key };
+  const { data } = supabaseAdmin.storage.from("audio-tracks").getPublicUrl(target.key);
+  return { audioUrl: data.publicUrl };
 }
 
 // Downloads an external image (a YouTube thumbnail, a Telegram document

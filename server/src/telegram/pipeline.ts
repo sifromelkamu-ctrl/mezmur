@@ -1,9 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "../prisma.js";
-import { supabaseAdmin } from "../supabase.js";
 import { toTrackDTO } from "../routes/artists.js";
 import { similarity } from "../artwork/matching.js";
 import { getTelegramClient } from "./client.js";
@@ -11,7 +9,13 @@ import { downloadTelegramAudio } from "./download.js";
 import { buildTelegramSourceId } from "./enumerate.js";
 import { generateWaveform, getAudioDurationSeconds } from "../youtube/waveform.js";
 import { CancelledImportError } from "../youtube/safeError.js";
-import { createSignedAudioUploadUrl, DuplicateImportError, findOrCreateAlbum, IDENTITY_MIN } from "../catalogImport/shared.js";
+import {
+  createAudioUploadTarget,
+  DuplicateImportError,
+  findOrCreateAlbum,
+  IDENTITY_MIN,
+  resolveAudioUploadResult,
+} from "../catalogImport/shared.js";
 import type { AlbumType } from "../generated/prisma/enums.js";
 
 export { CancelledImportError, DuplicateImportError };
@@ -123,17 +127,16 @@ export async function importTelegramAudio({
 
     onProgress?.("uploading", 80, "Uploading audio to storage…");
     const audioBuffer = await readFile(audioPath);
-    const audioStoragePath = `${randomUUID()}.mp3`;
-    // audio-tracks' bucket policies only permit writes via a signed upload
-    // token — see youtube/pipeline.ts's identical comment for why.
-    const signedUrl = await createSignedAudioUploadUrl(audioStoragePath);
-    const putRes = await fetch(signedUrl, {
+    // createAudioUploadTarget picks Supabase or R2 (see catalogImport/shared.ts)
+    // — same as youtube/pipeline.ts, this call site doesn't need to know which.
+    const uploadTarget = await createAudioUploadTarget(".mp3");
+    const putRes = await fetch(uploadTarget.signedUrl, {
       method: "PUT",
       headers: { "Content-Type": "audio/mpeg" },
       body: new Uint8Array(audioBuffer),
     });
     if (!putRes.ok) throw new Error(`Audio upload failed with status ${putRes.status}`);
-    const { data: audioUrlData } = supabaseAdmin.storage.from("audio-tracks").getPublicUrl(audioStoragePath);
+    const audioUploadResult = resolveAudioUploadResult(uploadTarget);
 
     onProgress?.("saving", 95, "Saving track…");
     const album = albumTitle
@@ -162,7 +165,8 @@ export async function importTelegramAudio({
         // No album assigned -> the same "Single" convention YouTube catalog
         // import uses for its own ungrouped items.
         isSingle: !album,
-        audioUrl: audioUrlData.publicUrl,
+        audioUrl: audioUploadResult.audioUrl,
+        audioStorageKey: audioUploadResult.audioStorageKey,
         coverUrl: album?.coverUrl ?? undefined,
         sourceUrl: `https://t.me/${channelUsername}/${messageId}`,
         sourceId: sourceIdForTrack,

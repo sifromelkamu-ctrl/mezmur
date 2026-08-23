@@ -100,10 +100,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Most of the catalog has no real audio file yet (only tracks uploaded
-  // through the admin flow do) — those fall back to the simulated timer
-  // below so nothing regresses for existing content.
-  const hasRealAudio = Boolean(currentTrack?.audioUrl);
+  // hasAudio (not audioUrl) is the real signal now: an R2-hosted track has
+  // no permanent audioUrl at all by design (see ApiTrack.audioUrl's doc
+  // comment) — its real audio is fetched fresh, right before playing, in
+  // the load effect below. Content with genuinely no audio file at all
+  // (Sermons/Podcasts converted to track-shaped objects, etc.) still falls
+  // back to the simulated timer further down so nothing regresses there.
+  const hasRealAudio = Boolean(currentTrack?.hasAudio);
 
   const playTrack = useCallback((track: ApiTrack, newQueue?: ApiTrack[]) => {
     setCurrentTrack(track);
@@ -235,23 +238,50 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [togglePlay, prev, next, seek]);
 
   // Load whichever track is current into the real <audio> element. Tracks
-  // without an audioUrl explicitly stop/unload it so stale audio can't keep
-  // playing underneath the simulated-timer fallback.
+  // with neither an audioUrl nor hasAudio explicitly stop/unload it so stale
+  // audio can't keep playing underneath the simulated-timer fallback.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    let cancelled = false;
+
     if (currentTrack?.audioUrl) {
+      // Legacy Supabase-hosted audio — a real permanent URL, used directly
+      // exactly as before.
       audio.src = currentTrack.audioUrl;
       audio.currentTime = 0;
       audio.volume = volume;
       if (isPlaying) audio.play().catch(() => {});
+    } else if (currentTrack?.hasAudio) {
+      // R2-hosted audio has no permanent URL by design (see
+      // ApiTrack.audioUrl's doc comment) — fetch a short-lived signed one
+      // right before playing, rather than ever storing something that
+      // silently expires on its own. `cancelled`/the ref check guard
+      // against the track changing again before this resolves.
+      audio.pause();
+      audio.removeAttribute("src");
+      const trackId = currentTrack.id;
+      tracksApi
+        .getStreamUrl(trackId)
+        .then(({ url }) => {
+          if (cancelled || audioRef.current !== audio || currentTrackRef.current?.id !== trackId) return;
+          audio.src = url;
+          audio.currentTime = 0;
+          audio.volume = volume;
+          if (isPlaying) audio.play().catch(() => {});
+        })
+        .catch(() => {});
     } else {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
     }
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack?.id, currentTrack?.audioUrl]);
+  }, [currentTrack?.id, currentTrack?.audioUrl, currentTrack?.hasAudio]);
 
   // Play/pause the real audio element in lockstep with isPlaying.
   useEffect(() => {

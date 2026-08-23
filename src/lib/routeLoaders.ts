@@ -10,6 +10,7 @@ export const routeLoaders = {
   adminSubmissions: () => import("../pages/AdminSubmissions"),
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
+  adminMediaMigration: () => import("../pages/AdminMediaMigration"),
   adminUpload: () => import("../pages/AdminUpload"),
   adminUserAccess: () => import("../pages/AdminUserAccess"),
   allConcerts: () => import("../pages/AllConcerts"),

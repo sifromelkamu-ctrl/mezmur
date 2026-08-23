@@ -19,7 +19,7 @@ import { runArtistSpotifySync } from "../spotifySync/sync.js";
 import type { SpotifySyncMode, ArtistSyncProgress, ArtistSyncSummary } from "../spotifySync/types.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { normalizeForMatch } from "../artwork/matching.js";
-import { findOrCreateArtist, findOrCreateAlbum } from "../catalogImport/shared.js";
+import { createAudioUploadTarget, findOrCreateArtist, findOrCreateAlbum, resolveAudioUploadResult } from "../catalogImport/shared.js";
 import { notifyUserPush } from "../push.js";
 
 const router = Router();
@@ -202,17 +202,11 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
     }
 
     const ext = fileExt ? (fileExt.startsWith(".") ? fileExt : `.${fileExt}`) : ".mp3";
-    const path = `${randomUUID()}${ext}`;
-
-    const { data: signed, error: signError } = await supabaseAdmin.storage
-      .from("audio-tracks")
-      .createSignedUploadUrl(path);
-    if (signError || !signed) {
-      res.status(500).json({ error: signError?.message ?? "Could not create upload URL" });
-      return;
-    }
-
-    const { data: publicUrlData } = supabaseAdmin.storage.from("audio-tracks").getPublicUrl(path);
+    // createAudioUploadTarget picks Supabase or R2 (see catalogImport/shared.ts)
+    // — this route doesn't need to know which; it just hands the signedUrl
+    // back to the client the same way it always has.
+    const uploadTarget = await createAudioUploadTarget(ext);
+    const audioUploadResult = resolveAudioUploadResult(uploadTarget);
 
     const track = await prisma.track.create({
       data: {
@@ -221,7 +215,8 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
         albumId: effectiveAlbumId,
         genre,
         duration,
-        audioUrl: publicUrlData.publicUrl,
+        audioUrl: audioUploadResult.audioUrl,
+        audioStorageKey: audioUploadResult.audioStorageKey,
         trackNumber: effectiveAlbumId ? trackNumber : undefined,
         isSingle: Boolean(isSingle),
       },
@@ -232,7 +227,11 @@ router.post("/upload-track", async (req: AuthedRequest, res) => {
 
     res.status(201).json({
       track: toTrackDTO(track),
-      upload: { signedUrl: signed.signedUrl, token: signed.token, path },
+      // `token` is a Supabase-specific field the client never actually reads
+      // (see adminApi.putAudioFile — plain PUT to signedUrl) but is kept in
+      // the response shape for backward compatibility; empty for R2, whose
+      // presigned URL carries everything it needs on its own.
+      upload: { signedUrl: uploadTarget.signedUrl, token: "", path: uploadTarget.key },
     });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Track upload failed" });

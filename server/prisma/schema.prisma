@@ -249,6 +249,14 @@ model Artist {
   monthlyListeners Int      @default(0)
   isGroup          Boolean  @default(false)
   photoUrl         String?
+  // R2 object key for photoUrl once this artist's photo lives in Cloudflare
+  // R2 instead of Supabase Storage — null means photoUrl (if set) is still a
+  // legacy Supabase public URL, used as-is. Non-null means photoUrl is
+  // *also* kept in sync (R2's public bucket URL for this key) so every
+  // existing reader that just does <img src={photoUrl}> keeps working
+  // unchanged; this column only exists so playback/migration code has a
+  // stable key to act on without re-parsing a URL. See server/src/storage/r2.ts.
+  photoStorageKey  String?
   ownerId          String?  @db.Uuid
   owner            Profile? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   albums           Album[]
@@ -287,6 +295,8 @@ model Album {
   gradientFrom String?
   gradientTo   String?
   coverUrl     String?
+  // See Artist.photoStorageKey for the contract — same idea, for coverUrl.
+  coverStorageKey String?
   description  String?
   albumType    AlbumType @default(album)
   releaseDate  DateTime?
@@ -317,6 +327,19 @@ model Track {
   genre              String?
   audioUrl           String?
   coverUrl           String?
+  // R2 object key in the *private* audio bucket once this track's audio
+  // lives on R2 — null means audioUrl (if set) is still a legacy Supabase
+  // public URL, served as-is (unchanged behavior). Non-null means audioUrl
+  // is left stale/unused and real playback goes through
+  // GET /api/tracks/:id/play instead, which mints a short-lived signed URL
+  // from this key on every request — the raw key is never exposed to a
+  // client, and there is no long-lived public URL for R2-hosted audio at
+  // all. See server/src/storage/r2.ts and routes/tracks.ts.
+  audioStorageKey    String?
+  // See Artist.photoStorageKey for the contract — same idea, for coverUrl
+  // (only meaningful for a standalone single's own art; an album track's
+  // artwork always comes from the album instead, same as coverUrl today).
+  coverStorageKey    String?
   moods              String[]        @default([])
   playCount          Int             @default(0)
   // Nullable — a Single imported from YouTube that doesn't match any
@@ -391,6 +414,8 @@ model Playlist {
   gradientFrom String
   gradientTo   String
   coverUrl     String?
+  // See Artist.photoStorageKey for the contract — same idea, for coverUrl.
+  coverStorageKey String?
   ownerId      String?         @db.Uuid
   owner        Profile?        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   tracks       PlaylistTrack[]
@@ -714,4 +739,53 @@ model TelegramImportItem {
 
   @@unique([batchId, messageId])
   @@index([batchId])
+}
+
+// --- Supabase Storage -> Cloudflare R2 media migration ---
+// One row per media file (audio, artwork, ...) tracked for migration. Never
+// deleted automatically, never triggers deletion of the Supabase original —
+// this table is purely a ledger the migration worker (see
+// server/src/storage/migration.ts) reads/writes to know what's left to do
+// and to resume correctly after an interruption (server restart, deploy,
+// network blip), rather than restarting the whole catalog from zero.
+enum MediaKind {
+  track_audio
+  track_cover
+  album_cover
+  artist_photo
+  playlist_cover
+}
+
+enum MediaMigrationStatus {
+  pending
+  processing
+  completed
+  failed
+  skipped
+  verified
+}
+
+model MediaMigrationJob {
+  id              String                @id @default(cuid())
+  mediaKind       MediaKind
+  // The id of the Track/Album/Artist/Playlist row this file belongs to —
+  // deliberately not a real foreign key (four different possible parent
+  // tables depending on mediaKind), same reasoning as YoutubeImportItem's
+  // trackId being a plain string rather than a relation.
+  entityId        String
+  sourceUrl       String
+  destinationKey  String
+  status          MediaMigrationStatus  @default(pending)
+  fileSize        Int?
+  checksum        String?
+  errorMessage    String?
+  retryCount      Int                   @default(0)
+  migratedAt      DateTime?
+  verifiedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([mediaKind, entityId])
+  @@index([status])
+  @@map("media_migration_jobs")
 }
