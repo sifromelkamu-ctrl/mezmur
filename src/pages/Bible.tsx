@@ -1055,29 +1055,25 @@ export default function Bible() {
                 className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
                 style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
               >
-                <div className="flex items-center gap-2 py-3 px-2.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                <div className="flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
                   {/* One continuous scrollable strip — highlight colors up
                       front, always visible, followed by every action, so the
-                      whole toolbar reads and scrolls as a single row. Taller
-                      than the original ship by 70% (vertical padding + the
-                      swatch/cancel-button diameters, which are height by
-                      construction) — icon and text size deliberately left at
-                      their original size, only the bar's height grows. */}
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
+                      whole toolbar reads and scrolls as a single row. */}
+                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
                     {HIGHLIGHT_COLORS.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => handleApplyHighlight(c.id)}
                         aria-label={`Highlight ${c.id}`}
-                        className={`w-12 h-12 shrink-0 rounded-full ${c.swatch} transition-transform ${
+                        className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
                           activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
                         }`}
                       />
                     ))}
-                    <div className="w-px h-8 bg-border shrink-0 mx-1.5" />
+                    <div className="w-px h-5 bg-border shrink-0 mx-1" />
                     <button
                       onClick={handleToggleFavorite}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
                       <Heart size={15} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
                       Save
@@ -1093,7 +1089,7 @@ export default function Bible() {
                               setEditingNoteVerse(soleVerse);
                               setNoteDraft(annotations[soleKey]?.note ?? "");
                             }}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
                           >
                             <StickyNote size={15} />
                             {hasNote ? "Edit note" : "Note"}
@@ -1102,14 +1098,14 @@ export default function Bible() {
                       })()}
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
                       {justCopied ? <Check size={15} className="text-gold" /> : <Copy size={15} />}
                       {justCopied ? "Copied" : "Copy"}
                     </button>
                     <button
                       onClick={handleShareSelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
                       {justShared ? <Check size={15} className="text-gold" /> : <Share2 size={15} />}
                       {justShared ? "Shared" : "Share"}
@@ -1117,14 +1113,14 @@ export default function Bible() {
                     <button
                       onClick={handleImageSelected}
                       disabled={generatingImage}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
                     >
                       {generatingImage ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
                       Image
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-3.5 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
                     >
                       <Columns2 size={15} />
                       Compare
@@ -1133,7 +1129,7 @@ export default function Bible() {
                   <button
                     onClick={() => setSelectedVerses(new Set())}
                     aria-label="Cancel selection"
-                    className="w-14 h-14 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
+                    className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
                   >
                     <X size={16} />
                   </button>
