@@ -4,6 +4,7 @@
 // generic placeholder. Pure rendering concern — never touches playback,
 // imports, or persisted data; results are cached in memory per image URL
 // for the lifetime of the tab.
+import { runLimited } from "./concurrencyLimit";
 
 export interface ArtworkPalette {
   primary: string;
@@ -180,7 +181,7 @@ export function extractPalette(url: string): Promise<ArtworkPalette | null> {
   const existing = inflight.get(url);
   if (existing) return existing;
 
-  const promise = new Promise<ArtworkPalette | null>((resolve) => {
+  const promise = runLimited(() => new Promise<ArtworkPalette | null>((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.decoding = "async";
@@ -213,7 +214,7 @@ export function extractPalette(url: string): Promise<ArtworkPalette | null> {
       resolve(null);
     };
     img.src = url;
-  });
+  }));
 
   inflight.set(url, promise);
   promise.finally(() => inflight.delete(url));

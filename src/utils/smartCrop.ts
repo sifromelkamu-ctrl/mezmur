@@ -12,6 +12,7 @@
 // classic seam-carving/smart-crop tools) — it is intentionally NOT framed
 // as literal face/logo/text detection, which would require a real model.
 import { clampFocal, coverZoom } from "./artworkTransform";
+import { runLimited } from "./concurrencyLimit";
 
 export interface SmartFrame {
   x: number; // focal point, 0-1 fraction of natural image width
@@ -101,14 +102,14 @@ export function computeSmartFrame(url: string): Promise<SmartFrame | null> {
   const cached = cache.get(url);
   if (cached) return cached;
 
-  const promise = new Promise<SmartFrame | null>((resolve) => {
+  const promise = runLimited(() => new Promise<SmartFrame | null>((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.decoding = "async";
     img.onload = () => resolve(analyze(img));
     img.onerror = () => resolve(null);
     img.src = url;
-  });
+  }));
 
   cache.set(url, promise);
   return promise;

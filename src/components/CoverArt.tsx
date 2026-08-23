@@ -125,7 +125,13 @@ export default function CoverArt({
   // "Singles only" gate for the freeform crop floor below.
   const allowFreeformCrop = entityType === "track" && !readOnlyArtwork;
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
-  const smartFrame = useSmartFrame(canFrame ? photoUrl : undefined);
+  // Only worth analyzing when there's no saved/override frame to use
+  // instead — activeFrame always prefers those, so without this check every
+  // already-curated piece of artwork would still pay for a second,
+  // crossOrigin-mode fetch + decode of the full-resolution image just to
+  // compute a result that gets thrown away below.
+  const needsSmartFrame = canFrame && !savedOverride && !artworkFrame;
+  const smartFrame = useSmartFrame(needsSmartFrame ? photoUrl : undefined);
   const activeFrame = savedOverride ?? artworkFrame ?? smartFrame;
   const frameReady = canFrame && Boolean(natural) && Boolean(activeFrame);
 
