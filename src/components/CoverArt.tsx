@@ -6,7 +6,7 @@ import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { useSmartFrame } from "../hooks/useSmartFrame";
 import { adminApi, type ArtworkEntityType, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
-import { computeRenderRect, coverZoom, hasLetterbox } from "../utils/artworkTransform";
+import { clampFramePosition, computeRenderRect, coverZoom, hasLetterbox } from "../utils/artworkTransform";
 import ArtworkEditor from "./ArtworkEditor";
 
 // Branded fallback cover for albums/artists/tracks with no artwork uploaded
@@ -166,16 +166,26 @@ export default function CoverArt({
     }
   };
 
-  // The displayed frame never renders under-cover — even a stale saved
-  // frame from before this floor was enforced (or a bad write from
-  // somewhere else) gets its zoom clamped up to coverZoom here, so the
-  // square is always fully covered by sharp image content. Rotation is
-  // passed through unchanged: a rotated square still needs the blurred-
-  // backdrop fill for its exposed corners (see hasLetterbox/showBackdrop
-  // below), which is a real, legitimate use of that fill — the thing being
-  // removed here is specifically the never-wanted under-zoom letterbox.
+  // The displayed frame never renders under-cover, and never pans past the
+  // image's own edges — the single choke point every frame (saved,
+  // smart-cropped, or a fallback default) goes through before it's used for
+  // layout, mirroring ArtworkEditor's own clampFrame. This matters even for
+  // a "normal" frame: useSmartFrame's own outer fallback (used when the
+  // crossOrigin analysis probe fails to load at all, e.g. a transient CORS
+  // hiccup) hands back a fixed y with no idea of the image's actual aspect
+  // ratio, since dimensions were never available to clamp against at that
+  // point. For a perfectly square source image that leaves zero pan slack,
+  // an unclamped y produced exactly this: the frame rendered offset with a
+  // real gap at the top, exposing the gradient placeholder behind it — not
+  // a letterbox (zoom was already correct), a genuine mispositioned crop.
   const displayFrame =
-    activeFrame && natural ? { ...activeFrame, zoom: Math.max(activeFrame.zoom, coverZoom(natural.w, natural.h)) } : activeFrame;
+    activeFrame && natural
+      ? (() => {
+          const zoom = Math.max(activeFrame.zoom, coverZoom(natural.w, natural.h));
+          const { x, y } = clampFramePosition({ ...activeFrame, zoom }, natural.w, natural.h);
+          return { ...activeFrame, zoom, x, y };
+        })()
+      : activeFrame;
 
   // Until the smart/saved frame and natural dimensions are both known, fall
   // back to plain object-cover so something reasonable shows immediately —
