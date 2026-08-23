@@ -700,6 +700,13 @@ model TelegramImportBatch {
   // of the same name.
   duplicateAlbumMap Json?
 
+  // Set when the most recent enumeration page (initial or /load-more) hit
+  // PAGE_SIZE and stopped there — the channel likely has more, older songs
+  // available. Drives whether the selection screen offers "Load older
+  // songs". Cleared back to false whenever a page comes back short of
+  // PAGE_SIZE, meaning enumeration reached the channel's actual beginning.
+  truncated Boolean @default(false)
+
   @@index([createdBy])
 }
 

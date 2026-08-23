@@ -337,6 +337,18 @@ export default function TelegramImport() {
     setBatch(latest);
   };
 
+  const [loadingMore, setLoadingMore] = useState(false);
+  const handleLoadMore = async () => {
+    if (!batch) return;
+    setLoadingMore(true);
+    try {
+      await adminApi.loadMoreTelegramCatalog(batch.id);
+      await refreshBatch();
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const toggleAlbum = (albumTitle: string) => {
     setCollapsedAlbums((prev) => {
       const next = new Set(prev);
@@ -727,6 +739,17 @@ export default function TelegramImport() {
               Import another channel
             </button>
           </div>
+
+          {phase === "selecting" && batch.truncated && (
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="self-start flex items-center gap-2 text-sm font-semibold text-fg-muted hover:text-fg px-3 py-1.5 rounded-full bg-elevated hover:bg-elevated-hover transition-colors disabled:opacity-50"
+            >
+              {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {loadingMore ? "Loading older songs…" : "Load older songs"}
+            </button>
+          )}
 
           {batch.error && (
             <p className="flex items-center gap-2 text-xs text-accent-red">

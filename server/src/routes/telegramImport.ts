@@ -88,7 +88,12 @@ router.post("/", async (req: AuthedRequest, res) => {
           data: {
             status: "ready",
             channelName: result.channelName,
-            error: result.truncated ? "Only the first items were imported; this channel has more than the supported limit." : null,
+            error: null,
+            // Drives the selection screen's "Load older songs" button
+            // instead of a scary red error — reaching this page's cap isn't
+            // a failure, just a normal stopping point for one request. See
+            // /load-more below for how the admin continues past it.
+            truncated: result.truncated,
           },
         }),
       ]);
@@ -101,6 +106,59 @@ router.post("/", async (req: AuthedRequest, res) => {
     });
 
   res.status(202).json({ batchId: batch.id });
+});
+
+// POST /api/admin/telegram-import/:batchId/load-more — continues
+// enumeration past the current page, appending the next PAGE_SIZE older
+// songs to this same batch. Only meaningful while batch.truncated is true
+// (see the initial enumeration above); Telegram message ids are
+// monotonically increasing per channel, so the numeric minimum among this
+// batch's already-fetched items is exactly "the oldest song seen so far" —
+// enumerateTelegramChannel continues strictly before that id.
+router.post("/:batchId/load-more", async (req, res) => {
+  const batch = await prisma.telegramImportBatch.findUnique({ where: { id: String(req.params.batchId) } });
+  if (!batch) {
+    res.status(404).json({ error: "Import batch not found" });
+    return;
+  }
+  if (!batch.truncated) {
+    res.status(400).json({ error: "This channel has no older songs left to load" });
+    return;
+  }
+
+  const existingItems = await prisma.telegramImportItem.findMany({
+    where: { batchId: batch.id },
+    select: { messageId: true, position: true },
+  });
+  const oldestMessageId = Math.min(...existingItems.map((i) => Number(i.messageId)));
+  const nextPosition = Math.max(...existingItems.map((i) => i.position)) + 1;
+
+  try {
+    const result = await enumerateTelegramChannel(batch.sourceUrl, {
+      beforeMessageId: oldestMessageId,
+      startPosition: nextPosition,
+    });
+    const existingIds = new Set(existingItems.map((i) => i.messageId));
+    const newItems = result.items.filter((item) => !existingIds.has(item.messageId));
+
+    await prisma.$transaction([
+      prisma.telegramImportItem.createMany({
+        data: newItems.map((item) => ({
+          batchId: batch.id,
+          messageId: item.messageId,
+          title: item.title,
+          performer: item.performer,
+          position: item.position,
+          duration: item.duration ?? undefined,
+          status: item.isDuplicate && !batch.allowDuplicates ? "skipped_duplicate" : "pending",
+        })),
+      }),
+      prisma.telegramImportBatch.update({ where: { id: batch.id }, data: { truncated: result.truncated } }),
+    ]);
+    res.status(201).json({ added: newItems.length, truncated: result.truncated });
+  } catch (err) {
+    res.status(400).json({ error: toSafeErrorMessage(err, "Could not load older songs", "telegram-load-more") });
+  }
 });
 
 const assignAlbumSchema = z.object({

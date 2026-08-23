@@ -626,6 +626,9 @@ export interface TelegramCatalogBatch {
   createdAt: string;
   targetArtistId: string | null;
   allowDuplicates: boolean;
+  // True when the most recent page (initial enumeration or /load-more) hit
+  // the per-request cap — the channel likely has older songs left to fetch.
+  truncated: boolean;
   items: TelegramCatalogItem[];
 }
 
@@ -829,6 +832,11 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ itemIds, albumTitle }),
     }),
+  // Continues enumeration past this batch's current page, appending the
+  // next page of older songs — only meaningful while the batch's
+  // `truncated` flag is true.
+  loadMoreTelegramCatalog: (batchId: string) =>
+    request<{ added: number; truncated: boolean }>(`/admin/telegram-import/${batchId}/load-more`, { method: "POST" }),
   listTelegramCatalogBatches: (params?: { q?: string; status?: string; page?: number; pageSize?: number }) => {
     const qs = new URLSearchParams();
     if (params?.q) qs.set("q", params.q);

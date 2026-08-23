@@ -3,12 +3,14 @@ import { prisma } from "../prisma.js";
 import { getTelegramClient } from "./client.js";
 import { extractTelegramChannelUsername } from "./validate.js";
 
-// Keeps the selection UI and resulting DB rows manageable even for a
-// channel with a very long posting history, while still reaching well back
-// into most channels' full catalog — 500 was cutting off older songs on
-// channels with a large back-catalog before their whole history had been
-// scanned (enumeration reads newest-first, see reverse: false below).
-const MAX_TOTAL_ITEMS = 2000;
+// Per-request page size, not an overall cap — enumeration reads newest-
+// first (reverse: false below), so a single request only ever goes this
+// deep into a channel's history. Older songs beyond this page are reached
+// by calling enumerateTelegramChannel again with beforeMessageId set to the
+// oldest message id already seen (see routes/telegramImport.ts's
+// /load-more), rather than raising this number — a flat larger cap here
+// just means a slower, more failure-prone single request instead.
+const PAGE_SIZE = 500;
 
 export interface TelegramCatalogEntry {
   messageId: string;
@@ -42,14 +44,24 @@ function findFileNameAttribute(doc: Api.Document): string | undefined {
   return attr?.fileName;
 }
 
-// Enumerates a public Telegram channel's audio posts (server-side filtered
-// via InputMessagesFilterMusic, so this never has to page through every
-// message the channel has ever posted — mirrors how YouTube enumeration
-// reads the Releases/Playlists tabs instead of scanning everything). Reads
-// title/performer/duration straight off each message's own
-// DocumentAttributeAudio — Telegram's own tagging is usually already clean,
-// unlike YouTube video titles which need heuristic cleanup.
-export async function enumerateTelegramChannel(channelUrlOrUsername: string): Promise<TelegramCatalogEnumeration> {
+// Enumerates one page (PAGE_SIZE items) of a public Telegram channel's audio
+// posts (server-side filtered via InputMessagesFilterMusic, so this never
+// has to page through every message the channel has ever posted — mirrors
+// how YouTube enumeration reads the Releases/Playlists tabs instead of
+// scanning everything). Reads title/performer/duration straight off each
+// message's own DocumentAttributeAudio — Telegram's own tagging is usually
+// already clean, unlike YouTube video titles which need heuristic cleanup.
+//
+// beforeMessageId (optional) continues from strictly older messages than
+// the given id — pass the oldest messageId already fetched to get the next
+// page. startPosition offsets the returned items' `position` field so a
+// continued page's ordering picks up after the previous page's items
+// instead of restarting at 0.
+export async function enumerateTelegramChannel(
+  channelUrlOrUsername: string,
+  options: { beforeMessageId?: number; startPosition?: number } = {}
+): Promise<TelegramCatalogEnumeration> {
+  const { beforeMessageId, startPosition = 0 } = options;
   const username = extractTelegramChannelUsername(channelUrlOrUsername);
   if (!username) {
     throw new Error("That doesn't look like a Telegram channel link (expected t.me/channelname or @channelname)");
@@ -62,14 +74,15 @@ export async function enumerateTelegramChannel(channelUrlOrUsername: string): Pr
 
   const rawItems: Omit<TelegramCatalogEntry, "isDuplicate">[] = [];
   let truncated = false;
-  let position = 0;
+  let position = startPosition;
 
   for await (const message of client.iterMessages(entity, {
     filter: new Api.InputMessagesFilterMusic(),
-    limit: MAX_TOTAL_ITEMS + 1,
+    limit: PAGE_SIZE + 1,
     reverse: false,
+    ...(beforeMessageId ? { offsetId: beforeMessageId } : {}),
   })) {
-    if (rawItems.length >= MAX_TOTAL_ITEMS) {
+    if (rawItems.length >= PAGE_SIZE) {
       truncated = true;
       break;
     }
@@ -89,7 +102,7 @@ export async function enumerateTelegramChannel(channelUrlOrUsername: string): Pr
   }
 
   if (rawItems.length === 0) {
-    throw new Error("No audio files found in this channel");
+    throw new Error(beforeMessageId ? "No older audio files found in this channel" : "No audio files found in this channel");
   }
 
   const candidateSourceIds = rawItems.map((i) => buildTelegramSourceId(channelId, i.messageId));
