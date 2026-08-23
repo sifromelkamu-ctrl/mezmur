@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -110,6 +111,24 @@ function publicBaseUrl(): string {
 // by design.
 export function publicArtworkUrl(key: string): string {
   return `${publicBaseUrl()}/${key}`;
+}
+
+// Unlike Supabase's public buckets (which allow cross-origin GETs by
+// default), a fresh R2 bucket has no CORS policy at all — so the app's
+// client-side artwork tools (smart-crop focal-point analysis, the
+// ArtworkEditor's natural-dimension probe), which both load images with
+// crossOrigin="anonymous" to read pixel data via canvas, silently fail for
+// every R2-hosted image and fall back to a non-cover framing. One-time setup
+// call, safe to re-run (idempotent — just overwrites the same policy).
+export async function setPublicBucketCors(): Promise<void> {
+  await requireClient().send(
+    new PutBucketCorsCommand({
+      Bucket: R2_BUCKET_NAME,
+      CORSConfiguration: {
+        CORSRules: [{ AllowedOrigins: ["*"], AllowedMethods: ["GET", "HEAD"], AllowedHeaders: ["*"], MaxAgeSeconds: 86400 }],
+      },
+    })
+  );
 }
 
 // Uploads a small in-memory buffer (images) to the public artwork bucket.

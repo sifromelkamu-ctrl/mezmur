@@ -2,7 +2,7 @@ import { Router, type Response } from "express";
 import { z } from "zod";
 import { isAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
-import { r2Configured } from "../storage/r2.js";
+import { r2Configured, setPublicBucketCors } from "../storage/r2.js";
 import {
   assertCanStartBatch,
   discoverPendingMedia,
@@ -79,6 +79,16 @@ router.post("/run", async (req: AuthedRequest, res) => {
   }
   const batchSize = parsed.data.batchSize ?? (Number(process.env.MEDIA_MIGRATION_BATCH_SIZE) || 50);
   await startBatch(res, batchSize);
+});
+
+// TEMP: one-time fix for R2 buckets having no CORS policy by default
+// (Supabase's public buckets always allowed cross-origin GETs; R2 doesn't
+// unless configured), which broke the client's crossOrigin="anonymous"
+// canvas reads (smart-crop analysis, ArtworkEditor natural-dimension probe)
+// for every R2-hosted image. Remove this route once it's been called.
+router.post("/fix-cors", async (_req: AuthedRequest, res) => {
+  await setPublicBucketCors();
+  res.json({ ok: true });
 });
 
 // POST /api/admin/media-migration/retry-failed — resets every failed job
