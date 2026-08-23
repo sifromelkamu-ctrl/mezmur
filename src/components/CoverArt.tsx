@@ -6,7 +6,7 @@ import { useArtworkPalette } from "../hooks/useArtworkPalette";
 import { useSmartFrame } from "../hooks/useSmartFrame";
 import { adminApi, type ArtworkEntityType, type ArtworkFrame } from "../lib/api";
 import { emitArtworkChanged } from "../lib/artworkEvents";
-import { computeRenderRect, hasLetterbox } from "../utils/artworkTransform";
+import { computeRenderRect, coverZoom, hasLetterbox } from "../utils/artworkTransform";
 import ArtworkEditor from "./ArtworkEditor";
 
 // Branded fallback cover for albums/artists/tracks with no artwork uploaded
@@ -118,12 +118,6 @@ export default function CoverArt({
   const showPhoto = Boolean(photoUrl) && !photoFailed;
   const palette = useArtworkPalette(showPhoto ? photoUrl : undefined, gradient);
 
-  // A track's own artwork only exists at all when it has no album ("Album
-  // Artwork Is Master Artwork" — see readOnlyArtwork's doc above): every
-  // editable (!readOnlyArtwork) track CoverArt is therefore always a
-  // standalone Single, never an album/artist's shared image. That's the
-  // "Singles only" gate for the freeform crop floor below.
-  const allowFreeformCrop = entityType === "track" && !readOnlyArtwork;
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
   // Only worth analyzing when there's no saved/override frame to use
   // instead — activeFrame always prefers those, so without this check every
@@ -172,15 +166,25 @@ export default function CoverArt({
     }
   };
 
+  // The displayed frame never renders under-cover — even a stale saved
+  // frame from before this floor was enforced (or a bad write from
+  // somewhere else) gets its zoom clamped up to coverZoom here, so the
+  // square is always fully covered by sharp image content. Rotation is
+  // passed through unchanged: a rotated square still needs the blurred-
+  // backdrop fill for its exposed corners (see hasLetterbox/showBackdrop
+  // below), which is a real, legitimate use of that fill — the thing being
+  // removed here is specifically the never-wanted under-zoom letterbox.
+  const displayFrame =
+    activeFrame && natural ? { ...activeFrame, zoom: Math.max(activeFrame.zoom, coverZoom(natural.w, natural.h)) } : activeFrame;
+
   // Until the smart/saved frame and natural dimensions are both known, fall
   // back to plain object-cover so something reasonable shows immediately —
   // never object-contain, which is exactly what produced visible letterbox
   // borders. Once ready, the frame-based render below always fully covers
-  // the square too, by construction (see smartCrop.ts): the blurred-backdrop
-  // fill only ever appears for a rotation or a deliberate manual under-zoom
-  // an admin explicitly saved, never as automatic/default behavior.
+  // the square too — the blurred-backdrop fill only ever appears now for an
+  // actual rotation, never for zoom.
   const showBackdrop = Boolean(
-    frameReady && natural && activeFrame && hasLetterbox(activeFrame, natural.w, natural.h) && showPhoto && !rounded
+    frameReady && natural && displayFrame && hasLetterbox(displayFrame, natural.w, natural.h) && showPhoto && !rounded
   );
 
   const framed = size !== "sm";
@@ -196,7 +200,7 @@ export default function CoverArt({
       }
     : {};
 
-  const rect = frameReady && natural && activeFrame ? computeRenderRect(activeFrame, natural.w, natural.h, 1000) : null;
+  const rect = frameReady && natural && displayFrame ? computeRenderRect(displayFrame, natural.w, natural.h, 1000) : null;
 
   return (
     <div

@@ -10,14 +10,6 @@ interface ArtworkEditorProps {
   initialFrame?: ArtworkFrame;
   onSave: (frame: ArtworkFrame) => void | Promise<void>;
   onClose: () => void;
-  // Singles-only (see CoverArt: entityType === "track" && !readOnlyArtwork —
-  // a track with its own artwork, never an album/artist's shared image).
-  // Lets the zoom floor drop from "fully covers the square" down to "whole
-  // image fits inside the square", so the admin can manually frame just the
-  // part they want even when that leaves the rest of the square letterboxed
-  // — CoverArt already renders that case via its blurred-backdrop fill (see
-  // hasLetterbox), this just unlocks reaching it from the editor.
-  allowFreeform?: boolean;
 }
 
 // CROP_SIZE is the fixed crop window (never moves, matches what every other
@@ -82,7 +74,7 @@ function mid(a: { x: number; y: number }, b: { x: number; y: number }) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
-export default function ArtworkEditor({ photoUrl, initialFrame, onSave, onClose, allowFreeform = false }: ArtworkEditorProps) {
+export default function ArtworkEditor({ photoUrl, initialFrame, onSave, onClose }: ArtworkEditorProps) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [smartFrame, setSmartFrame] = useState<ArtworkFrame | null>(null);
   const startFrame = useMemo(() => initialFrame ?? smartFrame ?? neutralFrame(), [initialFrame, smartFrame]);
@@ -97,16 +89,10 @@ export default function ArtworkEditor({ photoUrl, initialFrame, onSave, onClose,
 
   // Fill floor: "image exactly fills the square" — below this zoom the
   // image would be smaller than the square, leaving a gap (letterbox).
-  // Every entity except a Single's own artwork is locked to this floor, so
-  // the square is always fully covered. A Single (allowFreeform) can drop
-  // all the way to fitZoom (1 — "whole image fits inside the square", see
-  // computeRenderRect) for genuine manual/freeform framing; CoverArt
-  // already renders that case correctly via its letterbox backdrop.
+  // Always enforced, for every entity — the square is always fully covered,
+  // no exceptions, so nothing ever renders under-zoomed/letterboxed.
   const fillZoom = natural ? coverZoom(natural.w, natural.h) : 1;
-  const fitZoom = 1;
-  const minZoom = allowFreeform ? fitZoom : fillZoom;
-  // Max zoom-in stays anchored to fillZoom regardless of mode, so the
-  // available in-close-up detail range doesn't change with the floor.
+  const minZoom = fillZoom;
   const maxZoom = fillZoom * ZOOM_RANGE_MULTIPLIER;
 
   // Single choke point every pan/zoom update goes through: clamps zoom to
