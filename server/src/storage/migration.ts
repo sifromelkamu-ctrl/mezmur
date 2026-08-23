@@ -184,11 +184,18 @@ export async function discoverPendingMedia(): Promise<{ discovered: number }> {
 async function updateEntityStorageKey(mediaKind: MediaKind, entityId: string, key: string, publicUrl: string): Promise<void> {
   switch (mediaKind) {
     case "track_audio":
-      // Deliberately does NOT set audioUrl — R2 audio has no permanent
+      // Explicitly clears audioUrl, not just leaves it unset — a migrated
+      // track's audioUrl still held its old (working, non-deleted) Supabase
+      // URL, which toTrackDTO would keep serving straight through
+      // GET /api/tracks exactly as before, silently defeating the whole
+      // point: it's the same permanent, unauthenticated, un-expiring link
+      // this migration exists to get rid of. R2 audio has no permanent
       // public URL by design (see Track.audioStorageKey's doc comment in
-      // schema.prisma). Real playback goes through routes/tracks.ts's
-      // signed /:id/stream-url instead.
-      await prisma.track.update({ where: { id: entityId }, data: { audioStorageKey: key } });
+      // schema.prisma) — real playback goes through routes/tracks.ts's
+      // signed /:id/stream-url instead, which already prefers
+      // audioStorageKey over audioUrl, but only actually matters once
+      // audioUrl stops being handed out directly too.
+      await prisma.track.update({ where: { id: entityId }, data: { audioStorageKey: key, audioUrl: null } });
       return;
     case "track_cover":
       await prisma.track.update({ where: { id: entityId }, data: { coverStorageKey: key, coverUrl: publicUrl } });
