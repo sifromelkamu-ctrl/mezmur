@@ -3,10 +3,12 @@ import { prisma } from "../prisma.js";
 import { getTelegramClient } from "./client.js";
 import { extractTelegramChannelUsername } from "./validate.js";
 
-// Same ceiling YouTube catalog import uses, for the same reason: keeps the
-// selection UI and resulting DB rows manageable even for a channel with a
-// very long posting history.
-const MAX_TOTAL_ITEMS = 500;
+// Keeps the selection UI and resulting DB rows manageable even for a
+// channel with a very long posting history, while still reaching well back
+// into most channels' full catalog — 500 was cutting off older songs on
+// channels with a large back-catalog before their whole history had been
+// scanned (enumeration reads newest-first, see reverse: false below).
+const MAX_TOTAL_ITEMS = 2000;
 
 export interface TelegramCatalogEntry {
   messageId: string;
