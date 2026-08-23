@@ -7,8 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Columns2,
   Copy,
   Heart,
+  Image as ImageIcon,
   Leaf,
   Loader2,
   Pause,
@@ -26,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { BIBLE_BOOKS, type BibleBookMeta } from "../data/bibleBooks";
 import { useAuth } from "../context/useAuth";
 import { useTheme } from "../context/ThemeContext";
+import BibleCompareModal from "../components/bible/BibleCompareModal";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import BibleSettingsModal from "../components/bible/BibleSettingsModal";
 import NotificationsPanel from "../components/home/NotificationsPanel";
@@ -45,6 +48,7 @@ import {
   type HighlightColor,
   type VerseAnnotation,
 } from "../utils/bibleAnnotations";
+import { shareVerseAsImage } from "../utils/bibleVerseImage";
 import {
   ENGLISH_FONT_FAMILY_CLASSES,
   ENGLISH_VERSION_LABELS,
@@ -67,6 +71,27 @@ type BookText = Record<string, string[]>; // chapter number -> verses
 // licensing restriction) is the text actually being read.
 function bookDisplayName(book: BibleBookMeta, language: "am" | "en"): string {
   return language === "en" ? book.name : book.nameAm;
+}
+
+// Formats a sorted list of 0-based verse indices as 1-based verse numbers
+// for a citation, collapsing contiguous runs into ranges (e.g. selecting
+// verses 3-5 and 8 and 10-11 reads "3-5,8,10-11") rather than every verse
+// spelled out individually — matches how a citation is normally written.
+function formatVerseNumbers(sortedIndices: number[]): string {
+  const parts: string[] = [];
+  let start = sortedIndices[0];
+  let prev = sortedIndices[0];
+  for (let idx = 1; idx <= sortedIndices.length; idx++) {
+    const current = sortedIndices[idx];
+    if (current === prev + 1) {
+      prev = current;
+      continue;
+    }
+    parts.push(start === prev ? `${start + 1}` : `${start + 1}-${prev + 1}`);
+    start = current;
+    prev = current;
+  }
+  return parts.join(",");
 }
 
 const WORD_ART_TITLE =
@@ -208,6 +233,9 @@ export default function Bible() {
   const [editingNoteVerse, setEditingNoteVerse] = useState<number | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [justCopied, setJustCopied] = useState(false);
+  const [justShared, setJustShared] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
   const [showBibleSettings, setShowBibleSettings] = useState(false);
@@ -529,19 +557,61 @@ export default function Bible() {
     });
   };
 
-  const handleCopySelected = async () => {
-    if (!verses) return;
+  // Shared "quote — citation" composition every selection action (Copy,
+  // Share, Image, Compare's header) uses, so a verse leaving the app always
+  // identifies itself instead of pasting/sharing as anonymous text.
+  const getSelectionText = (): { text: string; citation: string | null; withCitation: string; ids: number[] } | null => {
+    if (!verses) return null;
     const ids = [...selectedVerses].sort((a, b) => a - b);
     const text = ids
       .map((i) => verses[i])
       .filter(Boolean)
       .join(" ");
+    const citation = book ? `${bookDisplayName(book, prefs.language)} ${chapter}:${formatVerseNumbers(ids)}` : null;
+    const withCitation = citation ? `“${text}” — ${citation}` : text;
+    return { text, citation, withCitation, ids };
+  };
+
+  const handleCopySelected = async () => {
+    const selection = getSelectionText();
+    if (!selection) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(selection.withCitation);
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 1500);
     } catch {
       // clipboard unavailable — silently ignore
+    }
+  };
+
+  const handleShareSelected = async () => {
+    const selection = getSelectionText();
+    if (!selection) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: selection.withCitation });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to clipboard copy
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(selection.withCitation);
+      setJustShared(true);
+      setTimeout(() => setJustShared(false), 1800);
+    } catch {
+      // clipboard unavailable — silently ignore
+    }
+  };
+
+  const handleImageSelected = async () => {
+    const selection = getSelectionText();
+    if (!selection || !selection.citation || generatingImage) return;
+    setGeneratingImage(true);
+    try {
+      await shareVerseAsImage(selection.text, selection.citation);
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -951,68 +1021,113 @@ export default function Bible() {
           </div>
         ) : null}
 
-        {selectedVerses.size > 0 && (
-          <div className="sticky bottom-4 z-20 flex items-center gap-2 flex-wrap p-3 bg-elevated rounded-xl shadow-2xl border border-border">
-            <span className="text-xs font-bold text-fg-muted pl-1 pr-1">
-              {selectedVerses.size} {selectedVerses.size === 1 ? "verse" : "verses"}
-            </span>
-            <div className="w-px h-5 bg-border" />
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleApplyHighlight(c.id)}
-                className={`w-7 h-7 rounded-full ${c.swatch} transition-transform hover:scale-110`}
-                aria-label={`Highlight ${c.id}`}
-              />
-            ))}
-            <div className="w-px h-5 bg-border" />
-            <button
-              onClick={handleCopySelected}
-              className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
-            >
-              {justCopied ? <Check size={14} className="text-gold" /> : <Copy size={14} />}
-              {justCopied ? "Copied" : "Copy"}
-            </button>
-            {selectedVerses.size === 1 &&
-              (() => {
-                const soleVerse = [...selectedVerses][0];
-                const soleKey = bookSlug && chapter ? verseKey(bookSlug, chapter, soleVerse) : "";
-                const hasNote = Boolean(annotations[soleKey]?.note);
-                return (
+        {selectedVerses.size > 0 &&
+          (() => {
+            const colorsInSelection = new Set(
+              [...selectedVerses].map((i) => {
+                const k = bookSlug && chapter ? verseKey(bookSlug, chapter, i) : "";
+                return annotations[k]?.color ?? null;
+              })
+            );
+            const activeColor = colorsInSelection.size === 1 ? [...colorsInSelection][0] : null;
+            const allFavorited = [...selectedVerses].every((i) => {
+              const k = bookSlug && chapter ? verseKey(bookSlug, chapter, i) : "";
+              return annotations[k]?.favorite;
+            });
+            const sortedSelection = [...selectedVerses].sort((a, b) => a - b);
+            return (
+              <div className="sticky bottom-4 z-20">
+                <div className="flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                  {/* One continuous scrollable strip — highlight colors up
+                      front, always visible, followed by every action, so the
+                      whole toolbar reads and scrolls as a single row. */}
+                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+                    {HIGHLIGHT_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleApplyHighlight(c.id)}
+                        aria-label={`Highlight ${c.id}`}
+                        className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
+                          activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
+                        }`}
+                      />
+                    ))}
+                    <div className="w-px h-5 bg-border shrink-0 mx-1" />
+                    <button
+                      onClick={handleToggleFavorite}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                    >
+                      <Heart size={15} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
+                      Save
+                    </button>
+                    {selectedVerses.size === 1 &&
+                      (() => {
+                        const soleVerse = [...selectedVerses][0];
+                        const soleKey = bookSlug && chapter ? verseKey(bookSlug, chapter, soleVerse) : "";
+                        const hasNote = Boolean(annotations[soleKey]?.note);
+                        return (
+                          <button
+                            onClick={() => {
+                              setEditingNoteVerse(soleVerse);
+                              setNoteDraft(annotations[soleKey]?.note ?? "");
+                            }}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                          >
+                            <StickyNote size={15} />
+                            {hasNote ? "Edit note" : "Note"}
+                          </button>
+                        );
+                      })()}
+                    <button
+                      onClick={handleCopySelected}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                    >
+                      {justCopied ? <Check size={15} className="text-gold" /> : <Copy size={15} />}
+                      {justCopied ? "Copied" : "Copy"}
+                    </button>
+                    <button
+                      onClick={handleShareSelected}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                    >
+                      {justShared ? <Check size={15} className="text-gold" /> : <Share2 size={15} />}
+                      {justShared ? "Shared" : "Share"}
+                    </button>
+                    <button
+                      onClick={handleImageSelected}
+                      disabled={generatingImage}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
+                    >
+                      {generatingImage ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+                      Image
+                    </button>
+                    <button
+                      onClick={() => setShowCompare(true)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                    >
+                      <Columns2 size={15} />
+                      Compare
+                    </button>
+                  </div>
                   <button
-                    onClick={() => {
-                      setEditingNoteVerse(soleVerse);
-                      setNoteDraft(annotations[soleKey]?.note ?? "");
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
+                    onClick={() => setSelectedVerses(new Set())}
+                    aria-label="Cancel selection"
+                    className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
                   >
-                    <StickyNote size={14} />
-                    {hasNote ? "Edit note" : "Note"}
+                    <X size={16} />
                   </button>
-                );
-              })()}
-            {(() => {
-              const soleVerse = selectedVerses.size === 1 ? [...selectedVerses][0] : null;
-              const soleKey = soleVerse !== null && bookSlug && chapter ? verseKey(bookSlug, chapter, soleVerse) : "";
-              const isFavorited = Boolean(annotations[soleKey]?.favorite);
-              return (
-                <button
-                  onClick={handleToggleFavorite}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-2 py-1.5 rounded-md hover:bg-hover transition-colors"
-                >
-                  <Heart size={14} className={isFavorited ? "text-red-400" : ""} fill={isFavorited ? "currentColor" : "none"} />
-                  {isFavorited ? "Favorited" : "Favorite"}
-                </button>
-              );
-            })()}
-            <button
-              onClick={() => setSelectedVerses(new Set())}
-              className="ml-auto text-xs font-semibold text-fg-subtle hover:text-fg px-2 py-1.5"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
+                </div>
+                {showCompare && bookSlug && chapter && book && (
+                  <BibleCompareModal
+                    bookSlug={bookSlug}
+                    chapter={chapter}
+                    verseIndices={sortedSelection}
+                    reference={`${bookDisplayName(book, prefs.language)} ${chapter}:${formatVerseNumbers(sortedSelection)}`}
+                    onClose={() => setShowCompare(false)}
+                  />
+                )}
+              </div>
+            );
+          })()}
       </div>
     );
   }
