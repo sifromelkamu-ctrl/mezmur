@@ -1058,13 +1058,13 @@ export default function Bible() {
                 style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
               >
                 <div
-                  className="relative flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.28)] backdrop-blur-xl"
-                  style={{ background: "color-mix(in oklab, var(--bible-navy) 94%, transparent)" }}
+                  className="relative flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.45)]"
+                  style={{ background: "rgba(28, 21, 48, 0.98)" }}
                 >
                   {showHighlightPicker && (
                     <div
-                      className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.28)] backdrop-blur-xl"
-                      style={{ background: "color-mix(in oklab, var(--bible-navy) 96%, transparent)" }}
+                      className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.45)]"
+                      style={{ background: "rgba(28, 21, 48, 0.99)" }}
                     >
                       {HIGHLIGHT_COLORS.map((c) => (
                         <button
@@ -1077,7 +1077,7 @@ export default function Bible() {
                           className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
                             activeColor === c.id ? "ring-2 ring-offset-2 ring-white scale-110" : ""
                           }`}
-                          style={activeColor === c.id ? { "--tw-ring-offset-color": "var(--bible-navy)" } as CSSProperties : undefined}
+                          style={activeColor === c.id ? ({ "--tw-ring-offset-color": "rgb(28, 21, 48)" } as CSSProperties) : undefined}
                         />
                       ))}
                       <button
