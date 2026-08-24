@@ -1057,9 +1057,15 @@ export default function Bible() {
                 className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
                 style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
               >
-                <div className="relative flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                <div
+                  className="relative flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.28)] backdrop-blur-xl"
+                  style={{ background: "color-mix(in oklab, var(--bible-navy) 94%, transparent)" }}
+                >
                   {showHighlightPicker && (
-                    <div className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                    <div
+                      className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.28)] backdrop-blur-xl"
+                      style={{ background: "color-mix(in oklab, var(--bible-navy) 96%, transparent)" }}
+                    >
                       {HIGHLIGHT_COLORS.map((c) => (
                         <button
                           key={c.id}
@@ -1069,14 +1075,15 @@ export default function Bible() {
                           }}
                           aria-label={`Highlight ${c.id}`}
                           className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
-                            activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
+                            activeColor === c.id ? "ring-2 ring-offset-2 ring-white scale-110" : ""
                           }`}
+                          style={activeColor === c.id ? { "--tw-ring-offset-color": "var(--bible-navy)" } as CSSProperties : undefined}
                         />
                       ))}
                       <button
                         onClick={() => setShowHighlightPicker(false)}
                         aria-label="Close color picker"
-                        className="w-7 h-7 shrink-0 rounded-full border border-border flex items-center justify-center text-fg-subtle hover:text-fg transition-colors"
+                        className="w-7 h-7 shrink-0 rounded-full border border-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors"
                       >
                         <X size={12} />
                       </button>
@@ -1085,27 +1092,32 @@ export default function Bible() {
                   {/* One continuous scrollable strip — the highlight picker
                       collapses to a single button (colors reveal in a popup
                       on tap) so it doesn't eat width from everything else,
-                      then every other action follows in the same row. */}
-                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+                      then every other action follows in the same row. Navy/
+                      gold instead of the page's own cream so the bar reads
+                      as a distinct, designed surface rather than blending
+                      into the page background — matches the accent color
+                      the rest of this section already uses (Verse of the
+                      Day, testament cards). */}
+                  <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
                     <button
                       onClick={() => setShowHighlightPicker((v) => !v)}
-                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 ${
-                        showHighlightPicker ? "text-fg bg-hover" : "text-fg-muted hover:text-fg"
+                      className={`flex items-center gap-2 text-sm font-semibold px-3.5 py-2.5 rounded-full transition-colors shrink-0 ${
+                        showHighlightPicker ? "text-gold bg-white/10" : "text-white/75 hover:text-white hover:bg-white/10"
                       }`}
                     >
                       {activeColor ? (
-                        <span className={`w-3.5 h-3.5 rounded-full ${HIGHLIGHT_COLORS.find((c) => c.id === activeColor)?.swatch}`} />
+                        <span className={`w-4 h-4 rounded-full ${HIGHLIGHT_COLORS.find((c) => c.id === activeColor)?.swatch}`} />
                       ) : (
-                        <Highlighter size={15} />
+                        <Highlighter size={17} />
                       )}
                       Highlight
                     </button>
-                    <div className="w-px h-5 bg-border shrink-0 mx-1" />
+                    <div className="w-px h-6 bg-white/15 shrink-0 mx-0.5" />
                     <button
                       onClick={handleToggleFavorite}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                     >
-                      <Heart size={15} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
+                      <Heart size={17} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
                       Save
                     </button>
                     {selectedVerses.size === 1 &&
@@ -1119,40 +1131,40 @@ export default function Bible() {
                               setEditingNoteVerse(soleVerse);
                               setNoteDraft(annotations[soleKey]?.note ?? "");
                             }}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                            className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                           >
-                            <StickyNote size={15} />
+                            <StickyNote size={17} />
                             {hasNote ? "Edit note" : "Note"}
                           </button>
                         );
                       })()}
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                     >
-                      {justCopied ? <Check size={15} className="text-gold" /> : <Copy size={15} />}
+                      {justCopied ? <Check size={17} className="text-gold" /> : <Copy size={17} />}
                       {justCopied ? "Copied" : "Copy"}
                     </button>
                     <button
                       onClick={handleShareSelected}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                     >
-                      {justShared ? <Check size={15} className="text-gold" /> : <Share2 size={15} />}
+                      {justShared ? <Check size={17} className="text-gold" /> : <Share2 size={17} />}
                       {justShared ? "Shared" : "Share"}
                     </button>
                     <button
                       onClick={handleImageSelected}
                       disabled={generatingImage}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 disabled:opacity-60"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0 disabled:opacity-60"
                     >
-                      {generatingImage ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+                      {generatingImage ? <Loader2 size={17} className="animate-spin" /> : <ImageIcon size={17} />}
                       Image
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted hover:text-fg px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                     >
-                      <Columns2 size={15} />
+                      <Columns2 size={17} />
                       Compare
                     </button>
                   </div>
@@ -1162,9 +1174,9 @@ export default function Bible() {
                       setShowHighlightPicker(false);
                     }}
                     aria-label="Cancel selection"
-                    className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
+                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 </div>
                 {showCompare && bookSlug && chapter && book && (
