@@ -964,9 +964,13 @@ export default function Bible() {
                     }
                     className={`${FONT_SIZE_CLASSES[prefs.fontSize]} ${
                       prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : FONT_FAMILY_CLASSES[prefs.fontFamily]
-                    } text-fg leading-loose cursor-pointer rounded-lg px-2 -mx-2 py-1.5 transition-all ${
+                    } text-fg leading-loose cursor-pointer rounded-xl px-3 -mx-1.5 py-2 transition-all duration-200 ${
                       highlightMeta ? highlightMeta.bg : "hover:bg-hover"
-                    } ${isSelected ? "ring-2 ring-gold ring-inset" : ""}`}
+                    } ${
+                      isSelected
+                        ? "shadow-[inset_3px_0_0_0_var(--color-gold),0_4px_16px_-4px_rgba(212,175,55,0.4)]"
+                        : ""
+                    }`}
                   >
                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold/15 text-gold text-[10px] font-bold mr-2 align-middle">
                       {i + 1}
