@@ -10,6 +10,7 @@ import {
   Columns2,
   Copy,
   Heart,
+  Highlighter,
   Image as ImageIcon,
   Leaf,
   Loader2,
@@ -235,6 +236,7 @@ export default function Bible() {
   const [noteDraft, setNoteDraft] = useState("");
   const [justCopied, setJustCopied] = useState(false);
   const [justShared, setJustShared] = useState(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
@@ -1055,21 +1057,49 @@ export default function Bible() {
                 className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
                 style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
               >
-                <div className="flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
-                  {/* One continuous scrollable strip — highlight colors up
-                      front, always visible, followed by every action, so the
-                      whole toolbar reads and scrolls as a single row. */}
-                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
-                    {HIGHLIGHT_COLORS.map((c) => (
+                <div className="relative flex items-center gap-1 p-1.5 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                  {showHighlightPicker && (
+                    <div className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 bg-elevated/95 backdrop-blur-xl rounded-full shadow-2xl border border-border">
+                      {HIGHLIGHT_COLORS.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            handleApplyHighlight(c.id);
+                            setShowHighlightPicker(false);
+                          }}
+                          aria-label={`Highlight ${c.id}`}
+                          className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
+                            activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
+                          }`}
+                        />
+                      ))}
                       <button
-                        key={c.id}
-                        onClick={() => handleApplyHighlight(c.id)}
-                        aria-label={`Highlight ${c.id}`}
-                        className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
-                          activeColor === c.id ? "ring-2 ring-offset-2 ring-offset-elevated ring-fg scale-110" : ""
-                        }`}
-                      />
-                    ))}
+                        onClick={() => setShowHighlightPicker(false)}
+                        aria-label="Close color picker"
+                        className="w-7 h-7 shrink-0 rounded-full border border-border flex items-center justify-center text-fg-subtle hover:text-fg transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                  {/* One continuous scrollable strip — the highlight picker
+                      collapses to a single button (colors reveal in a popup
+                      on tap) so it doesn't eat width from everything else,
+                      then every other action follows in the same row. */}
+                  <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+                    <button
+                      onClick={() => setShowHighlightPicker((v) => !v)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full hover:bg-hover transition-colors shrink-0 ${
+                        showHighlightPicker ? "text-fg bg-hover" : "text-fg-muted hover:text-fg"
+                      }`}
+                    >
+                      {activeColor ? (
+                        <span className={`w-3.5 h-3.5 rounded-full ${HIGHLIGHT_COLORS.find((c) => c.id === activeColor)?.swatch}`} />
+                      ) : (
+                        <Highlighter size={15} />
+                      )}
+                      Highlight
+                    </button>
                     <div className="w-px h-5 bg-border shrink-0 mx-1" />
                     <button
                       onClick={handleToggleFavorite}
@@ -1127,7 +1157,10 @@ export default function Bible() {
                     </button>
                   </div>
                   <button
-                    onClick={() => setSelectedVerses(new Set())}
+                    onClick={() => {
+                      setSelectedVerses(new Set());
+                      setShowHighlightPicker(false);
+                    }}
                     aria-label="Cancel selection"
                     className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
                   >
