@@ -11,6 +11,7 @@ import {
 import { tracksApi, type ApiTrack } from "../lib/api";
 import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
 import { emitMediaStarted, onMediaStarted } from "../lib/mediaEvents";
+import { streamUrlFetch } from "../lib/prefetchAudio";
 import { recordPlayed, recordPosition } from "../lib/recentlyPlayed";
 import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
 import { useSubscription } from "./useSubscription";
@@ -256,13 +257,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // R2-hosted audio has no permanent URL by design (see
       // ApiTrack.audioUrl's doc comment) — fetch a short-lived signed one
       // right before playing, rather than ever storing something that
-      // silently expires on its own. `cancelled`/the ref check guard
+      // silently expires on its own. Goes through streamUrlFetch's shared
+      // cache (see lib/prefetchAudio.ts) rather than calling the API
+      // directly, so a track row's own onPointerDown prefetch and this real
+      // playback attempt reuse one request instead of firing it twice —
+      // often this resolves instantly because the prefetch already
+      // finished before the tap did. `cancelled`/the ref check guard
       // against the track changing again before this resolves.
       audio.pause();
       audio.removeAttribute("src");
       const trackId = currentTrack.id;
-      tracksApi
-        .getStreamUrl(trackId)
+      streamUrlFetch(trackId)
         .then(({ url }) => {
           if (cancelled || audioRef.current !== audio || currentTrackRef.current?.id !== trackId) return;
           audio.src = url;

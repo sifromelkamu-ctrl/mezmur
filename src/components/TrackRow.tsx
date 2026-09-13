@@ -3,6 +3,7 @@ import { memo, useState } from "react";
 import { usePlayer } from "../context/PlayerContext";
 import { useFavorites } from "../context/FavoritesContext";
 import type { ApiTrack } from "../lib/api";
+import { prefetchTrackAudio } from "../lib/prefetchAudio";
 import { formatDuration } from "../utils/format";
 import AddToPlaylistModal from "./AddToPlaylistModal";
 import CoverArt from "./CoverArt";
@@ -70,6 +71,7 @@ function TrackRow({
   return (
     <div
       onClick={handleClick}
+      onPointerDown={() => !isCurrent && prefetchTrackAudio(track)}
       className={`group grid ${
         showPlayCount && hasTrailingColumn
           ? "grid-cols-[24px_1fr_auto_auto_auto]"

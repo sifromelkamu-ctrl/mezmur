@@ -2,24 +2,31 @@ import { useEffect, useState } from "react";
 import mezmurLogo from "../assets/mezmur-logo.png";
 
 const WORDMARK = "MEZMUR";
-const LETTER_STAGGER_MS = 55;
-const LETTERS_START_MS = 350;
-const SHIMMER_START_MS = LETTERS_START_MS + WORDMARK.length * LETTER_STAGGER_MS + 250;
+// Compressed to roughly half the original pacing (was 55/350/250/450/2830)
+// per an explicit "make the app faster" request — cold start was paying a
+// flat ~2.8s branded hold on every single launch regardless of how fast
+// data actually loaded underneath it (see the HOLD_MS comment below). Same
+// choreography, same beats, just run at a brisker tempo so the intro reads
+// as premium rather than slow.
+const LETTER_STAGGER_MS = 25;
+const LETTERS_START_MS = 150;
+const SHIMMER_START_MS = LETTERS_START_MS + WORDMARK.length * LETTER_STAGGER_MS + 120;
 const TAGLINE_WORDS = ["Worship.", "Listen.", "Inspire."];
-// Each word's 0.5s pop animation peaks (scale overshoot + full opacity) at
-// its own 60% mark — 300ms in — which is exactly when a 300ms stagger let
-// the next word start, so the three used to visually overlap/cascade into
+// Each word's 0.35s pop animation (see the inline animation below) peaks at
+// its own 60% mark, which is exactly when a same-length stagger would let
+// the next word start, so the three would visually overlap/cascade into
 // each other instead of reading as a clear 1-2-3 sequence. Widening the gap
 // past that peak fixes it.
-const TAGLINE_STAGGER_MS = 450;
+const TAGLINE_STAGGER_MS = 180;
 // The last tagline word finishes popping in and settles at SHIMMER_START_MS
-// + 2 * TAGLINE_STAGGER_MS + 0.5s pop duration = 2330ms; this holds another
-// half second past that so all three words are unmistakably shown together,
-// at rest, before exiting — not just barely finished landing. Data fetching
-// already starts immediately underneath this overlay (see App.tsx — the
-// whole provider tree mounts regardless of showSplash), so lengthening this
-// only extends the branded intro, not any real loading.
-const HOLD_MS = 2830;
+// + 2 * TAGLINE_STAGGER_MS + 0.35s pop duration; this holds a short beat
+// past that so all three words are unmistakably shown together, at rest,
+// before exiting — not just barely finished landing. Data fetching already
+// starts immediately underneath this overlay (see App.tsx — the whole
+// provider tree mounts regardless of showSplash), so this hold only ever
+// extends the branded intro, never any real loading — which is exactly why
+// it's worth keeping short.
+const HOLD_MS = SHIMMER_START_MS + 2 * TAGLINE_STAGGER_MS + 350 + 150;
 // Must match .splash-exiting's animation-duration in index.css (0.55s) —
 // this is only the JS-side timer that unmounts the component once that CSS
 // fade-out finishes, not an independent duration.
@@ -114,7 +121,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
               style={{
                 color: SPLASH_TEAL_LIGHT,
                 letterSpacing: "0.1em",
-                animation: `splash-tagline-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${
+                animation: `splash-tagline-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1) ${
                   SHIMMER_START_MS + i * TAGLINE_STAGGER_MS
                 }ms forwards`,
               }}
