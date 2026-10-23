@@ -24,6 +24,33 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<!-- iOS 27 turned "no Scene lifecycle adoption" from a logged
+		     runtime warning into a hard EXC_BREAKPOINT crash on launch
+		     (seen live on an iPhone 18 Pro Max running 27.0.1 — the app
+		     crashed instantly, before any UI, while the same build ran
+		     fine on older iOS). This app otherwise still uses the plain
+		     AppDelegate + Main storyboard setup below, completely
+		     unchanged - SceneDelegate.swift just re-points that same
+		     storyboard through the Scene lifecycle UIKit now requires. -->
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
