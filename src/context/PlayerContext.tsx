@@ -11,7 +11,7 @@ import {
 import { tracksApi, type ApiTrack } from "../lib/api";
 import { eventAppliesToTrack, onArtworkChanged } from "../lib/artworkEvents";
 import { emitMediaStarted, onMediaStarted } from "../lib/mediaEvents";
-import { streamUrlFetch } from "../lib/prefetchAudio";
+import { prefetchTrackAudio, streamUrlFetch } from "../lib/prefetchAudio";
 import { recordPlayed, recordPosition } from "../lib/recentlyPlayed";
 import { applyTrackMetadataPatch, onTrackMetadataChanged } from "../lib/trackMetadataEvents";
 import { useSubscription } from "./useSubscription";
@@ -287,6 +287,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id, currentTrack?.audioUrl, currentTrack?.hasAudio]);
+
+  // Warms the signed URL for whichever track `next()` would jump to, the
+  // moment the current one starts playing — same idea as TrackRow's
+  // onPointerDown prefetch (see lib/prefetchAudio.ts), just for the skip
+  // button instead of a fresh tap. Without this, every single Next press
+  // paid the full getStreamUrl round trip from a cold start, which is what
+  // the loading spinner on skip was actually waiting on. Shuffle skipped:
+  // its target is re-randomized at the moment of the actual jump, so
+  // there's no single "next" to warm in advance.
+  useEffect(() => {
+    if (shuffle || !currentTrack || queue.length < 2) return;
+    const idx = queue.findIndex((t) => t.id === currentTrack.id);
+    if (idx === -1) return;
+    const nextTrack = queue[(idx + 1) % queue.length];
+    prefetchTrackAudio(nextTrack);
+  }, [currentTrack, queue, shuffle]);
 
   // Play/pause the real audio element in lockstep with isPlaying.
   useEffect(() => {
