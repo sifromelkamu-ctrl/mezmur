@@ -8,9 +8,15 @@ interface BackButtonProps {
   // photo through it instead of sitting on top as a flat dot, for the
   // detail pages whose hero fills the whole top of the screen.
   variant?: "dark" | "glass";
+  // "glass" only: distance below the safe-area inset, in rem. Defaults to
+  // the original 1.25 for every existing caller — only a page that
+  // explicitly wants its glass buttons sitting closer to the status bar
+  // (e.g. ArtistDetail) passes a smaller value, so this never shifts
+  // anything on a page that didn't ask for it.
+  topOffsetRem?: number;
 }
 
-export default function BackButton({ className = "", variant = "dark" }: BackButtonProps) {
+export default function BackButton({ className = "", variant = "dark", topOffsetRem = 1.25 }: BackButtonProps) {
   const navigate = useNavigate();
   const goBack = () => {
     // React Router's history state carries an `idx` that's 0 only for the
@@ -29,6 +35,11 @@ export default function BackButton({ className = "", variant = "dark" }: BackBut
       onClick={goBack}
       className={`absolute left-4 w-11 h-11 rounded-full flex items-center justify-center text-white transition-colors z-10 ${
         variant === "glass"
+          ? "bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg hover:bg-white/20"
+          : "top-4 bg-black/50 hover:bg-black/70"
+      } ${className}`}
+      style={
+        variant === "glass"
           ? // "glass" only ever sits inside a hero whose own negative top
             // margin cancels the page's ambient safe-area padding (see e.g.
             // ArtistDetail's hero div), so top-4 alone would place it a flat
@@ -38,10 +49,13 @@ export default function BackButton({ className = "", variant = "dark" }: BackBut
             // intercept touches meant for the page beneath it, even where
             // it's visually transparent/overlaid. Re-adding the inset here
             // keeps it floating near the top on both platforms while
-            // guaranteeing it clears that zone entirely.
-            "top-[calc(env(safe-area-inset-top)+1.25rem)] bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg hover:bg-white/20"
-          : "top-4 bg-black/50 hover:bg-black/70"
-      } ${className}`}
+            // guaranteeing it clears that zone entirely. An inline style
+            // (not a Tailwind class) specifically so topOffsetRem can vary
+            // per caller without fighting Tailwind's own class-order-based
+            // specificity.
+            { top: `calc(env(safe-area-inset-top) + ${topOffsetRem}rem)` }
+          : undefined
+      }
       aria-label="Go back"
     >
       <ChevronLeft size={22} />

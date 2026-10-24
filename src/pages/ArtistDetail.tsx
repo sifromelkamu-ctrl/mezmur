@@ -422,13 +422,15 @@ export default function ArtistDetail() {
         />
 
         <HeroTopScrim />
-        <BackButton variant="glass" />
+        <BackButton variant="glass" topOffsetRem={0.75} />
         {/* Same reasoning as BackButton's "glass" variant: this floats near
             the true top of the screen inside a hero whose negative margin
             cancels the page's ambient safe-area padding, so it needs its
             own explicit inset to clear the system UI touch zone up there
-            (status bar on Android, Dynamic Island on newer iPhones). */}
-        <div className="absolute top-[calc(env(safe-area-inset-top)+1.25rem)] right-4">
+            (status bar on Android, Dynamic Island on newer iPhones). Kept
+            in sync with BackButton's own topOffsetRem={0.75} above so the
+            two stay aligned. */}
+        <div className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] right-4">
           <button
             onClick={() => setShowMenu((m) => !m)}
             className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg flex items-center justify-center text-white hover:bg-white/20 transition-colors"
@@ -556,14 +558,13 @@ export default function ArtistDetail() {
 
       {/* Bright content surface — everything from here down follows the
           app's real light/dark theme (unlike the hero above, which stays
-          this one fixed teal gradient always). The negative top margin
-          exactly cancels the action row's own mb-6 above, so the rounded
-          top corners sit flush against the buttons with no dead gap, while
-          the gradient still shows through the rounded corners themselves
-          (it extends behind this whole container). */}
+          this one fixed teal gradient always). A small positive gap instead
+          of the previous negative margin, which made the rounded top
+          corners sit flush against the action row right above with no
+          breathing room at all. */}
       <div
         className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10 bg-panel"
-        style={{ marginTop: "-24px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
+        style={{ marginTop: "14px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
       >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
