@@ -345,18 +345,20 @@ export default function ArtistDetail() {
             every artist — stays fully transparent for the top half of the
             photo (an earlier version started darkening at 18% and stacked a
             second black overlay on top, washing out most of the picture)
-            and only darkens the bottom third, resolving to solid
+            and only darkens the bottom quarter, resolving to solid
             artist.gradient[1] by its own bottom edge — the exact same color
             the flat page background below uses, so there's no seam between
             the photo and the action-button row sitting on that background.
-            A gentler alpha ramp than an earlier version (33/80/b3 instead
-            of 4d/99/dd) — for a vivid/warm gradient color (orange, red) the
-            stronger ramp read as an oversaturated wash competing with the
-            name instead of a subtle legibility aid. */}
+            Softened twice now (33/80/b3, then this) — for a vivid/warm
+            gradient color (orange, red) even the first softened ramp still
+            read as a strong wash competing with the name; this pushes the
+            transparent region further down and caps mid-ramp opacity much
+            lower, so only a thin band right behind the text actually
+            darkens and the photo stays visible through most of the hero. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}33 62%, ${artist.gradient[1]}80 75%, ${artist.gradient[1]}b3 90%, ${artist.gradient[1]} 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 58%, ${artist.gradient[1]}1a 70%, ${artist.gradient[1]}4d 82%, ${artist.gradient[1]}8c 93%, ${artist.gradient[1]} 100%)`,
           }}
         />
 
