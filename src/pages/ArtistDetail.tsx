@@ -381,11 +381,11 @@ export default function ArtistDetail() {
     // bug: its color stops are percentages of the *whole page*, so on a
     // shorter page (short bio, few albums) the hero's fixed-height bottom
     // edge landed mid-transition, producing a visible hard seam. A flat
-    // fill always matches exactly. Olive green now instead of near-black —
+    // fill always matches exactly. Light gray now instead of near-black —
     // must stay in sync with the hero wash's own final stop below.
     <div
       style={{
-        backgroundColor: "#c2c77e",
+        backgroundColor: "#dcdcdc",
         marginTop: "calc(-1 * env(safe-area-inset-top))",
         paddingTop: "env(safe-area-inset-top)",
       }}
@@ -408,13 +408,13 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Olive green wash now, not light blue — same alpha (0b/13) and
-            same ~15% band at the bottom of the hero as the last three
+        {/* Light gray wash now, not olive green — same alpha (0b/13) and
+            same ~15% band at the bottom of the hero as the last four
             passes, just a different color family again. TEAL/TEAL_DEEP
             themselves are untouched — this wash is the only thing
             switching color, not the badge/Play button/other teal accents
             elsewhere on this page. The very last stop stays fully opaque
-            #c2c77e — it must match the flat page wrapper's own background
+            #dcdcdc — it must match the flat page wrapper's own background
             exactly, same reasoning as always, just updated to the new
             color so the two stay in sync and there's no seam. The
             Shuffle/Follow/Share buttons right below keep their
@@ -424,7 +424,7 @@ export default function ArtistDetail() {
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #c2c77e0b 91%, #c2c77e26 95%, #c2c77e 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #dcdcdc0b 91%, #dcdcdc26 95%, #dcdcdc 100%)`,
           }}
         />
 
