@@ -22,7 +22,6 @@ import HeroTopScrim from "../components/HeroTopScrim";
 import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
-import { useTheme } from "../context/ThemeContext";
 import {
   adminApi,
   albumsApi,
@@ -76,27 +75,27 @@ function albumSubtitle(album: ApiAlbum): string {
 // just a sliver of a third peeking in to signal it scrolls) rather than the
 // shared Card component, whose non-portrait variant does the opposite
 // (1-line title, 2-line subtitle). Same shadow/hover-scale/play-button
-// language as Card, snap-x child. Wrapped in its own light/dark card surface
-// per the split-theme redesign (white+#ECECEC border / #1A1A1A card).
+// language as Card, snap-x child. No frame/background/border around the
+// art itself (an earlier version wrapped it in a padded, bordered card,
+// which made 160px-wide art read as noticeably smaller inside a "gray
+// frame") — just the art and its own shadow, so the artwork itself stays
+// the visually prominent element.
 function AlbumCard({
   album,
   to,
   playing,
   onPlay,
-  isLight,
 }: {
   album: ApiAlbum;
   to: string;
   playing: boolean;
   onPlay: () => void;
-  isLight: boolean;
 }) {
   const navigate = useNavigate();
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-100 rounded-[20px] p-2.5 bg-elevated border border-border"
-      style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none" }}
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-100"
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
         <CoverArt
@@ -152,8 +151,6 @@ export default function ArtistDetail() {
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
-  const { mode } = useTheme();
-  const isLight = mode === "light";
 
   useEffect(() => {
     if (!id) return;
@@ -325,7 +322,7 @@ export default function ArtistDetail() {
     // this reason — they don't need this wrapper to push content down for
     // them.
     <div style={{ backgroundColor: artist.gradient[1], marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
-      <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
+      <div className="relative w-full overflow-hidden" style={{ height: "min(36vh, 320px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
             <img
@@ -351,11 +348,15 @@ export default function ArtistDetail() {
             and only darkens the bottom third, resolving to solid
             artist.gradient[1] by its own bottom edge — the exact same color
             the flat page background below uses, so there's no seam between
-            the photo and the action-button row sitting on that background. */}
+            the photo and the action-button row sitting on that background.
+            A gentler alpha ramp than an earlier version (33/80/b3 instead
+            of 4d/99/dd) — for a vivid/warm gradient color (orange, red) the
+            stronger ramp read as an oversaturated wash competing with the
+            name instead of a subtle legibility aid. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}4d 62%, ${artist.gradient[1]}99 75%, ${artist.gradient[1]}dd 90%, ${artist.gradient[1]} 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}33 62%, ${artist.gradient[1]}80 75%, ${artist.gradient[1]}b3 90%, ${artist.gradient[1]} 100%)`,
           }}
         />
 
@@ -440,13 +441,24 @@ export default function ArtistDetail() {
           />
         </div>
 
-        <div className="absolute bottom-0 inset-x-0 p-6">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-brand/50 bg-brand-dark/40 px-3 py-1 mb-3 backdrop-blur-sm">
-            <Check size={12} className="text-brand-glow" strokeWidth={3} />
+        {/* select-none: without it, a long-press anywhere in here (common on
+            a touch device, even unintentionally) triggers the browser's own
+            native text-selection UI — a blue caret, drag handles, the whole
+            "select/copy" affordance — over what's meant to read as plain
+            app chrome, not a selectable web page. */}
+        <div className="absolute bottom-0 inset-x-0 p-6 select-none">
+          {/* No checkmark/"verified" framing — this app has no real
+              verification concept for artists (no such field exists on the
+              model), so a checkmark here would only ever be a fabricated
+              signal. Still a useful "this is an artist profile" type badge,
+              same idea as AlbumDetail's plain "Album" badge. */}
+          <div className="inline-flex items-center rounded-full border border-brand/50 bg-brand-dark/40 px-3 py-1 mb-3 backdrop-blur-sm">
             <span className="text-xs font-bold uppercase tracking-wide text-brand-glow">Artist</span>
           </div>
           <h1 className="text-4xl font-black tracking-tight break-words text-white">{artist.name}</h1>
-          <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
+          {artist.monthlyListeners > 0 && (
+            <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
+          )}
         </div>
       </div>
 
@@ -654,12 +666,20 @@ export default function ArtistDetail() {
 
             {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
               <section key={type} className="mb-8">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                  <h2 className="text-xl font-bold tracking-tight text-fg">
-                    {ALBUM_TYPE_SECTION_LABEL[type]}
-                  </h2>
-                </div>
+                {/* The plain "album" type's own section label is literally
+                    "Albums" — the exact same word the active tab right above
+                    already says, so showing it again here read as a flat-out
+                    duplicate heading. EPs/Singles/Compilations keep theirs
+                    since those genuinely need their own label to tell them
+                    apart from each other within this same tab. */}
+                {type !== "album" && (
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
+                    <h2 className="text-xl font-bold tracking-tight text-fg">
+                      {ALBUM_TYPE_SECTION_LABEL[type]}
+                    </h2>
+                  </div>
+                )}
                 {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
                     edge inset of its own — negative margin cancels the parent's
                     padding (bleeding the scrollable hit-area to the true
@@ -676,7 +696,6 @@ export default function ArtistDetail() {
                       to={`/album/${album.id}`}
                       playing={isPlaying && currentTrack?.albumId === album.id}
                       onPlay={() => handlePlayAlbum(album.id)}
-                      isLight={isLight}
                     />
                   ))}
                 </div>
