@@ -51,6 +51,14 @@ process.on("uncaughtException", (err) => {
 
 const app = express();
 
+// Render (and most PaaS hosts) terminate TLS at their own edge and forward
+// plain HTTP internally, so req.protocol reports "http" by default even for
+// a real https:// request — without this, req.protocol is just wrong
+// behind that proxy, which broke og:url on the new /share pages (claimed
+// http:// for an https:// page). Express reads this from the standard
+// X-Forwarded-Proto header once trust proxy is on.
+app.set("trust proxy", 1);
+
 app.use(cors());
 
 // Registered before express.json() and with its own raw-body parser: Stripe
