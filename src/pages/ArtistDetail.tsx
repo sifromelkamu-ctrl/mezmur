@@ -410,16 +410,16 @@ export default function ArtistDetail() {
         </div>
         {/* Teal→black wash, compressed to the final ~15% of the hero (right
             up against where it ends and the Play button row begins), with
-            the intermediate stops' color strength cut twice now (66/b3 ->
-            33/5a -> this, another 30% down to 24/3f). The very last stop
-            stays fully opaque #050707 regardless — that's what keeps the
-            bottom edge flush with the flat page background right below it,
-            not a legibility choice, so it's the one stop this never
-            touches. */}
+            the intermediate stops' color strength cut three times now
+            (66/b3 -> 33/5a -> 24/3f -> this, another 40% down to 16/26).
+            The very last stop stays fully opaque #050707 regardless —
+            that's what keeps the bottom edge flush with the flat page
+            background right below it, not a legibility choice, so it's the
+            one stop this never touches. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, ${TEAL_DEEP}24 91%, #0d2f2c3f 95%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, ${TEAL_DEEP}16 91%, #0d2f2c26 95%, #050707 100%)`,
           }}
         />
 
