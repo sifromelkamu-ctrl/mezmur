@@ -1,4 +1,4 @@
-import { Check, Clock, Download, GripVertical, Pencil, Play, Shuffle, Trash2, Upload, X } from "lucide-react";
+import { Check, Clock, Download, GripVertical, Heart, Pencil, Play, Share2, Shuffle, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
@@ -40,7 +40,14 @@ export default function AlbumDetail() {
   const [orderedTracks, setOrderedTracks] = useState<ApiAlbumDetail["tracks"]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [showArtworkEditor, setShowArtworkEditor] = useState(false);
+  // Local-only, same as ArtistDetail's own "following" toggle — there's no
+  // album-level favorites concept in the backend (FavoritesContext is
+  // track-only), so this mirrors that existing precedent rather than
+  // building a whole new persisted feature for a coloring/layout pass.
+  const [liked, setLiked] = useState(false);
+  const [copied, setCopied] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
@@ -48,6 +55,7 @@ export default function AlbumDetail() {
     setLoading(true);
     setAlbum(null);
     setEditing(false);
+    setLiked(false);
     cachedDetailFetch(`album:${id}`, () => albumsApi.get(id))
       .then((a) => {
         setAlbum(a);
@@ -86,6 +94,22 @@ export default function AlbumDetail() {
     if (!shuffle) toggleShuffle();
     const randomTrack = orderedTracks[Math.floor(Math.random() * orderedTracks.length)];
     playTrack(randomTrack, orderedTracks);
+  };
+
+  const albumUrl = `${window.location.origin}${window.location.pathname}#/album/${album.id}`;
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: album.title, url: albumUrl });
+        return;
+      } catch {
+        // user cancelled or share failed, fall through to clipboard copy
+      }
+    }
+    await navigator.clipboard.writeText(albumUrl);
+    setCopied(true);
+    if (copiedTimeout.current) clearTimeout(copiedTimeout.current);
+    copiedTimeout.current = setTimeout(() => setCopied(false), 1800);
   };
 
   const startEditing = () => {
@@ -291,9 +315,9 @@ export default function AlbumDetail() {
           ) : (
             <>
               <div className="flex items-center justify-center gap-2">
-                <p className="text-sm font-semibold uppercase tracking-wide">
+                <span className="inline-flex items-center rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand">
                   {album.albumType === "live" ? "Concert" : "Album"}
-                </p>
+                </span>
                 {isAdmin && (
                   <button onClick={startEditing} className="text-fg-muted hover:text-fg transition-colors" aria-label="Edit album">
                     <Pencil size={14} />
@@ -309,8 +333,14 @@ export default function AlbumDetail() {
                   {album.artistName}
                 </span>{" "}
                 {album.year ? `· ${album.year} ` : ""}· {orderedTracks.length} songs, {formatDuration(totalDuration)}
-                {album.genre ? ` · ${album.genre}` : ""}
               </p>
+              {album.genre && (
+                <div className="flex justify-center mt-3">
+                  <span className="rounded-full bg-elevated border border-border px-3 py-1 text-xs font-semibold text-fg-muted">
+                    {album.genre}
+                  </span>
+                </div>
+              )}
               {album.description && <p className="text-sm text-fg-muted max-w-2xl mt-3">{album.description}</p>}
             </>
           )}
@@ -321,10 +351,11 @@ export default function AlbumDetail() {
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={handlePlay}
-            className="w-14 h-14 rounded-full bg-brand text-black flex items-center justify-center shadow-lg shadow-brand/30 hover:scale-110 hover:shadow-brand/50 transition-all"
+            className="flex items-center gap-2 bg-brand text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg shadow-brand/30 hover:scale-105 transition-transform"
             aria-label="Play album"
           >
-            <Play size={24} fill="black" className="ml-1" />
+            <Play size={18} fill="black" />
+            Play
           </button>
           <button
             onClick={handleShuffle}
@@ -334,6 +365,22 @@ export default function AlbumDetail() {
             aria-label="Shuffle album"
           >
             <Shuffle size={18} />
+          </button>
+          <button
+            onClick={() => setLiked((l) => !l)}
+            className={`w-11 h-11 rounded-full flex items-center justify-center border transition-colors ${
+              liked ? "border-brand text-brand" : "border-border text-fg-muted hover:text-fg"
+            }`}
+            aria-label={liked ? "Remove from Favorites" : "Add to Favorites"}
+          >
+            <Heart size={17} fill={liked ? "currentColor" : "none"} />
+          </button>
+          <button
+            onClick={handleShare}
+            className="w-11 h-11 rounded-full flex items-center justify-center border border-border text-fg-muted hover:text-fg transition-colors"
+            aria-label="Share album"
+          >
+            {copied ? <Check size={18} className="text-brand" /> : <Share2 size={18} />}
           </button>
           {album.albumType === "live" && (
             <button
