@@ -301,18 +301,21 @@ export default function ArtistDetail() {
   const previewSongs = songsSectionTracks.slice(0, 5);
 
   return (
-    // Flat, not a gradient — the hero→black transition lives entirely on
-    // the hero below, scoped to its own fixed height (see comment there).
+    // Flat, not a gradient — the hero→dark transition lives entirely on the
+    // hero below, scoped to its own fixed height (see comment there).
     // Keeping a second, page-length-based gradient here was the bug: its
     // color stops are percentages of the *whole page*, so on a shorter page
     // (short bio, few albums) the hero's fixed-height bottom edge landed
     // mid-transition, producing a visible hard seam. A flat fill always
-    // matches exactly — bg-panel (the exact same token the content surface
-    // below uses) rather than a hardcoded dark hex, so it's the same color
-    // the hero's own wash now fades into (see below) and the same color
-    // behind the content surface's rounded-corner gaps, instead of a fixed
-    // near-black that only happened to look intentional in dark mode and
-    // read as a flat-out mismatch in light mode.
+    // matches exactly.
+    //
+    // Tinted by this artist's gradient (same color the hero wash below
+    // fades into) rather than a theme token — this area also backs the
+    // action-button row right below the hero, whose white/translucent
+    // icons need a consistently dark backdrop regardless of light/dark
+    // mode. Theme-following colors only start at the content surface
+    // further down (see the transition strip right above it).
+    //
     // No paddingTop to compensate the negative margin above — the hero
     // photo (this div's first child) is meant to bleed all the way under
     // the status bar/notch, not stop short of it behind a flat strip of
@@ -321,7 +324,7 @@ export default function ArtistDetail() {
     // `top-[calc(env(safe-area-inset-top)+1.25rem)]` offset for exactly
     // this reason — they don't need this wrapper to push content down for
     // them.
-    <div className="bg-panel" style={{ marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
+    <div style={{ backgroundColor: artist.gradient[1], marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
@@ -345,15 +348,14 @@ export default function ArtistDetail() {
             every artist — stays fully transparent for the top half of the
             photo (an earlier version started darkening at 18% and stacked a
             second black overlay on top, washing out most of the picture)
-            and only darkens the bottom third, resolving to var(--color-panel)
-            — the exact same token the flat page background and the content
-            surface below both use — by its own bottom edge, instead of a
-            hardcoded near-black that matched dark mode but clashed hard
-            against light mode's cream. */}
+            and only darkens the bottom third, resolving to solid
+            artist.gradient[1] by its own bottom edge — the exact same color
+            the flat page background below uses, so there's no seam between
+            the photo and the action-button row sitting on that background. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}4d 62%, ${artist.gradient[1]}99 75%, ${artist.gradient[1]}dd 90%, var(--color-panel) 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}4d 62%, ${artist.gradient[1]}99 75%, ${artist.gradient[1]}dd 90%, ${artist.gradient[1]} 100%)`,
           }}
         />
 
@@ -486,18 +488,24 @@ export default function ArtistDetail() {
         </div>
       </div>
 
+      {/* Bridges the artist-tinted area above (hero + action-button row,
+          deliberately dark regardless of theme — see the wrapper's own
+          comment) into the content surface's real light/dark background
+          right below, instead of jumping straight from one to the other —
+          that hard cut was the actual seam; the button row and the content
+          surface were always two genuinely different colors, never
+          supposed to match outright. */}
+      <div
+        aria-hidden="true"
+        style={{ height: "28px", backgroundImage: `linear-gradient(180deg, ${artist.gradient[1]}, var(--color-panel))` }}
+      />
+
       {/* Bright content surface — everything from here down follows the
-          app's real light/dark theme (unlike the hero above, which stays
-          tinted by this artist's own gradient always). A small positive gap
-          instead of the overlapping negative margin this used to have — now
-          that the area behind it (the flat page background, and the hero's
-          own wash) resolves to this exact same bg-panel color, the rounded
-          top corners read as a soft floating card on a matching background
-          rather than needing to sit flush against the buttons to hide a
-          seam that no longer exists. */}
+          app's real light/dark theme (unlike the hero and button row
+          above, which stay tinted by this artist's own gradient always). */}
       <div
         className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10 bg-panel"
-        style={{ marginTop: "10px", boxShadow: "0 -12px 32px rgba(0,0,0,0.12)" }}
+        style={{ boxShadow: "0 -12px 32px rgba(0,0,0,0.12)" }}
       >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
