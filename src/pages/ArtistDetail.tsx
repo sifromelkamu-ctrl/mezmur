@@ -381,11 +381,12 @@ export default function ArtistDetail() {
     // bug: its color stops are percentages of the *whole page*, so on a
     // shorter page (short bio, few albums) the hero's fixed-height bottom
     // edge landed mid-transition, producing a visible hard seam. A flat
-    // fill always matches exactly. Light gray now instead of near-black —
-    // must stay in sync with the hero wash's own final stop below.
+    // fill always matches exactly. "Light black" (a soft charcoal, not
+    // pure black) now — must stay in sync with the hero wash's own final
+    // stop below.
     <div
       style={{
-        backgroundColor: "#dcdcdc",
+        backgroundColor: "#2e2e2e",
         marginTop: "calc(-1 * env(safe-area-inset-top))",
         paddingTop: "env(safe-area-inset-top)",
       }}
@@ -408,23 +409,23 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Light gray wash now, not olive green — same alpha (0b/13) and
-            same ~15% band at the bottom of the hero as the last four
-            passes, just a different color family again. TEAL/TEAL_DEEP
-            themselves are untouched — this wash is the only thing
-            switching color, not the badge/Play button/other teal accents
-            elsewhere on this page. The very last stop stays fully opaque
-            #dcdcdc — it must match the flat page wrapper's own background
-            exactly, same reasoning as always, just updated to the new
-            color so the two stay in sync and there's no seam. The
-            Shuffle/Follow/Share buttons right below keep their
-            dark-on-light styling from the light-blue pass — still a light
-            enough color for black/10 circles and dark icons to read
-            clearly. */}
+        {/* "Light black" wash now, and back to a smooth, continuous
+            decrease spanning most of the hero (transparent at the top,
+            solid by the bottom) instead of the last several passes' tiny
+            ~15% band — starts increasing at 35%, ramps smoothly the rest
+            of the way down, no abrupt jump. TEAL/TEAL_DEEP themselves are
+            untouched — this wash is the only thing switching color, not
+            the badge/Play button/other teal accents elsewhere on this
+            page. The very last stop stays fully opaque #2e2e2e — it must
+            match the flat page wrapper's own background exactly, same
+            reasoning as always. Since the backdrop is dark again (not
+            light gray/blue anymore), the Shuffle/Follow/Share buttons
+            switch back to white-on-dark styling — dark icons would
+            disappear against this. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #dcdcdc0b 91%, #dcdcdc26 95%, #dcdcdc 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 35%, #2e2e2e14 55%, #2e2e2e59 78%, #2e2e2e 100%)`,
           }}
         />
 
@@ -543,23 +544,23 @@ export default function ArtistDetail() {
           </button>
           <button
             onClick={handleShuffle}
-            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-black/10 hover:bg-black/15"
-            style={{ color: shuffle ? TEAL : "rgba(0,0,0,0.55)" }}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
+            style={{ color: shuffle ? TEAL : "rgba(255,255,255,0.75)" }}
             aria-label="Shuffle"
           >
             <Shuffle size={18} />
           </button>
           <button
             onClick={() => setFollowing((f) => !f)}
-            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-black/10 hover:bg-black/15"
-            style={{ color: following ? TEAL : "rgba(0,0,0,0.55)" }}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
+            style={{ color: following ? TEAL : "rgba(255,255,255,0.75)" }}
             aria-label={following ? "Unfollow artist" : "Follow artist"}
           >
             <Heart size={17} fill={following ? "currentColor" : "none"} />
           </button>
           <button
             onClick={handleShare}
-            className="w-11 h-11 rounded-full bg-black/10 hover:bg-black/15 flex items-center justify-center text-black/55 transition-colors"
+            className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center text-white/75 transition-colors"
             aria-label="Share artist"
           >
             {copied ? <Check size={18} style={{ color: TEAL }} /> : <Share2 size={18} />}
