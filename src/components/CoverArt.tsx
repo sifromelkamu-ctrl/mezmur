@@ -166,6 +166,27 @@ export default function CoverArt({
     }
   };
 
+  // onError alone misses a real failure mode seen on-device: the request
+  // just stalls (no load, no error, ever) instead of cleanly failing —
+  // common on flaky cellular/Wi-Fi, especially with several carousel images
+  // in flight at once. Without this, that one <img> sits at opacity:0
+  // forever, showing nothing but the background gradient behind it, even
+  // though the exact same URL loads fine moments later in another instance
+  // (e.g. the mini player). Treat a long stall the same as an error so it
+  // feeds into the same retry/fallback path.
+  useEffect(() => {
+    if (!showPhoto || loaded || photoFailed) return;
+    const STALL_TIMEOUT_MS = 6000;
+    const timer = setTimeout(() => {
+      setRetryCount((c) => {
+        if (c < MAX_PHOTO_RETRIES) return c + 1;
+        setPhotoFailed(true);
+        return c;
+      });
+    }, STALL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [retrySrc, showPhoto, loaded, photoFailed]);
+
   // The displayed frame never renders under-cover, and never pans past the
   // image's own edges — the single choke point every frame (saved,
   // smart-cropped, or a fallback default) goes through before it's used for
