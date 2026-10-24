@@ -408,20 +408,22 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Teal→black wash, compressed to the final ~15% of the hero (right
-            up against where it ends and the Play button row begins), with
-            the intermediate stops' color strength cut five times now
-            (66/b3 -> 33/5a -> 24/3f -> 16/26 -> this, another 50% down to
-            0b/13 — roughly 4%/7% opacity, close to the floor where this
-            stops doing anything for text legibility over a bright photo).
-            The very last stop stays fully opaque #050707 regardless —
-            that's what keeps the bottom edge flush with the flat page
-            background right below it, not a legibility choice, so it's the
-            one stop this never touches. */}
+        {/* Gray→black wash now, not teal — the intermediate stops switched
+            from TEAL_DEEP/#0d2f2c (both teal-tinted) to neutral grays
+            (#4a4a4a/#2c2c2c) of similar lightness, same alpha (0b/13) as
+            the last pass. TEAL/TEAL_DEEP themselves are untouched — this
+            wash is the only thing switching color family, not the badge/
+            Play button/other teal accents elsewhere on this page. Still
+            compressed to the final ~15% of the hero (right up against
+            where it ends and the Play button row begins). The very last
+            stop stays fully opaque #050707 regardless — that's what keeps
+            the bottom edge flush with the flat page background right below
+            it, not a legibility/color choice, so it's the one stop this
+            never touches. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, ${TEAL_DEEP}0b 91%, #0d2f2c13 95%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #4a4a4a0b 91%, #2c2c2c13 95%, #050707 100%)`,
           }}
         />
 
