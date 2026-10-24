@@ -5,6 +5,19 @@ import { Fragment, type ReactNode } from "react";
 // boundaries unambiguous) — covers Amharic (and Tigrigna/Ge'ez) script used
 // throughout the catalog's titles.
 const ETHIOPIC_RUN = new RegExp("[\\u1200-\\u137F\\u1380-\\u139F\\u2D80-\\u2DDF\\uAB00-\\uAB2F]+", "g");
+// Same pattern, no `g` flag — ETHIOPIC_RUN's `g` flag makes bare .test()
+// calls on it stateful (lastIndex carries over between calls, silently
+// flipping the result on alternating calls), so this gets its own instance
+// rather than reusing that one directly.
+const ETHIOPIC_TEST = new RegExp(ETHIOPIC_RUN.source);
+
+// Whether any of the text is Ethiopic script — used to gate Latin-only
+// display fonts (e.g. Playfair Display, which has no Ethiopic glyphs and
+// would otherwise silently fall through to the browser's generic serif
+// fallback instead of the app's own Abyssinica SIL).
+export function hasEthiopicScript(text: string): boolean {
+  return ETHIOPIC_TEST.test(text);
+}
 
 // Splits mixed Amharic/Latin text (e.g. "Yidnekachew Teka · ኢየሱስ") into runs
 // and shrinks only the Latin runs — Abyssinica SIL (the font --font-sans

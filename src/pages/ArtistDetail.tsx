@@ -37,6 +37,7 @@ import {
 } from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
+import { hasEthiopicScript } from "../utils/scriptText";
 
 // The hero stays this one fixed teal gradient regardless of the app's
 // light/dark toggle (explicitly kept "exactly as it is" per the split-theme
@@ -524,7 +525,20 @@ export default function ArtistDetail() {
               Artist
             </span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight break-words text-white">{artist.name}</h1>
+          {/* font-playfair — the same premium serif display font already
+              used for Home's greeting, section headers, and the splash
+              logo elsewhere in the app — rather than the plain default
+              sans. Gated on script: Playfair Display has no Ethiopic
+              glyphs, so an Amharic name would otherwise silently fall
+              through to the browser's generic serif instead of the app's
+              own Abyssinica SIL; those names keep the default sans. */}
+          <h1
+            className={`text-4xl font-black tracking-tight break-words text-white ${
+              hasEthiopicScript(artist.name) ? "" : "font-playfair"
+            }`}
+          >
+            {artist.name}
+          </h1>
           <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
       </div>
