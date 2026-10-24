@@ -15,7 +15,6 @@ import {
   Leaf,
   Loader2,
   Pause,
-  Play,
   ScrollText,
   Search,
   Settings2,
@@ -1759,23 +1758,17 @@ export default function Bible() {
         )}
       </div>
 
-      {/* Hero — completely redesigned from the old "photo + flat dark
-          gradient + centered quote card" look (which is the same layout
-          every inspirational-verse app uses) into a "Now Playing" style
-          card instead: the photo stays bright and uncovered at the top,
-          and a frosted glass dock anchored to the bottom holds the verse
-          — laid out like a music mini-player (title/subtitle on the
-          left, a play button on the right, a seek-bar scrubber along the
-          bottom tracking position in the 29-photo set). It's a verse
-          card that looks like it belongs in a music app, not a generic
-          quote-card clone. Swipe mechanics on the photo itself (left/
-          right through HERO_IMAGES) are unchanged. */}
+      {/* Hero — a single "verse of the day" card (one per local calendar
+          day, see the fetch effect above). The background photo defaults to
+          the day's pick from HERO_IMAGES but is swipeable across the whole
+          set, with a progress line + counter below (not per-photo dots —
+          see that indicator's own comment for why). */}
       {!heroVerse ? (
-        <div className="w-full h-[236px] rounded-[28px] mb-2 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
+        <div className="w-full h-[176px] rounded-3xl mb-2 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
         <div className="mb-1.5">
           <div
-            className="relative w-full h-[236px] rounded-[28px] overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.4)]"
+            className="relative w-full h-[176px] rounded-3xl overflow-hidden shadow-[0_20px_45px_-18px_rgba(36,28,61,0.35)]"
             onTouchStart={(e) => {
               heroTouchStartX.current = e.touches[0].clientX;
             }}
@@ -1808,83 +1801,70 @@ export default function Bible() {
                 />
               ))}
             </div>
-
-            {/* Each pill is frosted on its own (no full-card overlay
-                needed up here) so the photo itself stays visible and
-                vivid above the dock. */}
-            <div className="absolute top-3 inset-x-3 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-black/35 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1">
-                <Sun size={11} strokeWidth={2.5} />
-                {prefs.language === "en" ? "Daily Verse" : "የዕለቱ ቃል"}
-              </span>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10" />
+          <button
+            onClick={handleShareHeroVerse}
+            aria-label="Share verse"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-md active:scale-90 transition-transform"
+          >
+            {heroShared ? (
+              <Check size={14} style={{ color: "var(--bible-purple)" }} />
+            ) : (
+              <Share2 size={13} style={{ color: "var(--bible-navy)" }} />
+            )}
+          </button>
+          <div className="relative h-full flex flex-col items-center text-center justify-end p-4 pointer-events-none">
+            <span
+              className="self-start inline-flex w-fit items-center gap-1.5 rounded-full bg-white/90 text-[9px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 mb-2"
+              style={{ color: "var(--bible-purple)" }}
+            >
+              <Sun size={11} strokeWidth={2.5} />
+              {prefs.language === "en" ? "Verse of the Day" : "የዕለቱ ቃል"}
+            </span>
+            <p
+              className={`${
+                prefs.language === "en"
+                  ? `${ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily]} text-[1.05rem]`
+                  : "font-abyssinica text-[0.9rem]"
+              } font-bold text-white leading-snug mb-1.5 line-clamp-3 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
+            >
+              {heroVerse.text}
+            </p>
+            <div className="w-full flex items-center justify-end gap-3">
               <button
-                onClick={handleShareHeroVerse}
-                aria-label="Share verse"
-                className="w-8 h-8 rounded-full bg-black/35 backdrop-blur-md flex items-center justify-center active:scale-90 transition-transform"
+                onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
+                aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
+                className="pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full text-white shadow-lg active:scale-95 transition-transform"
+                style={{ background: "var(--bible-navy)" }}
               >
-                {heroShared ? <Check size={14} className="text-white" /> : <Share2 size={13} className="text-white" />}
+                <BookOpen size={15} />
               </button>
+              <p className="text-[11px] font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">{heroVerse.ref}</p>
             </div>
-
-            {/* Glass dock — backdrop-blur over the photo plus a dark
-                gradient base (the gradient keeps text legible even where
-                a bright patch of photo peeks through the blur). */}
-            <div className="absolute inset-x-0 bottom-0 backdrop-blur-xl bg-gradient-to-t from-black/85 via-black/65 to-black/10 pt-7 pb-3 px-4">
-              <div className="absolute inset-x-0 top-0 h-px bg-white/15" />
-              <span
-                aria-hidden="true"
-                className="absolute -top-1 left-2 text-white/10 leading-none select-none"
-                style={{ fontSize: "4.5rem", fontFamily: "Georgia, serif" }}
-              >
-                "
-              </span>
-              <p
-                className={`relative ${
-                  prefs.language === "en"
-                    ? `${ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily]} text-[1.05rem]`
-                    : "font-abyssinica text-[0.9rem]"
-                } font-bold text-white leading-snug line-clamp-3 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]`}
-              >
-                {heroVerse.text}
-              </p>
-
-              {/* Title/subtitle (ref + "Today's Reading") on the left,
-                  play button on the right — same arrangement as a music
-                  mini-player's track info + play control. */}
-              <div className="flex items-center justify-between gap-3 mt-2.5">
-                <div className="min-w-0">
-                  <p className="text-white font-bold text-sm leading-tight truncate [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
-                    {heroVerse.ref}
-                  </p>
-                  <p className="text-white/60 text-[10px] font-semibold uppercase tracking-wide">
-                    {prefs.language === "en" ? "Today's Reading" : "የዛሬ ንባብ"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => openVerse(heroVerse.slug, heroVerse.chapter, heroVerse.verseIndex)}
-                  aria-label={prefs.language === "en" ? "Read full chapter" : "ሙሉውን ያንብቡ"}
-                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full text-white shadow-lg active:scale-95 transition-transform"
-                  style={{ background: "var(--bible-purple)" }}
-                >
-                  <Play size={18} strokeWidth={2.4} fill="white" className="ml-0.5" />
-                </button>
-              </div>
-
-              {/* Scrubber — replaces the old below-card dot row/progress
-                  line entirely, folded into the dock itself like a seek
-                  bar instead of a separate floating element. */}
-              <div className="flex items-center gap-2 mt-2.5">
-                <div className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-white transition-all duration-300"
-                    style={{ width: `${((heroImageIndex + 1) / HERO_IMAGES.length) * 100}%` }}
-                  />
-                </div>
-                <span className="text-[9px] font-semibold text-white/60 tabular-nums shrink-0">
-                  {heroImageIndex + 1}/{HERO_IMAGES.length}
-                </span>
-              </div>
+          </div>
+          </div>
+          {/* A 29-photo set doesn't fit as individual dots on a phone width
+              (29 × dot+gap overflows well past the screen) — a thin
+              progress line + "n / total" counter scales to any pool size
+              and reads as more deliberate than a row of dots wrapping or
+              overflowing. Swiping the hero still moves through every
+              photo; this just shows where you are in that set. */}
+          <div className="flex items-center justify-center gap-2 mt-1.5">
+            <div
+              className="h-1 w-24 rounded-full overflow-hidden"
+              style={{ background: "color-mix(in oklab, var(--color-fg-subtle) 30%, transparent)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${((heroImageIndex + 1) / HERO_IMAGES.length) * 100}%`,
+                  background: "var(--bible-purple)",
+                }}
+              />
             </div>
+            <span className="text-[10px] font-semibold text-fg-subtle tabular-nums">
+              {heroImageIndex + 1}/{HERO_IMAGES.length}
+            </span>
           </div>
         </div>
       )}
