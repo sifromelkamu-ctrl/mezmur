@@ -25,17 +25,13 @@ export default function BibleModeNav() {
   // App.tsx's fixed bottom bar, a separate part of the tree), so the same
   // two hex values are just repeated directly.
   const purple = isLight ? "#5B3FE0" : "#8B6CFF";
-  // A richer three-stop gradient for the center button specifically
-  // (lighter/base/deep), not just the flat `purple` the ring/icons use —
-  // "deep" reuses the exact hex ReadingPlanCard's own Old Testament
-  // accentDeepVar already uses (Bible.tsx), so it's the same purple
-  // family, just one more step down. Gold ring on top is this app's own
-  // established "premium" signal (the gold/dark theme everywhere else,
-  // WORD_ART_TITLE, the verse-image card's gold frame) borrowed onto
-  // this one purple button instead of leaving it flat.
-  const purpleLight = isLight ? "#8B6CFF" : "#A78BFA";
-  const purpleDeep = isLight ? "#3F2AAE" : "#5B3FE0";
+  // Black + gold for the center button specifically — the app's own
+  // classic premium identity (the dark/gold theme every other section
+  // uses, WORD_ART_TITLE, the verse-image card's navy/gold look) rather
+  // than a purple variant, so this one button reads as unmistakably
+  // "Mezmur" against the Bible section's own purple/green bar around it.
   const gold = isLight ? "#f3c969" : "#d4af37";
+  const goldGlow = isLight ? "#ffe3a3" : "#e4c765";
 
   // OT/NT icons match TESTAMENT_THEME's own old/new icons in Bible.tsx
   // (BookOpen / Leaf) — same real Old/New Testament progress + book list
@@ -69,24 +65,29 @@ export default function BibleModeNav() {
           wordmark letter the Bible home header's own avatar badge uses
           (Bible.tsx), rather than an icon standing in for the app — the
           literal brand initial is the most direct "this returns to
-          Mezmur" there is. A three-stop gradient + thin gold ring + a
-          glossy top highlight instead of a flat fill, so it reads as a
-          deliberately premium badge rather than a plain colored circle —
-          still the one visually different element in the bar. */}
+          Mezmur" there is. Black-to-black gradient + a bright gold ring,
+          gold "M" — this app's own dark/gold premium look, carried onto
+          this one button so it reads as unmistakably "Mezmur" against
+          the Bible section's own purple/green bar around it. */}
       <button
         onClick={() => navigate("/")}
         aria-label="Back to Mezmur"
         className="relative -mt-7 flex items-center justify-center w-[52px] h-[52px] rounded-full shrink-0 overflow-hidden active:scale-90 transition-transform shadow-lg"
         style={{
-          backgroundImage: `radial-gradient(120% 120% at 30% 20%, ${purpleLight} 0%, ${purple} 55%, ${purpleDeep} 100%)`,
-          boxShadow: `0 10px 24px -6px ${purple}99, inset 0 0 0 1.5px ${gold}80`,
+          backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2b2b2b 0%, #141414 55%, #000000 100%)",
+          boxShadow: `0 10px 24px -6px rgba(0,0,0,0.85), inset 0 0 0 1.5px ${gold}`,
         }}
       >
         <span
           className="absolute inset-x-1 top-0.5 h-1/2 rounded-full pointer-events-none"
-          style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.4), transparent)" }}
+          style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.18), transparent)" }}
         />
-        <span className="relative text-white font-playfair font-bold text-xl [text-shadow:0_1px_6px_rgba(0,0,0,0.35)]">M</span>
+        <span
+          className="relative font-playfair font-bold text-xl"
+          style={{ color: gold, textShadow: `0 0 10px ${goldGlow}66, 0 1px 4px rgba(0,0,0,0.6)` }}
+        >
+          M
+        </span>
       </button>
 
       {itemsEnd.map(({ id, label, icon: Icon }) => (
