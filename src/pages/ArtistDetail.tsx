@@ -4,7 +4,6 @@ import {
   Link2,
   MoreHorizontal,
   Music2,
-  Pause,
   Pencil,
   Play,
   Plus,
@@ -19,8 +18,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import defaultAlbumArt from "../assets/default-album-art.jpg";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
-import EqualizerBars from "../components/EqualizerBars";
 import HeroTopScrim from "../components/HeroTopScrim";
+import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
 import { useTheme } from "../context/ThemeContext";
@@ -31,10 +30,8 @@ import {
   type ApiAlbum,
   type ApiAlbumType,
   type ApiArtistDetail,
-  type ApiTrack,
 } from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
-import { formatDuration } from "../utils/format";
 
 // The hero stays this one fixed teal gradient regardless of the app's
 // light/dark toggle (explicitly kept "exactly as it is" per the split-theme
@@ -139,63 +136,6 @@ function AlbumCard({
   );
 }
 
-// Bespoke Single Releases row for the split-theme content surface — the
-// shared TrackRow reads the app's generic text-fg/text-fg-muted tokens,
-// which don't match this section's exact spec'd hex values (#111111 title /
-// #6B7280 artist / #9CA3AF duration in light mode), so this mirrors
-// TrackRow's play/pause/queue behavior with its own themed markup instead.
-function SongRow({
-  track,
-  index,
-  queue,
-}: {
-  track: ApiTrack;
-  index: number;
-  queue: ApiTrack[];
-}) {
-  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
-  const isCurrent = currentTrack?.id === track.id;
-
-  const handleClick = () => {
-    if (isCurrent) togglePlay();
-    else playTrack(track, queue);
-  };
-
-  return (
-    <div
-      onClick={handleClick}
-      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0 bg-panel border border-border"
-      style={{ paddingBlock: "10px" }}
-    >
-      <div className="flex items-center justify-center text-sm w-6 text-fg-subtle">
-        <span className="group-hover:hidden">{isCurrent && isPlaying ? <EqualizerBars /> : index}</span>
-        <span className="hidden group-hover:flex">
-          {isCurrent && isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-3 min-w-0">
-        <CoverArt
-          gradient={track.gradient}
-          size="sm"
-          photoUrl={track.coverUrl}
-          entityType="track"
-          entityId={track.id}
-          artworkFrame={track.artworkFrame}
-        />
-        <p
-          className={`text-sm font-medium truncate ${isCurrent ? "" : "text-fg"}`}
-          style={isCurrent ? { color: TEAL } : undefined}
-        >
-          {track.title}
-        </p>
-      </div>
-
-      <span className="text-sm tabular-nums text-right text-fg-subtle">{formatDuration(track.duration)}</span>
-    </div>
-  );
-}
-
 export default function ArtistDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -210,7 +150,7 @@ export default function ArtistDetail() {
   const [saving, setSaving] = useState(false);
   const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false);
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
-  const [showAllSongs, setShowAllSongs] = useState(false);
+  const [activeTab, setActiveTab] = useState<"albums" | "songs">("albums");
   const [addingAlbum, setAddingAlbum] = useState(false);
   const [newAlbumTitle, setNewAlbumTitle] = useState("");
   const [newAlbumType, setNewAlbumType] = useState<ApiAlbumType>("album");
@@ -231,7 +171,7 @@ export default function ArtistDetail() {
     setEditing(false);
     setHeroPhotoLoaded(false);
     setHeroPhotoFailed(false);
-    setShowAllSongs(false);
+    setActiveTab("albums");
     cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id))
       .then(setArtist)
       .catch(() => setArtist(null))
@@ -243,13 +183,6 @@ export default function ArtistDetail() {
     for (const album of artist?.albums ?? []) grouped[album.albumType].push(album);
     return grouped;
   }, [artist]);
-
-  // Stats card figures — derived from data already fetched (each album
-  // already carries its own trackCount).
-  const totalSongCount = useMemo(
-    () => (artist?.albums ?? []).reduce((sum, a) => sum + (a.trackCount ?? 0), 0),
-    [artist]
-  );
 
   if (loading) {
     return (
@@ -372,7 +305,7 @@ export default function ArtistDetail() {
   };
 
   const showHeroPhoto = Boolean(artist.photoUrl) && !heroPhotoFailed;
-  const visibleSongs = showAllSongs ? songsSectionTracks : songsSectionTracks.slice(0, 5);
+  const previewSongs = songsSectionTracks.slice(0, 5);
 
   return (
     // Flat, not a gradient — the teal→black transition now lives entirely
@@ -609,27 +542,35 @@ export default function ArtistDetail() {
           )
         )}
 
-        <div
-          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8 bg-elevated border border-border"
-          style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none" }}
-        >
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{artist.albums.length}</span>
-            </div>
-            <span className="text-xs text-fg-muted">Albums</span>
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{totalSongCount}</span>
-            </div>
-            <span className="text-xs text-fg-muted">Songs</span>
-          </div>
+        {/* Replaces an old static album/song-count card with real
+            navigation — the content below now only ever shows one of the
+            two, so the switch doubles as an at-a-glance summary of which
+            you're looking at. Teal underline matches the hero/action row
+            above; everything else in this content surface follows the
+            real light/dark theme. */}
+        <div className="flex items-center gap-6 mb-6 border-b border-border">
+          {(
+            [
+              { id: "albums" as const, label: "Albums" },
+              { id: "songs" as const, label: "Songs" },
+            ]
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative pb-3 text-base font-semibold transition-colors ${
+                activeTab === tab.id ? "text-fg" : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full" style={{ backgroundColor: TEAL }} />
+              )}
+            </button>
+          ))}
         </div>
 
-        {isAdmin &&
+        {activeTab === "albums" && isAdmin &&
           (addingAlbum ? (
             <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
               <div>
@@ -694,65 +635,90 @@ export default function ArtistDetail() {
             </button>
           ))}
 
-        {artist.albums.length === 0 && !addingAlbum && (
-          <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
-            <Music2 size={18} />
-            No albums yet{isAdmin ? " — add one above." : " — check back soon."}
-          </div>
+        {activeTab === "albums" && (
+          <>
+            {artist.albums.length === 0 && !addingAlbum && (
+              <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
+                <Music2 size={18} />
+                No albums yet{isAdmin ? " — add one above." : " — check back soon."}
+              </div>
+            )}
+
+            {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
+              <section key={type} className="mb-8">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
+                  <h2 className="text-xl font-bold tracking-tight text-fg">
+                    {ALBUM_TYPE_SECTION_LABEL[type]}
+                  </h2>
+                </div>
+                {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
+                    edge inset of its own — negative margin cancels the parent's
+                    padding (bleeding the scrollable hit-area to the true
+                    viewport edge), +16px brings the visible cards back in from
+                    there. */}
+                <div
+                  className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-4 pb-1"
+                  style={{ marginInline: "-20px", paddingInline: "16px", scrollPaddingInline: "16px" }}
+                >
+                  {albumsByType[type].map((album) => (
+                    <AlbumCard
+                      key={album.id}
+                      album={album}
+                      to={`/album/${album.id}`}
+                      playing={isPlaying && currentTrack?.albumId === album.id}
+                      onPlay={() => handlePlayAlbum(album.id)}
+                      isLight={isLight}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {/* A preview, not the full list — "See All" jumps to the Songs
+                tab rather than expanding in place, so this tab stays a
+                short overview of both an artist's albums and their songs
+                (matching what each tab's own label promises). */}
+            {previewSongs.length > 0 && (
+              <section className="mb-2">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
+                    <h2 className="text-xl font-bold tracking-tight text-fg">{songsSectionTitle}</h2>
+                  </div>
+                  {songsSectionTracks.length > 5 && (
+                    <button
+                      onClick={() => setActiveTab("songs")}
+                      className="text-sm font-semibold text-brand hover:text-brand-glow transition-colors"
+                    >
+                      See All
+                    </button>
+                  )}
+                </div>
+                {previewSongs.map((track, i) => (
+                  <TrackRow key={track.id} track={track} index={i + 1} queue={songsSectionTracks} showArtistName={false} showActions />
+                ))}
+              </section>
+            )}
+          </>
         )}
 
-        {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
-          <section key={type} className="mb-8">
-            <div className="flex items-center gap-2.5 mb-3">
-              <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
-              <h2 className="text-xl font-bold tracking-tight text-fg">
-                {ALBUM_TYPE_SECTION_LABEL[type]}
-              </h2>
-            </div>
-            {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
-                edge inset of its own — negative margin cancels the parent's
-                padding (bleeding the scrollable hit-area to the true
-                viewport edge), +16px brings the visible cards back in from
-                there. */}
-            <div
-              className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-4 pb-1"
-              style={{ marginInline: "-20px", paddingInline: "16px", scrollPaddingInline: "16px" }}
-            >
-              {albumsByType[type].map((album) => (
-                <AlbumCard
-                  key={album.id}
-                  album={album}
-                  to={`/album/${album.id}`}
-                  playing={isPlaying && currentTrack?.albumId === album.id}
-                  onPlay={() => handlePlayAlbum(album.id)}
-                  isLight={isLight}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
-
-        {songsSectionTracks.length > 0 && (
+        {activeTab === "songs" && (
           <section className="mb-2">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                <h2 className="text-xl font-bold tracking-tight text-fg">
-                  {songsSectionTitle}
-                </h2>
-              </div>
-              {songsSectionTracks.length > 5 && (
-                <button
-                  onClick={() => setShowAllSongs((s) => !s)}
-                  className="text-sm font-semibold text-brand hover:text-brand-glow transition-colors"
-                >
-                  {showAllSongs ? "Show less" : "View all"}
-                </button>
-              )}
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
+              <h2 className="text-xl font-bold tracking-tight text-fg">{songsSectionTitle}</h2>
             </div>
-            {visibleSongs.map((track, i) => (
-              <SongRow key={track.id} track={track} index={i + 1} queue={visibleSongs} />
-            ))}
+            {songsSectionTracks.length > 0 ? (
+              songsSectionTracks.map((track, i) => (
+                <TrackRow key={track.id} track={track} index={i + 1} queue={songsSectionTracks} showArtistName={false} showActions />
+              ))
+            ) : (
+              <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md text-fg-muted bg-elevated border border-border">
+                <Music2 size={18} />
+                No songs yet.
+              </div>
+            )}
           </section>
         )}
       </div>
