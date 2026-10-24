@@ -33,12 +33,6 @@ import {
 } from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
 
-// The hero stays this one fixed teal gradient regardless of the app's
-// light/dark toggle (explicitly kept "exactly as it is" per the split-theme
-// redesign) — only the content surface below it now follows the real theme.
-const TEAL = "#14b8a6";
-const TEAL_DEEP = "#134e4a";
-
 // The content surface below the hero used to carry its own bespoke
 // white/#121212 palette here, independent of the app's real theme (a past
 // "split-theme redesign"). That made this page read jarringly bright
@@ -113,7 +107,7 @@ function AlbumCard({
           entityId={album.id}
           artworkFrame={album.artworkFrame}
           className={`w-full aspect-square transition-transform duration-300 group-hover:scale-105 ${
-            playing ? "ring-2 ring-[#14b8a6] shadow-[0_0_14px_rgba(20,184,166,0.55)]" : ""
+            playing ? "ring-2 ring-brand/60 shadow-[0_0_14px_rgba(242,183,5,0.55)]" : ""
           }`}
         />
         <button
@@ -121,8 +115,7 @@ function AlbumCard({
             e.stopPropagation();
             onPlay();
           }}
-          className="absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center text-black opacity-0 group-hover:opacity-100 active:scale-90 transition-all shadow-lg"
-          style={{ backgroundColor: TEAL }}
+          className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-brand flex items-center justify-center text-black opacity-0 group-hover:opacity-100 active:scale-90 transition-all shadow-lg"
           aria-label={`Play ${album.title}`}
         >
           <Play size={14} fill="black" className="ml-0.5" />
@@ -341,8 +334,10 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Teal→black wash — stays fully transparent for the top half of the
-            photo (previous version started darkening at 18% and stacked a
+        {/* Tinted by this artist's own gradient (same idea as AlbumDetail's
+            hero wash using album.gradient) rather than one fixed hue for
+            every artist — stays fully transparent for the top half of the
+            photo (an earlier version started darkening at 18% and stacked a
             second black overlay on top, washing out most of the picture)
             and only darkens the bottom third, still fully resolving to
             solid #050707 by its own bottom edge so it stays flush with the
@@ -350,7 +345,7 @@ export default function ArtistDetail() {
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${TEAL_DEEP}4d 62%, #0d2f2c99 75%, #0a1614dd 90%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${artist.gradient[1]}4d 62%, ${artist.gradient[1]}99 75%, ${artist.gradient[1]}dd 90%, #050707 100%)`,
           }}
         />
 
@@ -436,14 +431,9 @@ export default function ArtistDetail() {
         </div>
 
         <div className="absolute bottom-0 inset-x-0 p-6">
-          <div
-            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 mb-3 backdrop-blur-sm"
-            style={{ borderColor: `${TEAL}80`, backgroundColor: `${TEAL_DEEP}66` }}
-          >
-            <Check size={12} style={{ color: TEAL }} strokeWidth={3} />
-            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: TEAL }}>
-              Artist
-            </span>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-brand/50 bg-brand-dark/40 px-3 py-1 mb-3 backdrop-blur-sm">
+            <Check size={12} className="text-brand-glow" strokeWidth={3} />
+            <span className="text-xs font-bold uppercase tracking-wide text-brand-glow">Artist</span>
           </div>
           <h1 className="text-4xl font-black tracking-tight break-words text-white">{artist.name}</h1>
           <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
@@ -454,8 +444,7 @@ export default function ArtistDetail() {
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={handlePlayAll}
-            className="flex items-center gap-2 text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg hover:scale-105 transition-transform"
-            style={{ backgroundColor: TEAL, boxShadow: `0 10px 30px -8px ${TEAL}66` }}
+            className="flex items-center gap-2 bg-brand text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg shadow-brand/40 hover:scale-105 transition-transform"
             aria-label="Play"
           >
             <Play size={18} fill="black" />
@@ -463,16 +452,18 @@ export default function ArtistDetail() {
           </button>
           <button
             onClick={handleShuffle}
-            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
-            style={{ color: shuffle ? TEAL : "rgba(255,255,255,0.75)" }}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15 ${
+              shuffle ? "text-brand-glow" : "text-white/75"
+            }`}
             aria-label="Shuffle"
           >
             <Shuffle size={18} />
           </button>
           <button
             onClick={() => setFollowing((f) => !f)}
-            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
-            style={{ color: following ? TEAL : "rgba(255,255,255,0.75)" }}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15 ${
+              following ? "text-brand-glow" : "text-white/75"
+            }`}
             aria-label={following ? "Unfollow artist" : "Follow artist"}
           >
             <Heart size={17} fill={following ? "currentColor" : "none"} />
@@ -482,14 +473,14 @@ export default function ArtistDetail() {
             className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center text-white/75 transition-colors"
             aria-label="Share artist"
           >
-            {copied ? <Check size={18} style={{ color: TEAL }} /> : <Share2 size={18} />}
+            {copied ? <Check size={18} className="text-brand-glow" /> : <Share2 size={18} />}
           </button>
         </div>
       </div>
 
       {/* Bright content surface — everything from here down follows the
           app's real light/dark theme (unlike the hero above, which stays
-          this one fixed teal gradient always). The negative top margin
+          tinted by this artist's own gradient always). The negative top margin
           exactly cancels the action row's own mb-6 above, so the rounded
           top corners sit flush against the buttons with no dead gap, while
           the gradient still shows through the rounded corners themselves
@@ -545,9 +536,8 @@ export default function ArtistDetail() {
         {/* Replaces an old static album/song-count card with real
             navigation — the content below now only ever shows one of the
             two, so the switch doubles as an at-a-glance summary of which
-            you're looking at. Teal underline matches the hero/action row
-            above; everything else in this content surface follows the
-            real light/dark theme. */}
+            you're looking at. Brand-colored underline matches every other
+            "now playing"/active-state accent elsewhere in the app. */}
         <div className="flex items-center gap-6 mb-6 border-b border-border">
           {(
             [
@@ -564,7 +554,7 @@ export default function ArtistDetail() {
             >
               {tab.label}
               {activeTab === tab.id && (
-                <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full" style={{ backgroundColor: TEAL }} />
+                <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-brand" />
               )}
             </button>
           ))}
@@ -647,7 +637,7 @@ export default function ArtistDetail() {
             {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
               <section key={type} className="mb-8">
                 <div className="flex items-center gap-2.5 mb-3">
-                  <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
+                  <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
                   <h2 className="text-xl font-bold tracking-tight text-fg">
                     {ALBUM_TYPE_SECTION_LABEL[type]}
                   </h2>
