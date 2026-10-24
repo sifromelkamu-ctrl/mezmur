@@ -141,6 +141,14 @@ const BIBLE_HOME_THEME_LIGHT = {
   "--bible-text": "#241C3D",
   "--bible-green": "#2F9E6E",
   "--bible-green-soft": "#E3F5EC",
+  // Two more accents in the same family (one per light/dark pair below),
+  // so Quick Access can give each of its four actions its own color
+  // instead of all four sharing one gold tint — same system the
+  // category tiles already use, just extended.
+  "--bible-blue": "#2E6FA7",
+  "--bible-blue-soft": "#E2EEF7",
+  "--bible-rose": "#C13B55",
+  "--bible-rose-soft": "#FBE7EA",
 } as CSSProperties;
 
 const BIBLE_HOME_THEME_DARK = {
@@ -164,6 +172,10 @@ const BIBLE_HOME_THEME_DARK = {
   "--bible-text": "#F5F1E9",
   "--bible-green": "#3DDB96",
   "--bible-green-soft": "#182A20",
+  "--bible-blue": "#6FA8DC",
+  "--bible-blue-soft": "#1C2B38",
+  "--bible-rose": "#FF7A90",
+  "--bible-rose-soft": "#3A1E22",
 } as CSSProperties;
 
 // Well-mixed 32-bit integer hash (Murmur3-style finalizer) — unlike a plain
@@ -1407,11 +1419,43 @@ export default function Bible() {
     };
   });
 
+  // Each action gets its own accent (bg/fg) instead of all four sharing
+  // one gold tint — a quick, legible color code (purple=bookmarks,
+  // gold=notes, blue=history, rose=favorites) rather than four
+  // identical-looking circles differentiated only by their tiny icon.
   const QUICK_ACCESS = [
-    { id: "bookmarks", label: "Bookmarks", icon: Bookmark, onClick: () => setActiveModal("bookmarks") },
-    { id: "notes", label: "Notes", icon: StickyNote, onClick: () => setActiveModal("notes") },
-    { id: "history", label: "History", icon: Clock, onClick: () => setActiveModal("history") },
-    { id: "favorites", label: "Favorites", icon: Heart, onClick: () => setActiveModal("favorites") },
+    {
+      id: "bookmarks",
+      label: "Bookmarks",
+      icon: Bookmark,
+      bg: "var(--bible-purple-soft)",
+      fg: "var(--bible-purple)",
+      onClick: () => setActiveModal("bookmarks"),
+    },
+    {
+      id: "notes",
+      label: "Notes",
+      icon: StickyNote,
+      bg: "color-mix(in oklab, var(--color-gold) 18%, transparent)",
+      fg: "var(--color-gold-dark)",
+      onClick: () => setActiveModal("notes"),
+    },
+    {
+      id: "history",
+      label: "History",
+      icon: Clock,
+      bg: "var(--bible-blue-soft)",
+      fg: "var(--bible-blue)",
+      onClick: () => setActiveModal("history"),
+    },
+    {
+      id: "favorites",
+      label: "Favorites",
+      icon: Heart,
+      bg: "var(--bible-rose-soft)",
+      fg: "var(--bible-rose)",
+      onClick: () => setActiveModal("favorites"),
+    },
   ] as const;
 
   // Top-level category row — only the two tiles that map to a real,
@@ -1517,7 +1561,7 @@ export default function Bible() {
         onClick={() => setExpandedTestament((prev) => (prev === id ? null : id))}
         className="relative overflow-hidden text-center rounded-[28px] pt-2 px-4 pb-1 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
         style={{
-          backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 22%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
+          backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 32%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
       >
         <div className="relative mx-auto mb-1 w-[54px] h-[54px]">
@@ -1797,11 +1841,8 @@ export default function Bible() {
                 i > 0 ? "border-l border-border" : ""
               }`}
             >
-              <span
-                className="w-11 h-11 rounded-full flex items-center justify-center"
-                style={{ background: "color-mix(in oklab, var(--color-gold) 18%, transparent)" }}
-              >
-                <item.icon size={18} style={{ color: "var(--color-gold-dark)" }} />
+              <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: item.bg }}>
+                <item.icon size={18} style={{ color: item.fg }} />
               </span>
               <span className="text-xs font-semibold text-center leading-tight w-full truncate" style={{ color: "var(--bible-text)" }}>
                 {item.label}
@@ -1841,9 +1882,12 @@ export default function Bible() {
               const b = bookFromSlug(entry.bookSlug);
               if (!b) return null;
               const percent = Math.round((entry.chapter / b.chapterCount) * 100);
-              const palette = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length];
-              const accentVar = palette.accent;
-              const tileGradient = palette.gradient;
+              const accentVar = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length].accent;
+              // Same real bible-themed photography the hero card rotates
+              // through, not a flat color tile — a moody cover-style photo
+              // reads as a lot more premium than a plain gradient square,
+              // and this way it isn't a made-up "cover image" either.
+              const tilePhoto = HERO_IMAGES[i % HERO_IMAGES.length];
               return (
                 <button
                   key={`${entry.bookSlug}-${entry.chapter}`}
@@ -1852,8 +1896,10 @@ export default function Bible() {
                   style={{ background: "var(--color-elevated)" }}
                 >
                   <div
-                    className="w-full h-9 rounded-lg flex items-center justify-between px-2 mb-1"
-                    style={{ backgroundImage: `linear-gradient(160deg, rgba(0,0,0,0.05), rgba(0,0,0,0.4)), ${tileGradient}` }}
+                    className="w-full h-9 rounded-lg flex items-center justify-between px-2 mb-1 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%), url(${tilePhoto})`,
+                    }}
                   >
                     <span
                       className={`${
@@ -1892,24 +1938,26 @@ export default function Bible() {
           {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug, i) => {
             const b = bookFromSlug(slug);
             if (!b) return null;
-            const palette = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length];
+            // Real bible-themed photography (same set the hero card
+            // rotates through) as the cover, book name overlaid at the
+            // bottom — a real photo cover reads as premium in a way a
+            // generic book icon on a flat tile doesn't, and it's the same
+            // asset family already used elsewhere on this page rather
+            // than a per-book image this app doesn't actually have.
+            const tilePhoto = HERO_IMAGES[i % HERO_IMAGES.length];
             return (
               <button
                 key={slug}
                 onClick={() => openVerse(slug, 1)}
-                className="shrink-0 w-20 flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+                className="shrink-0 w-20 h-20 rounded-2xl overflow-hidden relative shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform bg-cover bg-center"
+                style={{
+                  backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.75) 100%), url(${tilePhoto})`,
+                }}
               >
                 <span
-                  className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-sm ring-1 ring-black/[0.04]"
-                  style={{ backgroundImage: `linear-gradient(160deg, rgba(255,255,255,0.15), rgba(0,0,0,0.25)), ${palette.gradient}` }}
-                >
-                  <BookOpen size={22} className="text-white/90" />
-                </span>
-                <span
-                  className={`${
+                  className={`absolute inset-x-0 bottom-0 px-1.5 pb-1.5 ${
                     prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
-                  } text-xs font-semibold text-center leading-tight line-clamp-1`}
-                  style={{ color: "var(--bible-text)" }}
+                  } text-white text-[11px] font-bold text-center leading-tight line-clamp-1 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]`}
                 >
                   {bookDisplayName(b, prefs.language)}
                 </span>
