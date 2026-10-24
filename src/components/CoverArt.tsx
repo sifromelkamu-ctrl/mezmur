@@ -65,6 +65,21 @@ const sizeClasses: Record<string, string> = {
 
 const roundedXlClass = "w-20 h-20";
 
+// Upload now stores a second, much smaller derivative alongside the full
+// image, under a predictable "-thumb" suffix on the same key (see
+// server/src/upload.ts) — this derives that sibling URL from whatever
+// photoUrl/coverUrl the entity already has, so no new field needed to be
+// threaded through every DTO/admin form. Not every existing piece of
+// artwork has one yet (only generated going forward, until backfilled);
+// CoverArt falls back to the full image if the thumb 404s.
+function toThumbUrl(url: string): string {
+  const [base, query] = url.split("?");
+  const dotIndex = base.lastIndexOf(".");
+  if (dotIndex === -1) return url;
+  const thumbBase = `${base.slice(0, dotIndex)}-thumb${base.slice(dotIndex)}`;
+  return query ? `${thumbBase}?${query}` : thumbBase;
+}
+
 // One consistent "no artwork" badge, used everywhere (tracks, albums,
 // playlists, artists, sermons, podcasts) instead of a different generated
 // pattern per item — simpler and reads as more deliberate/premium.
@@ -109,6 +124,12 @@ export default function CoverArt({
   // won't re-issue an identical failed request on its own) papers over
   // exactly that kind of transient drop.
   const [retryCount, setRetryCount] = useState(0);
+  // albumHero is the one context that actually benefits from the full
+  // source resolution (a large, close-up hero image) — every other size
+  // only ever renders small enough that the much lighter thumbnail
+  // derivative covers it at any real device pixel ratio.
+  const wantsThumb = size !== "albumHero";
+  const [useThumb, setUseThumb] = useState(true);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [editing, setEditing] = useState(false);
   // Reflects a just-saved edit immediately in this instance, without
@@ -140,7 +161,8 @@ export default function CoverArt({
     return () => observer.disconnect();
   }, [isVisible]);
 
-  const palette = useArtworkPalette(showPhoto && isVisible ? photoUrl : undefined, gradient);
+  const baseUrl = photoUrl && wantsThumb && useThumb ? toThumbUrl(photoUrl) : photoUrl;
+  const palette = useArtworkPalette(showPhoto && isVisible ? baseUrl : undefined, gradient);
 
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
   // Only worth analyzing when there's no saved/override frame to use
@@ -149,7 +171,7 @@ export default function CoverArt({
   // crossOrigin-mode fetch + decode of the full-resolution image just to
   // compute a result that gets thrown away below.
   const needsSmartFrame = canFrame && !savedOverride && !artworkFrame && isVisible;
-  const smartFrame = useSmartFrame(needsSmartFrame ? photoUrl : undefined);
+  const smartFrame = useSmartFrame(needsSmartFrame ? baseUrl : undefined);
   const activeFrame = savedOverride ?? artworkFrame ?? smartFrame;
   const frameReady = canFrame && Boolean(natural) && Boolean(activeFrame);
 
@@ -172,6 +194,7 @@ export default function CoverArt({
     setLoaded(false);
     setPhotoFailed(false);
     setRetryCount(0);
+    setUseThumb(true);
     setNatural(null);
     setSavedOverride(undefined);
   }, [photoUrl]);
@@ -181,8 +204,17 @@ export default function CoverArt({
   const roundedClass = rounded ? "rounded-full" : size === "card" || size === "albumHero" ? "rounded-2xl" : "rounded-md";
 
   const MAX_PHOTO_RETRIES = 2;
-  const retrySrc = retryCount > 0 && photoUrl ? `${photoUrl}${photoUrl.includes("?") ? "&" : "?"}retry=${retryCount}` : photoUrl;
+  const retrySrc = retryCount > 0 && baseUrl ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryCount}` : baseUrl;
   const handlePhotoError = () => {
+    // Not every existing piece of artwork has a thumbnail derivative yet
+    // (only generated going forward, until the rest is backfilled) — a 404
+    // on the thumb just means "fall back to the full-size image", not a
+    // real failure, so it doesn't count against the retry budget below.
+    if (wantsThumb && useThumb) {
+      setUseThumb(false);
+      setRetryCount(0);
+      return;
+    }
     if (retryCount < MAX_PHOTO_RETRIES) {
       setTimeout(() => setRetryCount((c) => c + 1), 700);
     } else {
@@ -197,17 +229,11 @@ export default function CoverArt({
   // forever, showing nothing but the background gradient behind it, even
   // though the exact same URL loads fine moments later in another instance
   // (e.g. the mini player). Treat a long stall the same as an error so it
-  // feeds into the same retry/fallback path.
+  // feeds into the same thumb-fallback/retry path.
   useEffect(() => {
     if (!showPhoto || loaded || photoFailed) return;
     const STALL_TIMEOUT_MS = 6000;
-    const timer = setTimeout(() => {
-      setRetryCount((c) => {
-        if (c < MAX_PHOTO_RETRIES) return c + 1;
-        setPhotoFailed(true);
-        return c;
-      });
-    }, STALL_TIMEOUT_MS);
+    const timer = setTimeout(handlePhotoError, STALL_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [retrySrc, showPhoto, loaded, photoFailed]);
 
@@ -276,7 +302,7 @@ export default function CoverArt({
               and blurred — so the blur reads as a smeared continuation of
               the artwork's own edge pixels instead of a mismatched crop. */}
           <img
-            src={photoUrl}
+            src={baseUrl}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-contain scale-125 opacity-90"

@@ -2,6 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import adminRouter from "./routes/admin.js";
+import adminArtworkThumbsRouter from "./routes/adminArtworkThumbs.js";
 import adminFeaturedBannersRouter from "./routes/adminFeaturedBanners.js";
 import adminMediaMigrationRouter from "./routes/adminMediaMigration.js";
 import adminLibraryRouter from "./routes/adminLibrary.js";
@@ -92,6 +93,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/admin/library", adminLibraryRouter);
 app.use("/api/admin/featured-banners", adminFeaturedBannersRouter);
 app.use("/api/admin/media-migration", adminMediaMigrationRouter);
+app.use("/api/admin/artwork-thumbs", adminArtworkThumbsRouter);
 app.use("/api/admin/youtube-import", youtubeImportRouter);
 app.use("/api/admin/telegram-import", telegramImportRouter);
 

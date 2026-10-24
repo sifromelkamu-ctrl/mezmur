@@ -1,0 +1,153 @@
+// Generates the small "-thumb" artwork derivative (see upload.ts's
+// generateThumbnail) for every piece of artwork uploaded before that
+// feature existed, so CoverArt's fast thumbnail path covers the whole
+// existing catalog, not just new uploads going forward.
+//
+// Deliberately simpler than storage/migration.ts's Supabase->R2 job system:
+// this is naturally idempotent (each target is skipped if its thumb key
+// already exists in R2), so there's no need for a persisted per-file job
+// ledger — an interrupted run just gets re-started from scratch and
+// re-skips whatever's already done. In-memory progress only; lost on a
+// server restart, which is fine since restarting the backfill is cheap.
+import { prisma } from "../prisma.js";
+import { headObject, putArtworkObject, r2Configured } from "./r2.js";
+import { generateThumbnail } from "../upload.js";
+
+function r2Base(): string | null {
+  const base = (process.env.R2_MEDIA_DOMAIN || process.env.R2_PUBLIC_URL || "").trim().replace(/\/+$/, "");
+  return base || null;
+}
+
+// Inverse of r2.ts's publicArtworkUrl() — strips the known public base back
+// down to the object key. Returns null for a legacy Supabase-hosted URL (or
+// any other host), which has nothing to backfill here.
+function keyFromUrl(url: string, base: string): string | null {
+  const prefix = `${base}/`;
+  return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+}
+
+function thumbKeyFor(key: string): string {
+  const dot = key.lastIndexOf(".");
+  return dot === -1 ? `${key}-thumb` : `${key.slice(0, dot)}-thumb${key.slice(dot)}`;
+}
+
+function mimeFromKey(key: string): string {
+  const ext = key.slice(key.lastIndexOf(".") + 1).toLowerCase();
+  const map: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+  };
+  return map[ext] ?? "image/jpeg";
+}
+
+interface Target {
+  label: string;
+  url: string;
+}
+
+async function collectTargets(): Promise<Target[]> {
+  const [artists, albums, tracks, playlists] = await Promise.all([
+    prisma.artist.findMany({ where: { photoUrl: { not: null } }, select: { name: true, photoUrl: true } }),
+    prisma.album.findMany({ where: { coverUrl: { not: null } }, select: { title: true, coverUrl: true } }),
+    prisma.track.findMany({ where: { coverUrl: { not: null } }, select: { title: true, coverUrl: true } }),
+    prisma.playlist.findMany({ where: { coverUrl: { not: null } }, select: { title: true, coverUrl: true } }),
+  ]);
+  const targets: Target[] = [];
+  for (const a of artists) if (a.photoUrl) targets.push({ label: `artist:${a.name}`, url: a.photoUrl });
+  for (const a of albums) if (a.coverUrl) targets.push({ label: `album:${a.title}`, url: a.coverUrl });
+  for (const t of tracks) if (t.coverUrl) targets.push({ label: `track:${t.title}`, url: t.coverUrl });
+  for (const p of playlists) if (p.coverUrl) targets.push({ label: `playlist:${p.title}`, url: p.coverUrl });
+  return targets;
+}
+
+export interface BackfillStats {
+  running: boolean;
+  total: number;
+  checked: number;
+  generated: number;
+  alreadyHadOne: number;
+  failed: number;
+  skippedNonR2: number;
+  recentFailures: string[];
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export const backfillState: BackfillStats = {
+  running: false,
+  total: 0,
+  checked: 0,
+  generated: 0,
+  alreadyHadOne: 0,
+  failed: 0,
+  skippedNonR2: 0,
+  recentFailures: [],
+  startedAt: null,
+  finishedAt: null,
+};
+
+async function processTarget(target: Target, base: string): Promise<void> {
+  const key = keyFromUrl(target.url, base);
+  if (!key) {
+    backfillState.skippedNonR2++;
+    return;
+  }
+  const thumbKey = thumbKeyFor(key);
+  if (await headObject("artwork", thumbKey)) {
+    backfillState.alreadyHadOne++;
+    return;
+  }
+  try {
+    const res = await fetch(target.url);
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const thumb = await generateThumbnail(buffer, mimeFromKey(key));
+    await putArtworkObject(thumbKey, thumb.buffer, thumb.mimetype);
+    backfillState.generated++;
+  } catch (err) {
+    backfillState.failed++;
+    backfillState.recentFailures = [`${target.label}: ${(err as Error).message}`, ...backfillState.recentFailures].slice(0, 20);
+  }
+}
+
+const CONCURRENCY = 6;
+
+export async function runArtworkThumbBackfill(): Promise<void> {
+  if (backfillState.running) throw new Error("A backfill is already running");
+  if (!r2Configured) throw new Error("R2 is not configured");
+  const base = r2Base();
+  if (!base) throw new Error("R2_PUBLIC_URL or R2_MEDIA_DOMAIN must be set");
+
+  Object.assign(backfillState, {
+    running: true,
+    total: 0,
+    checked: 0,
+    generated: 0,
+    alreadyHadOne: 0,
+    failed: 0,
+    skippedNonR2: 0,
+    recentFailures: [],
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  } satisfies Partial<BackfillStats>);
+
+  try {
+    const targets = await collectTargets();
+    backfillState.total = targets.length;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < targets.length) {
+        const target = targets[cursor++];
+        await processTarget(target, base);
+        backfillState.checked++;
+      }
+    };
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  } finally {
+    backfillState.running = false;
+    backfillState.finishedAt = new Date().toISOString();
+  }
+}
