@@ -1080,6 +1080,7 @@ export default function Bible() {
             citation={verseImageComposer.citation}
             language={prefs.language}
             initialFontFamily={prefs.englishFontFamily}
+            initialAmharicFontFamily={prefs.fontFamily}
             onClose={() => setVerseImageComposer(null)}
           />
         )}

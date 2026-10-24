@@ -5,7 +5,10 @@ import { HERO_IMAGES } from "../../data/bibleHeroImages";
 import {
   ENGLISH_FONT_FAMILY_LABELS,
   ENGLISH_FONT_FAMILY_OPTIONS,
+  FONT_FAMILY_LABELS,
+  FONT_FAMILY_OPTIONS,
   type EnglishFontFamily,
+  type FontFamily,
 } from "../../utils/bibleReadingPrefs";
 import { renderVerseCard, shareCanvasAsImage, type VerseImageOverlay } from "../../utils/bibleVerseImage";
 
@@ -23,7 +26,18 @@ const FONT_STACKS: Record<EnglishFontFamily, string> = {
   inter: `"Inter", sans-serif`,
   playfair: `"Playfair Display", serif`,
 };
-const AMHARIC_FONT_STACK = `"Noto Serif Ethiopic", serif`;
+// Amharic gets its own font picker using the same Ethiopic-capable set
+// BibleSettingsModal's main reading-font picker already offers — none of
+// the Latin fonts above cover Ethiopic glyphs, so they're not reused here.
+const AMHARIC_FONT_STACKS: Record<FontFamily, string> = {
+  notoSans: `"Noto Sans Ethiopic", sans-serif`,
+  notoSerif: `"Noto Serif Ethiopic", serif`,
+  abyssinica: `"Abyssinica SIL", serif`,
+  menbere: `"Menbere", sans-serif`,
+  agbalumo: `"Agbalumo", cursive`,
+  googleSans: `"Google Sans", sans-serif`,
+  nyala: `"Nyala", "Noto Sans Ethiopic", sans-serif`,
+};
 
 const OVERLAY_OPTIONS: { id: VerseImageOverlay; label: string; previewAlpha: number }[] = [
   { id: "light", label: "Light", previewAlpha: 0.3 },
@@ -36,6 +50,7 @@ interface VerseImageComposerProps {
   citation: string;
   language: "am" | "en";
   initialFontFamily?: EnglishFontFamily;
+  initialAmharicFontFamily?: FontFamily;
   onClose: () => void;
 }
 
@@ -46,15 +61,23 @@ interface VerseImageComposerProps {
 // Reuses HERO_IMAGES (the same photo library the Bible home screen's daily
 // verse card rotates through) as the background gallery instead of a
 // separate curated set.
-export default function VerseImageComposer({ text, citation, language, initialFontFamily, onClose }: VerseImageComposerProps) {
+export default function VerseImageComposer({
+  text,
+  citation,
+  language,
+  initialFontFamily,
+  initialAmharicFontFamily,
+  onClose,
+}: VerseImageComposerProps) {
   const [step, setStep] = useState<"pick" | "edit">("pick");
   const [background, setBackground] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<VerseImageOverlay>("medium");
   const [fontFamily, setFontFamily] = useState<EnglishFontFamily>(initialFontFamily ?? "merriweather");
+  const [amharicFontFamily, setAmharicFontFamily] = useState<FontFamily>(initialAmharicFontFamily ?? "notoSerif");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const fontStack = language === "en" ? FONT_STACKS[fontFamily] : AMHARIC_FONT_STACK;
+  const fontStack = language === "en" ? FONT_STACKS[fontFamily] : AMHARIC_FONT_STACKS[amharicFontFamily];
 
   const handleSave = async () => {
     if (saving) return;
@@ -103,6 +126,12 @@ export default function VerseImageComposer({ text, citation, language, initialFo
                   Gradient
                 </span>
               </button>
+              {/* 79 photos in this grid — plain <img loading="lazy">
+                  instead of a CSS background-image, since a background-
+                  image has no native lazy-loading equivalent and would
+                  fetch all 79 full-size photos the instant this screen
+                  opens, not just the handful actually scrolled into
+                  view. */}
               {HERO_IMAGES.map((src) => (
                 <button
                   key={src}
@@ -110,10 +139,11 @@ export default function VerseImageComposer({ text, citation, language, initialFo
                     setBackground(src);
                     setStep("edit");
                   }}
-                  className="aspect-square rounded-xl overflow-hidden ring-1 ring-black/[0.06] bg-cover bg-center active:scale-95 transition-transform"
-                  style={{ backgroundImage: `url(${src})` }}
+                  className="aspect-square rounded-xl overflow-hidden ring-1 ring-black/[0.06] active:scale-95 transition-transform"
                   aria-label="Use this photo"
-                />
+                >
+                  <img src={src} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                </button>
               ))}
             </div>
           </div>
@@ -228,27 +258,40 @@ export default function VerseImageComposer({ text, citation, language, initialFo
               </p>
             </div>
 
-            {language === "en" && (
-              <div className="mb-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-muted mb-2">Font</p>
-                <div className="flex gap-2 overflow-x-auto overscroll-x-contain no-scrollbar">
-                  {ENGLISH_FONT_FAMILY_OPTIONS.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFontFamily(f)}
-                      className={`shrink-0 px-3.5 py-2 rounded-full border text-sm transition-colors ${
-                        fontFamily === f
-                          ? "bg-[var(--color-gold)] text-black border-transparent font-bold"
-                          : "border-border text-fg-muted hover:text-fg"
-                      }`}
-                      style={{ fontFamily: FONT_STACKS[f] }}
-                    >
-                      {ENGLISH_FONT_FAMILY_LABELS[f]}
-                    </button>
-                  ))}
-                </div>
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-fg-muted mb-2">Font</p>
+              <div className="flex gap-2 overflow-x-auto overscroll-x-contain no-scrollbar">
+                {language === "en"
+                  ? ENGLISH_FONT_FAMILY_OPTIONS.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFontFamily(f)}
+                        className={`shrink-0 px-3.5 py-2 rounded-full border text-sm transition-colors ${
+                          fontFamily === f
+                            ? "bg-[var(--color-gold)] text-black border-transparent font-bold"
+                            : "border-border text-fg-muted hover:text-fg"
+                        }`}
+                        style={{ fontFamily: FONT_STACKS[f] }}
+                      >
+                        {ENGLISH_FONT_FAMILY_LABELS[f]}
+                      </button>
+                    ))
+                  : FONT_FAMILY_OPTIONS.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setAmharicFontFamily(f)}
+                        className={`shrink-0 px-3.5 py-2 rounded-full border text-sm transition-colors ${
+                          amharicFontFamily === f
+                            ? "bg-[var(--color-gold)] text-black border-transparent font-bold"
+                            : "border-border text-fg-muted hover:text-fg"
+                        }`}
+                        style={{ fontFamily: AMHARIC_FONT_STACKS[f] }}
+                      >
+                        {FONT_FAMILY_LABELS[f]}
+                      </button>
+                    ))}
               </div>
-            )}
+            </div>
 
             {background && (
               <div>
