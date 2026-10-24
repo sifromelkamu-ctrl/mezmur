@@ -381,11 +381,11 @@ export default function ArtistDetail() {
     // bug: its color stops are percentages of the *whole page*, so on a
     // shorter page (short bio, few albums) the hero's fixed-height bottom
     // edge landed mid-transition, producing a visible hard seam. A flat
-    // fill always matches exactly. Light blue now instead of near-black —
+    // fill always matches exactly. Olive green now instead of near-black —
     // must stay in sync with the hero wash's own final stop below.
     <div
       style={{
-        backgroundColor: "#bfe0f5",
+        backgroundColor: "#c2c77e",
         marginTop: "calc(-1 * env(safe-area-inset-top))",
         paddingTop: "env(safe-area-inset-top)",
       }}
@@ -408,23 +408,23 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Light blue wash now, not gray/teal — same alpha (0b/13) and same
-            ~15% band at the bottom of the hero as the last two passes,
-            just a different color family again. TEAL/TEAL_DEEP themselves
-            are untouched — this wash is the only thing switching color,
-            not the badge/Play button/other teal accents elsewhere on this
-            page. The very last stop stays fully opaque #bfe0f5 (was
-            #050707) — it must match the flat page wrapper's own
-            background exactly, same reasoning as always, just updated to
-            the new color so the two stay in sync and there's no seam. The
-            Shuffle/Follow/Share buttons right below also switched from
-            white-on-dark to dark-on-light styling here — white icons on a
-            white/10 circle would've all but vanished against this light
-            backdrop. */}
+        {/* Olive green wash now, not light blue — same alpha (0b/13) and
+            same ~15% band at the bottom of the hero as the last three
+            passes, just a different color family again. TEAL/TEAL_DEEP
+            themselves are untouched — this wash is the only thing
+            switching color, not the badge/Play button/other teal accents
+            elsewhere on this page. The very last stop stays fully opaque
+            #c2c77e — it must match the flat page wrapper's own background
+            exactly, same reasoning as always, just updated to the new
+            color so the two stay in sync and there's no seam. The
+            Shuffle/Follow/Share buttons right below keep their
+            dark-on-light styling from the light-blue pass — still a light
+            enough color for black/10 circles and dark icons to read
+            clearly. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #bfe0f50b 91%, #bfe0f526 95%, #bfe0f5 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, #c2c77e0b 91%, #c2c77e26 95%, #c2c77e 100%)`,
           }}
         />
 
