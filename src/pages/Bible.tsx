@@ -10,6 +10,7 @@ import {
   Columns2,
   Copy,
   Heart,
+  Highlighter,
   Image as ImageIcon,
   Leaf,
   Loader2,
@@ -243,6 +244,7 @@ export default function Bible() {
   const [noteDraft, setNoteDraft] = useState("");
   const [justCopied, setJustCopied] = useState(false);
   const [justShared, setJustShared] = useState(false);
+  const [showHighlightColors, setShowHighlightColors] = useState(false);
   const [verseImageComposer, setVerseImageComposer] = useState<{ text: string; citation: string } | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
@@ -1150,7 +1152,10 @@ export default function Bible() {
                       Selected: {selectionCitation}
                     </p>
                     <button
-                      onClick={() => setSelectedVerses(new Set())}
+                      onClick={() => {
+                        setSelectedVerses(new Set());
+                        setShowHighlightColors(false);
+                      }}
                       aria-label="Cancel selection"
                       className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors -mr-1"
                     >
@@ -1159,25 +1164,48 @@ export default function Bible() {
                   </div>
                   <div className="border-t border-border" />
                   <div className="flex items-end gap-1 px-2 pt-2.5 pb-3 overflow-x-auto no-scrollbar">
-                    {/* Highlight colors shown directly, not behind a toggle
-                        button — same change Quick Access went through on
-                        the home screen: a glance at real colors beats one
-                        more tap to reveal them. */}
-                    {HIGHLIGHT_COLORS.map((c) => (
+                    {/* Condensed into one "Highlight" button, same shape as
+                        every other action here, until tapped — then it
+                        expands in place into the real color swatches.
+                        Keeps the row as compact as the rest of the actions
+                        instead of spending five slots on colors up front. */}
+                    {!showHighlightColors ? (
                       <button
-                        key={c.id}
-                        onClick={() => handleApplyHighlight(c.id)}
-                        aria-label={`Highlight ${c.id}`}
-                        className="flex flex-col items-center gap-1 shrink-0 px-1.5 py-1"
+                        onClick={() => setShowHighlightColors(true)}
+                        className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                       >
                         <span
-                          className={`w-9 h-9 rounded-full ${c.swatch} transition-transform ${
-                            activeColor === c.id ? "ring-2 ring-offset-2 ring-fg scale-110" : ""
-                          }`}
-                          style={activeColor === c.id ? ({ "--tw-ring-offset-color": "var(--color-elevated)" } as CSSProperties) : undefined}
-                        />
+                          className="w-9 h-9 rounded-full flex items-center justify-center"
+                          style={{ background: activeColor ? undefined : "var(--bible-purple-soft)" }}
+                        >
+                          {activeColor ? (
+                            <span className={`w-5 h-5 rounded-full ${HIGHLIGHT_COLORS.find((c) => c.id === activeColor)?.swatch}`} />
+                          ) : (
+                            <Highlighter size={16} style={{ color: "var(--bible-purple)" }} />
+                          )}
+                        </span>
+                        Highlight
                       </button>
-                    ))}
+                    ) : (
+                      HIGHLIGHT_COLORS.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            handleApplyHighlight(c.id);
+                            setShowHighlightColors(false);
+                          }}
+                          aria-label={`Highlight ${c.id}`}
+                          className="flex flex-col items-center gap-1 shrink-0 px-1.5 py-1"
+                        >
+                          <span
+                            className={`w-9 h-9 rounded-full ${c.swatch} transition-transform ${
+                              activeColor === c.id ? "ring-2 ring-offset-2 ring-fg scale-110" : ""
+                            }`}
+                            style={activeColor === c.id ? ({ "--tw-ring-offset-color": "var(--color-elevated)" } as CSSProperties) : undefined}
+                          />
+                        </button>
+                      ))
+                    )}
                     <div className="w-px h-10 bg-border shrink-0 mx-1 mb-2" />
                     <button
                       onClick={handleToggleFavorite}
