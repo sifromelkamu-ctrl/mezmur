@@ -1,7 +1,9 @@
 import {
   Check,
+  Disc3,
   Heart,
   Link2,
+  ListMusic,
   MoreHorizontal,
   Music2,
   Pause,
@@ -622,23 +624,46 @@ export default function ArtistDetail() {
           )
         )}
 
-        <div
-          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8 bg-elevated border border-border"
-          style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none" }}
-        >
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{artist.albums.length}</span>
+        {/* Dark glass card, not a theme-following flat panel — this is a
+            dedicated look (square colored icon badges, a real
+            number/label/subtitle hierarchy per stat, a blurred peek of the
+            artist's own photo on the right) rather than reusing bg-elevated,
+            so it reads as a distinct floating element the way a photo-app
+            stat card does. */}
+        <div className="relative rounded-2xl mb-8 overflow-hidden backdrop-blur-xl bg-black/30 ring-1 ring-white/10 shadow-lg">
+          {artist.photoUrl && (
+            <img
+              src={artist.photoUrl}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-y-0 right-0 w-28 object-cover opacity-25"
+              style={{ filter: "blur(6px)", maskImage: "linear-gradient(to left, black, transparent)" }}
+            />
+          )}
+          <div className="relative grid grid-cols-2 divide-x divide-white/10">
+            <div className="flex items-center gap-3 px-5 py-4">
+              <span
+                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: TEAL }}
+              >
+                <Disc3 size={20} className="text-black" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xl font-extrabold text-white leading-tight">{artist.albums.length}</p>
+                <p className="text-xs font-semibold text-white/90">Albums</p>
+                <p className="text-[11px] text-white/55">Complete albums</p>
+              </div>
             </div>
-            <span className="text-xs text-fg-muted">Albums</span>
-          </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{totalSongCount}</span>
+            <div className="flex items-center gap-3 px-5 py-4">
+              <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-blue-500">
+                <ListMusic size={20} className="text-white" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xl font-extrabold text-white leading-tight">{totalSongCount}</p>
+                <p className="text-xs font-semibold text-white/90">Songs</p>
+                <p className="text-[11px] text-white/55">Total tracks</p>
+              </div>
             </div>
-            <span className="text-xs text-fg-muted">Songs</span>
           </div>
         </div>
 
