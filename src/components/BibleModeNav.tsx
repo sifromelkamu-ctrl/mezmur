@@ -1,4 +1,4 @@
-import { BookOpen, Home, Leaf, Play, Settings2 } from "lucide-react";
+import { BookOpen, Home, Leaf, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { emitBibleNavAction } from "../lib/bibleNavEvents";
@@ -54,20 +54,19 @@ export default function BibleModeNav() {
         </button>
       ))}
 
-      {/* Center action — back to the main Mezmur app. A play triangle
-          rather than a generic "+" or arrow: it's the same shape as the
-          app's own logo/icon (src/assets/mezmur-logo.png is a play button
-          built around a cross), so it reads as "play Mezmur" — an
-          unambiguous pointer to the music app specifically, not just a
-          vague "back" — while still raised and solid-filled so it's the
-          one deliberately different element in the bar. */}
+      {/* Center action — back to the main Mezmur app. The same "M"
+          wordmark letter the Bible home header's own avatar badge uses
+          (Bible.tsx), rather than an icon standing in for the app — the
+          literal brand initial is the most direct "this returns to
+          Mezmur" there is. Raised and solid-filled so it's still the one
+          deliberately different element in the bar. */}
       <button
         onClick={() => navigate("/")}
         aria-label="Back to Mezmur"
         className="relative -mt-7 flex items-center justify-center w-[52px] h-[52px] rounded-full shrink-0 active:scale-90 transition-transform shadow-lg"
         style={{ background: purple, boxShadow: `0 10px 24px -6px ${purple}99` }}
       >
-        <Play size={22} strokeWidth={2.4} fill="white" className="text-white ml-0.5" />
+        <span className="text-white font-playfair font-bold text-xl">M</span>
       </button>
 
       {itemsEnd.map(({ id, label, icon: Icon }) => (
