@@ -269,10 +269,9 @@ export default function Bible() {
   // this — see bibleNavEvents.ts's own comment — so its non-"back to
   // Mezmur" buttons each just drive this page's own existing view state
   // directly, the same as if the equivalent in-page button had been
-  // tapped. "audio" and "settings" land on the same place: Bible
-  // Settings is where language/version (which decides real recording vs.
-  // text-to-speech) actually lives — there's no separate audio hub to
-  // send "audio" to instead.
+  // tapped. "ot"/"nt" land on the exact same real Old/New Testament
+  // progress + book list that ReadingPlanCard/BookList already render
+  // on this page — this just surfaces it from the bottom bar too.
   useEffect(() => {
     return onBibleNavAction((action) => {
       switch (action) {
@@ -283,13 +282,20 @@ export default function Bible() {
           setActiveModal(null);
           setExpandedTestament(null);
           break;
-        case "browse":
+        case "ot":
           setBookSlug(null);
           setChapter(null);
+          setShowBookSearch(false);
           setActiveModal(null);
-          setShowBookSearch(true);
+          setExpandedTestament("old");
           break;
-        case "audio":
+        case "nt":
+          setBookSlug(null);
+          setChapter(null);
+          setShowBookSearch(false);
+          setActiveModal(null);
+          setExpandedTestament("new");
+          break;
         case "settings":
           setShowBibleSettings(true);
           break;

@@ -1,4 +1,4 @@
-import { BookOpen, Home, Plus, Settings2, Volume2 } from "lucide-react";
+import { BookOpen, Home, Leaf, Play, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { emitBibleNavAction } from "../lib/bibleNavEvents";
@@ -26,12 +26,15 @@ export default function BibleModeNav() {
   // two hex values are just repeated directly.
   const purple = isLight ? "#5B3FE0" : "#8B6CFF";
 
-  const items: { id: "home" | "browse" | "audio" | "settings"; label: string; icon: typeof Home }[] = [
+  // OT/NT icons match TESTAMENT_THEME's own old/new icons in Bible.tsx
+  // (BookOpen / Leaf) — same real Old/New Testament progress + book list
+  // those cards already show, just reachable from the bottom bar too.
+  const items: { id: "home" | "ot"; label: string; icon: typeof Home }[] = [
     { id: "home", label: "Home", icon: Home },
-    { id: "browse", label: "Bible", icon: BookOpen },
+    { id: "ot", label: "OT", icon: BookOpen },
   ];
-  const itemsEnd: { id: "audio" | "settings"; label: string; icon: typeof Home }[] = [
-    { id: "audio", label: "Audio", icon: Volume2 },
+  const itemsEnd: { id: "nt" | "settings"; label: string; icon: typeof Home }[] = [
+    { id: "nt", label: "NT", icon: Leaf },
     { id: "settings", label: "More", icon: Settings2 },
   ];
 
@@ -51,19 +54,20 @@ export default function BibleModeNav() {
         </button>
       ))}
 
-      {/* Center "cross" action — the way back to the main Mezmur app,
-          styled as an actual cross (not a generic "+") since this is the
-          one button that belongs to the Bible identity rather than a
-          repurposed app icon. Raised above the pill's own line, solid
-          fill, so it reads as the one deliberately different element in
-          the bar. */}
+      {/* Center action — back to the main Mezmur app. A play triangle
+          rather than a generic "+" or arrow: it's the same shape as the
+          app's own logo/icon (src/assets/mezmur-logo.png is a play button
+          built around a cross), so it reads as "play Mezmur" — an
+          unambiguous pointer to the music app specifically, not just a
+          vague "back" — while still raised and solid-filled so it's the
+          one deliberately different element in the bar. */}
       <button
         onClick={() => navigate("/")}
         aria-label="Back to Mezmur"
         className="relative -mt-7 flex items-center justify-center w-[52px] h-[52px] rounded-full shrink-0 active:scale-90 transition-transform shadow-lg"
         style={{ background: purple, boxShadow: `0 10px 24px -6px ${purple}99` }}
       >
-        <Plus size={24} strokeWidth={2.4} className="text-white" />
+        <Play size={22} strokeWidth={2.4} fill="white" className="text-white ml-0.5" />
       </button>
 
       {itemsEnd.map(({ id, label, icon: Icon }) => (
