@@ -13,6 +13,7 @@ import {
   Highlighter,
   Image as ImageIcon,
   Leaf,
+  ListChecks,
   Loader2,
   Pause,
   ScrollText,
@@ -35,6 +36,7 @@ import BibleSettingsModal from "../components/bible/BibleSettingsModal";
 import NotificationsPanel from "../components/home/NotificationsPanel";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
+import { devotionalLineOfTheDay } from "../data/devotionalLines";
 import { MORNING_VERSES } from "../data/morningVerses";
 import { BOTTOM_RESERVE_PX } from "../lib/layout";
 import { isDailyVerseSubscribed, pushSupported, subscribeToDailyVerse, unsubscribeFromDailyVerse } from "../lib/pushNotifications";
@@ -63,6 +65,7 @@ import {
   type ReadingPrefs,
 } from "../utils/bibleReadingPrefs";
 import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../utils/bibleReadingHistory";
+import { onBibleNavAction } from "../lib/bibleNavEvents";
 import { speechSupported, useBibleAudio } from "../context/BibleAudioContext";
 
 type BookText = Record<string, string[]>; // chapter number -> verses
@@ -263,6 +266,42 @@ export default function Bible() {
   const [wholeBibleLoading, setWholeBibleLoading] = useState(false);
   const wholeBibleCacheRef = useRef<Map<string, BookText | null>>(new Map());
   const verseRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
+  const devotionalSectionRef = useRef<HTMLDivElement>(null);
+
+  // BibleModeNav (App.tsx) has no sub-routes to navigate to for any of
+  // this — see bibleNavEvents.ts's own comment — so its four non-"back to
+  // Mezmur" buttons each just drive this page's own existing view state
+  // directly, the same as if the equivalent in-page button had been
+  // tapped.
+  useEffect(() => {
+    return onBibleNavAction((action) => {
+      switch (action) {
+        case "home":
+          setBookSlug(null);
+          setChapter(null);
+          setShowBookSearch(false);
+          setActiveModal(null);
+          setExpandedTestament(null);
+          break;
+        case "browse":
+          setBookSlug(null);
+          setChapter(null);
+          setActiveModal(null);
+          setShowBookSearch(true);
+          break;
+        case "plans":
+          setBookSlug(null);
+          setChapter(null);
+          setShowBookSearch(false);
+          setActiveModal(null);
+          setExpandedTestament((t) => t ?? "old");
+          break;
+        case "settings":
+          setShowBibleSettings(true);
+          break;
+      }
+    });
+  }, []);
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
@@ -1375,6 +1414,35 @@ export default function Bible() {
     { id: "favorites", label: "Favorites", icon: Heart, onClick: () => setActiveModal("favorites") },
   ] as const;
 
+  // Top-level category row — each tile maps to something real already on
+  // this page rather than a separate feature of its own: Bible opens the
+  // book browser, Audio opens Bible Settings (where language/version,
+  // which decides real recording vs. text-to-speech, actually lives),
+  // Plan expands the real Old/New Testament progress (same data as the
+  // ReadingPlanCards above), Devotional scrolls to the real daily line at
+  // the bottom of this page. No "Community" tile — nothing backs it.
+  const CATEGORY_TILES = [
+    { id: "bible", label: "Bible", icon: BookOpen, bg: "var(--bible-purple-soft)", fg: "var(--bible-purple)", onClick: () => setShowBookSearch(true) },
+    { id: "audio", label: "Audio", icon: Volume2, bg: "var(--bible-green-soft)", fg: "var(--bible-green)", onClick: () => setShowBibleSettings(true) },
+    {
+      id: "plan",
+      label: "Plan",
+      icon: ListChecks,
+      bg: "color-mix(in oklab, var(--color-gold) 18%, transparent)",
+      fg: "var(--color-gold-dark)",
+      onClick: () => setExpandedTestament((t) => t ?? "old"),
+    },
+    {
+      id: "devotional",
+      label: "Devotional",
+      icon: Leaf,
+      bg: "var(--bible-purple-soft)",
+      fg: "var(--bible-purple)",
+      onClick: () => devotionalSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+    },
+    { id: "bookmarks-tile", label: "Bookmarks", icon: Bookmark, bg: "var(--bible-green-soft)", fg: "var(--bible-green)", onClick: () => setActiveModal("bookmarks") },
+  ] as const;
+
   const BookList = ({
     books,
     theme,
@@ -1594,6 +1662,28 @@ export default function Bible() {
 
       {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
 
+      {/* Category row — Bible / Audio / Plan / Devotional / Bookmarks.
+          Each tile's real destination is explained on CATEGORY_TILES
+          itself. This is the row that gives the page its own distinct
+          "mode" identity (matching BibleModeNav below), separate from the
+          Bookmarks/Notes/History/Favorites utility row further down. */}
+      <div className="grid grid-cols-5 gap-1.5 mb-2">
+        {CATEGORY_TILES.map((tile) => (
+          <button
+            key={tile.id}
+            onClick={tile.onClick}
+            className="flex flex-col items-center gap-1 py-1 active:scale-95 transition-transform"
+          >
+            <span className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: tile.bg }}>
+              <tile.icon size={18} style={{ color: tile.fg }} />
+            </span>
+            <span className="text-[10px] font-semibold text-center leading-tight" style={{ color: "var(--bible-text)" }}>
+              {tile.label}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Reading Plan — moved to the top of the page (above the hero) so
           it's the first thing visible. Repurposes the real Old/New
           Testament reading progress (see comment above oldPercent/
@@ -1802,6 +1892,73 @@ export default function Bible() {
           </div>
         </div>
       )}
+
+      {/* Books — a curated set of commonly-read books, not a ranked
+          "Popular Books" list (there's no real popularity/read-count data
+          to rank by — see bibleReadingHistory.ts; Continue Reading above
+          already uses the real per-book progress that *does* exist). */}
+      <div className="mb-1.5">
+        <div className="flex items-center gap-2 mb-2">
+          <Book size={16} style={{ color: "var(--color-gold-dark)" }} />
+          <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
+            {prefs.language === "en" ? "Books" : "መጻሕፍት"}
+          </h2>
+        </div>
+        <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain no-scrollbar">
+          {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug, i) => {
+            const b = bookFromSlug(slug);
+            if (!b) return null;
+            const palette = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length];
+            return (
+              <button
+                key={slug}
+                onClick={() => openVerse(slug, 1)}
+                className="shrink-0 w-20 flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+              >
+                <span
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-sm ring-1 ring-black/[0.04]"
+                  style={{ backgroundImage: `linear-gradient(160deg, rgba(255,255,255,0.15), rgba(0,0,0,0.25)), ${palette.gradient}` }}
+                >
+                  <BookOpen size={22} className="text-white/90" />
+                </span>
+                <span
+                  className={`${
+                    prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
+                  } text-xs font-semibold text-center leading-tight line-clamp-1`}
+                  style={{ color: "var(--bible-text)" }}
+                >
+                  {bookDisplayName(b, prefs.language)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Today's Devotional — the one real daily-rotating line
+          (devotionalLineOfTheDay, same source Home.tsx's own devotional
+          uses), kept modest rather than dressed up as a full article —
+          that's genuinely all the content there is behind it. */}
+      <div
+        ref={devotionalSectionRef}
+        className="relative rounded-2xl mb-3 p-4 shadow-[0_10px_28px_-16px_rgba(36,28,61,0.3)] ring-1 ring-black/[0.04]"
+        style={{ background: "var(--bible-purple-soft)" }}
+      >
+        <div className="flex items-center gap-2 mb-1.5">
+          <Leaf size={15} style={{ color: "var(--bible-purple)" }} />
+          <h2 className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--bible-purple)" }}>
+            {prefs.language === "en" ? "Today's Devotional" : "የዛሬ ትምህርት"}
+          </h2>
+        </div>
+        <p
+          className={`${
+            prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
+          } text-sm leading-relaxed`}
+          style={{ color: "var(--bible-text)" }}
+        >
+          {devotionalLineOfTheDay()}
+        </p>
+      </div>
 
       {activeModal === "bookmarks" && (
         <BibleListModal

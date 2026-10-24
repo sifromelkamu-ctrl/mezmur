@@ -2,6 +2,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { HashRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import BibleAudioBar from "./components/BibleAudioBar";
+import BibleModeNav from "./components/BibleModeNav";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
 import PreviewPaywallModal from "./components/PreviewPaywallModal";
@@ -65,6 +66,7 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAuthRoute = location.pathname === "/auth";
+  const isBibleRoute = location.pathname === "/bible";
   const isKeyboardOpen = useKeyboardOpen();
 
   // A share link's landing page (server/src/routes/share.ts) opens
@@ -181,7 +183,7 @@ function AppShell() {
         >
           <PlayerBar />
           <BibleAudioBar />
-          <MobileNav />
+          {isBibleRoute ? <BibleModeNav /> : <MobileNav />}
         </div>
       </div>
       <PreviewPaywallModal />
