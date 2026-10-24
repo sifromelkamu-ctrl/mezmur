@@ -408,17 +408,19 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Teal→black wash, compressed again — now just the final ~15% of
-            the hero, right up against where it ends and the Play button
-            row begins, instead of the ~22% band the previous pass left.
-            Photo stays fully visible everywhere above that. Still fully
-            resolving to solid #050707 by its own bottom edge so it stays
-            flush with the flat page background right below it regardless
-            of page length. */}
+        {/* Teal→black wash, compressed to the final ~15% of the hero (right
+            up against where it ends and the Play button row begins), and
+            now at half the color strength of the intermediate stops (33/5a
+            instead of 66/b3) — the mid-ramp color was still reading as a
+            strong tint even confined to that short band. The very last
+            stop stays fully opaque #050707 regardless — that's what keeps
+            the bottom edge flush with the flat page background right below
+            it, not a legibility choice, so it's the one stop this doesn't
+            touch. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, ${TEAL_DEEP}66 91%, #0d2f2cb3 95%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 85%, ${TEAL_DEEP}33 91%, #0d2f2c5a 95%, #050707 100%)`,
           }}
         />
 
