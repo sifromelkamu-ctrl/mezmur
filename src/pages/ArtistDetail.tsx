@@ -37,7 +37,6 @@ import {
 } from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
 import { formatDuration } from "../utils/format";
-import { hasEthiopicScript } from "../utils/scriptText";
 
 // The hero stays this one fixed teal gradient regardless of the app's
 // light/dark toggle (explicitly kept "exactly as it is" per the split-theme
@@ -525,27 +524,17 @@ export default function ArtistDetail() {
               Artist
             </span>
           </div>
-          {/* font-eb-garamond — switched from font-playfair (Playfair
-              Display's heavy, high-contrast editorial look wasn't it) to
-              EB Garamond, a classic, refined serif with a softer,
-              old-style character — already loaded and wired as one of the
-              app's Bible-reading font options, reused here rather than
-              introducing a new font. Gated on script, same reasoning as
-              before: EB Garamond has no Ethiopic glyphs, so an Amharic
-              name keeps the default sans instead of silently falling
-              through to the browser's generic serif. font-bold, not
-              font-black, for the Latin case — the EB Garamond weights
-              actually loaded (index.html) only go up to 700; asking for
-              900 would just make the browser synthetically (fake-)bold
-              the 700 weight instead of rendering a real one. Amharic names
-              keep font-black — that's the default sans's own real 900. */}
-          <h1
-            className={`text-4xl tracking-tight break-words text-white ${
-              hasEthiopicScript(artist.name) ? "font-black" : "font-eb-garamond font-bold"
-            }`}
-          >
-            {artist.name}
-          </h1>
+          {/* Dropped the serif experiments (Playfair Display, then EB
+              Garamond) for Inter — the app's own base font already
+              (--font-sans), and the one actually recognizable as "what
+              most apps use": it's the de facto standard UI typeface
+              across a huge share of modern products, not a niche choice.
+              No font-family override needed here at all — just inheriting
+              the page default is the correct answer. font-extrabold
+              (Inter's real loaded 800 weight, per index.html's
+              Inter:wght@...;800) instead of font-black (900 isn't loaded,
+              so the browser would've synthetically faux-bolded it). */}
+          <h1 className="text-4xl font-extrabold tracking-tight break-words text-white">{artist.name}</h1>
           <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
       </div>
