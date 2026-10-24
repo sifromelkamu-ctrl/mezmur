@@ -66,6 +66,8 @@ import {
 import { getReadChapterKeys, getRecentHistory, recordChapterRead } from "../utils/bibleReadingHistory";
 import { onBibleNavAction } from "../lib/bibleNavEvents";
 import { speechSupported, useBibleAudio } from "../context/BibleAudioContext";
+import { usePlayer } from "../context/PlayerContext";
+import { tracksApi } from "../lib/api";
 
 type BookText = Record<string, string[]>; // chapter number -> verses
 
@@ -233,6 +235,9 @@ export default function Bible() {
   // state — it needs to keep playing after this page unmounts (see
   // BibleAudioContext.tsx's own comment).
   const bibleAudio = useBibleAudio();
+  // For the "Audio" category tile's shuffle-music action — the main song
+  // player, not Bible audio. Bible.tsx has never needed this before.
+  const { shuffle, toggleShuffle, playTrack } = usePlayer();
   // Which testament's book list is open, if any — mutually exclusive
   // (opening one closes the other) rather than two independent booleans,
   // so only one book list is ever visible at a time.
@@ -562,6 +567,54 @@ export default function Bible() {
       language: prefs.language,
       verseText: verses.filter(Boolean).join(" "),
     });
+  };
+
+  // The "Audio" category tile — shuffles the actual song library (the
+  // main player, same shufflePlay Home's own Shuffle tile uses), not
+  // Bible content. Fetched on demand (this page never otherwise loads
+  // tracks) rather than kept loaded just for this one occasional tap.
+  const shuffleMusic = async () => {
+    try {
+      const allTracks = await tracksApi.list();
+      if (allTracks.length === 0) return;
+      if (!shuffle) toggleShuffle();
+      playTrack(allTracks[Math.floor(Math.random() * allTracks.length)], allTracks);
+    } catch {
+      // network failure — silently ignore, matches this file's other
+      // best-effort fetches (e.g. the daily-verse hero's own catch)
+    }
+  };
+
+  // The "Bible" category tile — shuffles into a random book+chapter and
+  // starts it playing via the same bibleAudio.toggleListen a chapter's own
+  // "Listen" button uses (real recording if one exists, text-to-speech
+  // otherwise — BibleAudioContext picks that, not this). Needs that
+  // chapter's verse text first, so it fetches the book's JSON directly
+  // rather than going through bookSlug/chapter state (this can be tapped
+  // from the home screen, with no book open at all).
+  const shuffleBibleAudio = async () => {
+    const randomBook = BIBLE_BOOKS[Math.floor(Math.random() * BIBLE_BOOKS.length)];
+    const randomChapter = Math.floor(Math.random() * randomBook.chapterCount) + 1;
+    const path =
+      prefs.language === "en"
+        ? `/bible/en/${prefs.englishVersion}/${randomBook.slug}.json`
+        : `/bible/${randomBook.slug}.json`;
+    try {
+      const res = await fetch(path);
+      if (!res.ok) return;
+      const data: BookText = await res.json();
+      const chapterVerses = data[randomChapter];
+      if (!chapterVerses) return;
+      bibleAudio.toggleListen({
+        bookSlug: randomBook.slug,
+        chapter: randomChapter,
+        label: `${bookDisplayName(randomBook, prefs.language)} ${randomChapter}`,
+        language: prefs.language,
+        verseText: chapterVerses.filter(Boolean).join(" "),
+      });
+    } catch {
+      // network/parse failure — silently ignore, same as above
+    }
   };
 
   const applyAnnotationUpdate = (key: string, updated: VerseAnnotation | undefined) => {
@@ -1502,17 +1555,22 @@ export default function Bible() {
     },
   ] as const;
 
-  // Top-level category row — only the two tiles that map to a real,
-  // distinct destination on this page: Bible opens the book browser,
-  // Audio opens Bible Settings (where language/version, which decides
-  // real recording vs. text-to-speech, actually lives). No Plan,
-  // Devotional, or Community tile — the reference design had those, but
-  // nothing on this page backs a standalone feature for any of them (the
-  // real reading-plan progress and verse-of-the-day content are already
-  // on the page in their own right, below, not gated behind a tile here).
+  // Top-level category row — two real, instant actions rather than
+  // navigation: Bible shuffles into a random chapter and starts it
+  // playing (real recording or text-to-speech — BibleAudioContext picks
+  // which), Audio shuffles the actual song library via the main player.
+  // (setShowBookSearch(true) was this tile's previous onClick, but that
+  // view only ever renders when a book is already open — `showBookSearch
+  // && book` — so from this home screen it was a silent no-op; this
+  // replaces a dead tap target with a real one, not a working feature.)
+  // No Plan, Devotional, or Community tile — the reference design had
+  // those, but nothing on this page backs a standalone feature for any of
+  // them (the real reading-plan progress and verse-of-the-day content are
+  // already on the page in their own right, below, not gated behind a
+  // tile here).
   const CATEGORY_TILES = [
-    { id: "bible", label: "Bible", icon: BookOpen, bg: "var(--bible-purple-soft)", fg: "var(--bible-purple)", onClick: () => setShowBookSearch(true) },
-    { id: "audio", label: "Audio", icon: Volume2, bg: "var(--bible-green-soft)", fg: "var(--bible-green)", onClick: () => setShowBibleSettings(true) },
+    { id: "bible", label: "Bible", icon: BookOpen, bg: "var(--bible-purple-soft)", fg: "var(--bible-purple)", onClick: shuffleBibleAudio },
+    { id: "audio", label: "Audio", icon: Volume2, bg: "var(--bible-green-soft)", fg: "var(--bible-green)", onClick: shuffleMusic },
   ] as const;
 
   const BookList = ({
