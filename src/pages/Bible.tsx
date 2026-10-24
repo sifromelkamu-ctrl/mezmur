@@ -100,18 +100,6 @@ function formatVerseNumbers(sortedIndices: number[]): string {
 const WORD_ART_TITLE =
   "bg-gradient-to-r from-gold via-gold-glow to-gold bg-clip-text text-transparent drop-shadow-[0_1px_12px_rgba(242,183,5,0.35)]";
 
-// A distinct premium tone per Continue Reading tile (cycled by index) —
-// all within the gold/bronze/copper family so the row reads as one
-// cohesive, premium palette rather than random colors.
-const TILE_GOLD_PALETTE = [
-  { gradient: "linear-gradient(160deg, #E3C167, #A9862B)", accent: "#C9A34A" },
-  { gradient: "linear-gradient(160deg, #D98850, #8B4A24)", accent: "#C97A46" },
-  { gradient: "linear-gradient(160deg, #E8D6A0, #B89B5E)", accent: "#CBAE72" },
-  { gradient: "linear-gradient(160deg, #E0A94E, #9C6B1C)", accent: "#D0922E" },
-  { gradient: "linear-gradient(160deg, #C2A66B, #6E5A32)", accent: "#A88C52" },
-  { gradient: "linear-gradient(160deg, #C9A34A, #7A5C1E)", accent: "#A9862B" },
-];
-
 // The Bible *home* screen (only) renders in its own purple/green palette,
 // independent of the app's global dark/gold theme — set as inline CSS
 // custom properties (rather than a stylesheet rule) so it always wins
@@ -215,6 +203,26 @@ const HERO_IMAGES = [
   "/bible/hero/hebrew-scripture.jpg",
   "/bible/hero/golden-sunset-sky.jpg",
   "/bible/hero/misty-road-cross.jpg",
+  "/bible/hero/starry-night-galaxy.jpg",
+  "/bible/hero/double-rainbow-field.jpg",
+  "/bible/hero/forest-waterfall.jpg",
+  "/bible/hero/alpine-peaks-sunrise.jpg",
+  "/bible/hero/desert-dunes-sunset.jpg",
+  "/bible/hero/praying-silhouette-sunset.jpg",
+  "/bible/hero/stained-glass-cathedral.jpg",
+  "/bible/hero/lighthouse-storm.jpg",
+  "/bible/hero/misty-autumn-path.jpg",
+  "/bible/hero/candle-flame-dark.jpg",
+  "/bible/hero/mountain-cross-sunrise.jpg",
+  "/bible/hero/ocean-waves-rocks.jpg",
+  "/bible/hero/aurora-norway.jpg",
+  "/bible/hero/misty-mountain-valley.jpg",
+  "/bible/hero/rain-window-bokeh.jpg",
+  "/bible/hero/gothic-church-tower.jpg",
+  "/bible/hero/bird-flock-sunset.jpg",
+  "/bible/hero/grand-canyon-sunset.jpg",
+  "/bible/hero/pink-dahlias-garden.jpg",
+  "/bible/hero/alberta-lake-sunrise.jpg",
 ];
 
 function dailyHeroImageIndexFor(date: Date): number {
@@ -223,6 +231,24 @@ function dailyHeroImageIndexFor(date: Date): number {
   for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
   return hash % HERO_IMAGES.length;
 }
+
+// A distinct, thematically-chosen cover photo per curated book (not the
+// same HERO_IMAGES set reused elsewhere on this page) — each picked to
+// actually evoke its book: light through trees for Genesis' creation,
+// a shepherd's flock for Psalms, scripture by candlelight for Proverbs'
+// wisdom, a dove for John, a fishing boat for Matthew calling fishermen,
+// literal Roman ruins for Romans, a dramatic sky for Revelation. `position`
+// overrides the default center crop for photos whose subject sits low in
+// frame, so it isn't cropped out of the small square tile.
+const BOOK_COVER_PHOTOS: Record<string, { src: string; position?: string }> = {
+  genesis: { src: "/bible/books/genesis.jpg" },
+  psalms: { src: "/bible/books/psalms.jpg", position: "center 85%" },
+  proverbs: { src: "/bible/books/proverbs.jpg" },
+  john: { src: "/bible/books/john.jpg" },
+  matthew: { src: "/bible/books/matthew.jpg", position: "center 90%" },
+  romans: { src: "/bible/books/romans.jpg" },
+  revelation: { src: "/bible/books/revelation.jpg" },
+};
 
 export default function Bible() {
   const navigate = useNavigate();
@@ -1335,8 +1361,6 @@ export default function Bible() {
   const oldTotalVerses = 23145;
   const newTotalVerses = 7959;
 
-  const recentHistory = getRecentHistory(8);
-
   const openVerse = (slug: string, chapterNum: number, verseIndex: number | null = null) => {
     setActiveModal(null);
     setBookSlug(slug);
@@ -1737,7 +1761,8 @@ export default function Bible() {
       {/* Hero — a single "verse of the day" card (one per local calendar
           day, see the fetch effect above). The background photo defaults to
           the day's pick from HERO_IMAGES but is swipeable across the whole
-          set, with dots below to show/jump to position. */}
+          set, with a progress line + counter below (not per-photo dots —
+          see that indicator's own comment for why). */}
       {!heroVerse ? (
         <div className="w-full h-[176px] rounded-3xl mb-2 animate-pulse" style={{ background: "var(--bible-purple-soft)" }} />
       ) : (
@@ -1762,8 +1787,18 @@ export default function Bible() {
               className="absolute inset-0 flex h-full transition-transform duration-200 ease-out"
               style={{ transform: `translateX(-${heroImageIndex * 100}%)` }}
             >
+              {/* 29 photos now (was 9) — lazy + async so the ~28 not
+                  currently shown don't all fetch on page load, only the
+                  ones a swipe actually brings near-visible. */}
               {HERO_IMAGES.map((src) => (
-                <img key={src} src={src} alt="" className="w-full h-full shrink-0 object-cover" />
+                <img
+                  key={src}
+                  src={src}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full shrink-0 object-cover"
+                />
               ))}
             </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/10" />
@@ -1808,20 +1843,28 @@ export default function Bible() {
             </div>
           </div>
           </div>
-          <div className="flex items-center justify-center gap-1.5 mt-1.5">
-            {HERO_IMAGES.map((src, i) => (
-              <button
-                key={src}
-                onClick={() => setHeroImageIndex(i)}
-                aria-label={`Go to photo ${i + 1}`}
-                className="h-1.5 rounded-full transition-all duration-300"
+          {/* A 29-photo set doesn't fit as individual dots on a phone width
+              (29 × dot+gap overflows well past the screen) — a thin
+              progress line + "n / total" counter scales to any pool size
+              and reads as more deliberate than a row of dots wrapping or
+              overflowing. Swiping the hero still moves through every
+              photo; this just shows where you are in that set. */}
+          <div className="flex items-center justify-center gap-2 mt-1.5">
+            <div
+              className="h-1 w-24 rounded-full overflow-hidden"
+              style={{ background: "color-mix(in oklab, var(--color-fg-subtle) 30%, transparent)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
                 style={{
-                  width: i === heroImageIndex ? "20px" : "6px",
-                  background: i === heroImageIndex ? "var(--bible-purple)" : "var(--color-fg-subtle)",
-                  opacity: i === heroImageIndex ? 1 : 0.4,
+                  width: `${((heroImageIndex + 1) / HERO_IMAGES.length) * 100}%`,
+                  background: "var(--bible-purple)",
                 }}
               />
-            ))}
+            </div>
+            <span className="text-[10px] font-semibold text-fg-subtle tabular-nums">
+              {heroImageIndex + 1}/{HERO_IMAGES.length}
+            </span>
           </div>
         </div>
       )}
@@ -1852,81 +1895,9 @@ export default function Bible() {
         </div>
       </div>
 
-      {/* Continue Reading — vertical list (matches the reference design),
-          as a compact horizontal row (not the reference's taller vertical
-          list) — the whole home screen is meant to fit one non-scrolling
-          view, and a vertical list here would push it past that. Percent is
-          real progress through the book (chapter / total chapters) —
-          there's no per-chapter scroll-position tracking to derive a truer
-          in-chapter percentage from. */}
-      {recentHistory.length > 0 && (
-        <div className="mb-1.5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <BookOpen size={16} style={{ color: "var(--color-gold-dark)" }} />
-              <h2 className="text-sm font-bold" style={{ color: "var(--bible-text)" }}>
-                {prefs.language === "en" ? "Continue Reading" : "ንባብ ይቀጥሉ"}
-              </h2>
-            </div>
-            <button
-              onClick={() => setActiveModal("history")}
-              className="flex items-center gap-0.5 text-xs font-semibold transition-colors"
-              style={{ color: "var(--bible-purple)" }}
-            >
-              {prefs.language === "en" ? "View all" : "ሁሉንም ይመልከቱ"}
-              <ChevronRight size={12} />
-            </button>
-          </div>
-          <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain no-scrollbar">
-            {recentHistory.slice(0, 6).map((entry, i) => {
-              const b = bookFromSlug(entry.bookSlug);
-              if (!b) return null;
-              const percent = Math.round((entry.chapter / b.chapterCount) * 100);
-              const accentVar = TILE_GOLD_PALETTE[i % TILE_GOLD_PALETTE.length].accent;
-              // Same real bible-themed photography the hero card rotates
-              // through, not a flat color tile — a moody cover-style photo
-              // reads as a lot more premium than a plain gradient square,
-              // and this way it isn't a made-up "cover image" either.
-              const tilePhoto = HERO_IMAGES[i % HERO_IMAGES.length];
-              return (
-                <button
-                  key={`${entry.bookSlug}-${entry.chapter}`}
-                  onClick={() => openVerse(entry.bookSlug, entry.chapter)}
-                  className="shrink-0 w-28 rounded-xl p-2.5 text-left shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform"
-                  style={{ background: "var(--color-elevated)" }}
-                >
-                  <div
-                    className="w-full h-9 rounded-lg flex items-center justify-between px-2 mb-1 bg-cover bg-center"
-                    style={{
-                      backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%), url(${tilePhoto})`,
-                    }}
-                  >
-                    <span
-                      className={`${
-                        prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
-                      } text-white font-bold text-xs leading-tight line-clamp-1 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]`}
-                    >
-                      {bookDisplayName(b, prefs.language)}
-                    </span>
-                    <span className="text-white text-[10px] font-semibold shrink-0 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]">
-                      {entry.chapter}
-                    </span>
-                  </div>
-                  <div className="h-1 rounded-full bg-black/[0.06] overflow-hidden mb-1">
-                    <div className="h-full rounded-full" style={{ width: `${percent}%`, background: accentVar }} />
-                  </div>
-                  <p className="text-[10px] font-semibold text-fg-muted">{percent}%</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Books — a curated set of commonly-read books, not a ranked
           "Popular Books" list (there's no real popularity/read-count data
-          to rank by — see bibleReadingHistory.ts; Continue Reading above
-          already uses the real per-book progress that *does* exist). */}
+          to rank by — see bibleReadingHistory.ts). */}
       <div className="mb-1.5">
         <div className="flex items-center gap-2 mb-2">
           <Book size={16} style={{ color: "var(--color-gold-dark)" }} />
@@ -1935,23 +1906,18 @@ export default function Bible() {
           </h2>
         </div>
         <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain no-scrollbar">
-          {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug, i) => {
+          {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug) => {
             const b = bookFromSlug(slug);
             if (!b) return null;
-            // Real bible-themed photography (same set the hero card
-            // rotates through) as the cover, book name overlaid at the
-            // bottom — a real photo cover reads as premium in a way a
-            // generic book icon on a flat tile doesn't, and it's the same
-            // asset family already used elsewhere on this page rather
-            // than a per-book image this app doesn't actually have.
-            const tilePhoto = HERO_IMAGES[i % HERO_IMAGES.length];
+            const cover = BOOK_COVER_PHOTOS[slug];
             return (
               <button
                 key={slug}
                 onClick={() => openVerse(slug, 1)}
-                className="shrink-0 w-20 h-20 rounded-2xl overflow-hidden relative shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform bg-cover bg-center"
+                className="shrink-0 w-20 h-20 rounded-2xl overflow-hidden relative shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform bg-cover"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.75) 100%), url(${tilePhoto})`,
+                  backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.75) 100%), url(${cover.src})`,
+                  backgroundPosition: cover.position ?? "center",
                 }}
               >
                 <span
