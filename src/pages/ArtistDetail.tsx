@@ -408,16 +408,18 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Teal→black wash — stays fully transparent for the top half of the
-            photo (previous version started darkening at 18% and stacked a
-            second black overlay on top, washing out most of the picture)
-            and only darkens the bottom third, still fully resolving to
-            solid #050707 by its own bottom edge so it stays flush with the
-            flat page background right below it regardless of page length. */}
+        {/* Teal→black wash — stays fully transparent until well past the
+            halfway point (previous version started darkening at 48%,
+            covering most of the lower half of the photo); now compressed
+            into a short band right at the bottom, around where the text
+            sits, so the photo itself stays visible almost all the way
+            down. Still fully resolving to solid #050707 by its own bottom
+            edge so it stays flush with the flat page background right
+            below it regardless of page length. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${TEAL_DEEP}4d 62%, #0d2f2c99 75%, #0a1614dd 90%, #050707 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 78%, ${TEAL_DEEP}66 86%, #0d2f2cb3 92%, #050707 100%)`,
           }}
         />
 
