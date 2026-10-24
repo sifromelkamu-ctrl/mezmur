@@ -522,8 +522,12 @@ export default function ArtistDetail() {
         </div>
       </div>
 
-      <div className="px-6 pt-6">
-        <div className="flex items-center gap-3 mb-6">
+      {/* pt-2/mb-2 instead of pt-6/mb-6 — this block sits on the page
+          wrapper's own solid black background (the hero wash's own final
+          stop), so trimming its padding directly shrinks how much plain
+          black shows between the hero and the content surface below. */}
+      <div className="px-6 pt-2">
+        <div className="flex items-center gap-3 mb-2">
           <button
             onClick={handlePlayAll}
             className="flex items-center gap-2 text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg hover:scale-105 transition-transform"
@@ -567,7 +571,7 @@ export default function ArtistDetail() {
           breathing room at all. */}
       <div
         className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10 bg-panel"
-        style={{ marginTop: "14px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
+        style={{ marginTop: "6px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
       >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
