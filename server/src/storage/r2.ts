@@ -112,12 +112,27 @@ export function publicArtworkUrl(key: string): string {
   return `${publicBaseUrl()}/${key}`;
 }
 
+// Every artwork object is permanently immutable once uploaded — a fresh
+// random key every time (see upload.ts), never overwritten in place — so a
+// viewer's cache can hold onto it forever instead of the weaker heuristic
+// freshness a CDN/browser falls back to with no explicit header. Safe to
+// apply to every artwork PUT unconditionally for exactly that reason; never
+// used for audio, which is only ever reached through short-lived signed
+// URLs that rotate on every playback request.
+const ARTWORK_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 // Uploads a small in-memory buffer (images) to the public artwork bucket.
 // Mirrors upload.ts's old uploadImageToStorage, just against R2 instead of
 // Supabase — every existing caller of that function gets this transparently.
 export async function uploadArtwork(buffer: Buffer, contentType: string, key: string): Promise<string> {
   await requireClient().send(
-    new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Body: buffer, ContentType: contentType })
+    new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      CacheControl: ARTWORK_CACHE_CONTROL,
+    })
   );
   return publicArtworkUrl(key);
 }
@@ -154,7 +169,35 @@ export async function putAudioObject(key: string, body: Buffer, contentType = "a
 }
 
 export async function putArtworkObject(key: string, body: Buffer, contentType: string): Promise<void> {
-  await requireClient().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType }));
+  await requireClient().send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      CacheControl: ARTWORK_CACHE_CONTROL,
+    })
+  );
+}
+
+// Server-side copy of an artwork object onto itself with the new
+// Cache-Control header applied — the standard S3/R2 trick for refreshing
+// metadata on an object already in the bucket without re-downloading or
+// re-uploading its bytes. Used once by the thumbnail backfill to apply
+// ARTWORK_CACHE_CONTROL retroactively to artwork uploaded before that
+// header existed; every upload going through uploadArtwork/putArtworkObject
+// above gets it automatically from here on.
+export async function refreshArtworkCacheControl(key: string, contentType: string): Promise<void> {
+  await requireClient().send(
+    new CopyObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      CopySource: `${R2_BUCKET_NAME}/${key}`,
+      Key: key,
+      ContentType: contentType,
+      CacheControl: ARTWORK_CACHE_CONTROL,
+      MetadataDirective: "REPLACE",
+    })
+  );
 }
 
 // True streaming transfer — the migration worker's own upload path (see
@@ -177,7 +220,17 @@ export async function streamToBucket(
 ): Promise<void> {
   const upload = new Upload({
     client: requireClient(),
-    params: { Bucket: bucket === "audio" ? R2_AUDIO_BUCKET_NAME : R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType },
+    params: {
+      Bucket: bucket === "audio" ? R2_AUDIO_BUCKET_NAME : R2_BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      // Audio is never reached via a long-lived URL (short-lived signed GETs
+      // only — see createAudioPlaybackUrl), so there's nothing to gain from
+      // caching it; artwork migrated through here is just as immutable as
+      // anything uploaded directly (see ARTWORK_CACHE_CONTROL above).
+      ...(bucket === "artwork" ? { CacheControl: ARTWORK_CACHE_CONTROL } : {}),
+    },
     // Conservative part size (S3/R2 minimum is 5MB) — keeps peak memory for
     // one in-flight upload low and predictable rather than defaulting to
     // whatever the SDK's own default queue/part-size tuning picks.

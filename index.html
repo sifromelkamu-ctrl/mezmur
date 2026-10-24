@@ -10,6 +10,13 @@
     <title>Mezmur — Ethiopian Gospel Music</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Every piece of artwork (album/artist/track/playlist covers) loads
+         from this R2 origin — preconnecting shaves the DNS+TLS handshake
+         off the very first image request instead of paying it inline with
+         Home's first paint. Update this if R2_MEDIA_DOMAIN/R2_PUBLIC_URL
+         (server/src/storage/r2.ts) ever changes to a different host — a
+         stale hint just does nothing, it won't break anything. -->
+    <link rel="preconnect" href="https://pub-7be0ddfdea8e41ada4199173d068f872.r2.dev" crossorigin />
     <!-- Loaded non-render-blocking: media="print" means the browser fetches
          it at normal priority without holding up first paint on it, then
          the onload flips it to screen media once it's actually ready.
