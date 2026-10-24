@@ -1905,7 +1905,7 @@ export default function Bible() {
             {prefs.language === "en" ? "Books" : "መጻሕፍት"}
           </h2>
         </div>
-        <div className="flex gap-2.5 overflow-x-auto overscroll-x-contain no-scrollbar">
+        <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar pb-0.5">
           {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug) => {
             const b = bookFromSlug(slug);
             if (!b) return null;
@@ -1914,16 +1914,26 @@ export default function Bible() {
               <button
                 key={slug}
                 onClick={() => openVerse(slug, 1)}
-                className="shrink-0 w-20 h-20 rounded-2xl overflow-hidden relative shadow-sm ring-1 ring-black/[0.04] active:scale-95 transition-transform bg-cover"
-                style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.75) 100%), url(${cover.src})`,
-                  backgroundPosition: cover.position ?? "center",
-                }}
+                className="shrink-0 w-24 flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
               >
+                {/* Name moved off the photo into its own caption below —
+                    the Amharic names for these books are two-word phrases
+                    (e.g. "መዝሙረ ዳዊት", "የማቴዎስ ወንጌል") that a single line
+                    clamped over an 80px photo was cutting off. A plain
+                    caption area with room to wrap to 2 lines shows the
+                    whole name regardless of length or script. */}
                 <span
-                  className={`absolute inset-x-0 bottom-0 px-1.5 pb-1.5 ${
+                  className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/[0.04] block bg-cover"
+                  style={{
+                    backgroundImage: `url(${cover.src})`,
+                    backgroundPosition: cover.position ?? "center",
+                  }}
+                />
+                <span
+                  className={`${
                     prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : "font-abyssinica"
-                  } text-white text-[11px] font-bold text-center leading-tight line-clamp-1 [text-shadow:0_1px_4px_rgba(0,0,0,0.6)]`}
+                  } text-[11px] font-bold text-center leading-tight line-clamp-2 w-full`}
+                  style={{ color: "var(--bible-text)" }}
                 >
                   {bookDisplayName(b, prefs.language)}
                 </span>
