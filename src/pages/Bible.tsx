@@ -10,7 +10,6 @@ import {
   Columns2,
   Copy,
   Heart,
-  Highlighter,
   Image as ImageIcon,
   Leaf,
   Loader2,
@@ -244,7 +243,6 @@ export default function Bible() {
   const [noteDraft, setNoteDraft] = useState("");
   const [justCopied, setJustCopied] = useState(false);
   const [justShared, setJustShared] = useState(false);
-  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [verseImageComposer, setVerseImageComposer] = useState<{ text: string; citation: string } | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
@@ -1007,16 +1005,31 @@ export default function Bible() {
                       prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : FONT_FAMILY_CLASSES[prefs.fontFamily]
                     } text-fg leading-loose cursor-pointer rounded-xl px-3 -mx-1.5 py-2 transition-all duration-200 ${
                       highlightMeta ? highlightMeta.bg : "hover:bg-hover"
-                    } ${
-                      isSelected
-                        ? "shadow-[inset_3px_0_0_0_var(--color-gold),0_4px_16px_-4px_rgba(212,175,55,0.4)]"
-                        : ""
                     }`}
                   >
                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold/15 text-gold text-[10px] font-bold mr-2 align-middle">
                       {i + 1}
                     </span>
-                    {verse}
+                    {/* A dotted underline (native Bible app's own selection
+                        style) instead of the old gold inset-shadow box —
+                        text-decoration underlines per wrapped line
+                        automatically, so a multi-line verse reads as
+                        "these lines are selected" rather than one solid
+                        highlighted block. */}
+                    <span
+                      style={
+                        isSelected
+                          ? {
+                              textDecorationLine: "underline",
+                              textDecorationStyle: "dotted",
+                              textDecorationColor: "var(--color-fg-subtle)",
+                              textUnderlineOffset: "6px",
+                            }
+                          : undefined
+                      }
+                    >
+                      {verse}
+                    </span>
                     {ann?.note && (
                       <StickyNote size={13} className="inline-block ml-1.5 mb-1 text-gold align-middle" />
                     )}
@@ -1099,6 +1112,9 @@ export default function Bible() {
               return annotations[k]?.favorite;
             });
             const sortedSelection = [...selectedVerses].sort((a, b) => a - b);
+            const selectionCitation = book
+              ? `${bookDisplayName(book, prefs.language)} ${chapter}:${formatVerseNumbers(sortedSelection)}`
+              : "";
             return (
               // `fixed`, not `sticky`: this used to sit inside <main>'s own
               // scroll box, and since <main> spans the full viewport height
@@ -1114,71 +1130,62 @@ export default function Bible() {
               // reserved height <main>'s own pb-48 and the virtualized list
               // pages already use to clear that band), keeps it in the same
               // place on screen regardless of scroll position or selection.
-              <div
-                className="fixed inset-x-0 z-20 px-4 max-w-2xl mx-auto"
-                style={{ bottom: BOTTOM_RESERVE_PX + 12 }}
-              >
+              //
+              // Restyled as a light bottom sheet (drag handle, "Selected:
+              // <citation>" header, colors shown inline instead of behind a
+              // toggle) matching the native Bible app's own selection sheet,
+              // in this page's own surface tokens rather than a dark navy/
+              // gold floating pill — so it reads as part of the page, not a
+              // separately-designed overlay dropped on top of it.
+              <div className="fixed inset-x-0 z-20 px-3 max-w-2xl mx-auto" style={{ bottom: BOTTOM_RESERVE_PX }}>
                 <div
-                  className="relative flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.45)]"
-                  style={{ background: "rgba(28, 21, 48, 0.98)" }}
+                  className="relative rounded-t-3xl shadow-2xl ring-1 ring-black/[0.06] overflow-hidden"
+                  style={{ background: "var(--color-elevated)" }}
                 >
-                  {showHighlightPicker && (
-                    <div
-                      className="absolute bottom-full left-1.5 mb-2 flex items-center gap-1.5 p-2 rounded-full shadow-2xl ring-1 ring-[color:rgba(212,175,55,0.45)]"
-                      style={{ background: "rgba(28, 21, 48, 0.99)" }}
-                    >
-                      {HIGHLIGHT_COLORS.map((c) => (
-                        <button
-                          key={c.id}
-                          onClick={() => {
-                            handleApplyHighlight(c.id);
-                            setShowHighlightPicker(false);
-                          }}
-                          aria-label={`Highlight ${c.id}`}
-                          className={`w-7 h-7 shrink-0 rounded-full ${c.swatch} transition-transform ${
-                            activeColor === c.id ? "ring-2 ring-offset-2 ring-white scale-110" : ""
-                          }`}
-                          style={activeColor === c.id ? ({ "--tw-ring-offset-color": "rgb(28, 21, 48)" } as CSSProperties) : undefined}
-                        />
-                      ))}
-                      <button
-                        onClick={() => setShowHighlightPicker(false)}
-                        aria-label="Close color picker"
-                        className="w-7 h-7 shrink-0 rounded-full border border-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )}
-                  {/* One continuous scrollable strip — the highlight picker
-                      collapses to a single button (colors reveal in a popup
-                      on tap) so it doesn't eat width from everything else,
-                      then every other action follows in the same row. Navy/
-                      gold instead of the page's own cream so the bar reads
-                      as a distinct, designed surface rather than blending
-                      into the page background — matches the accent color
-                      the rest of this section already uses (Verse of the
-                      Day, testament cards). */}
-                  <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+                  <div className="flex justify-center pt-2 pb-1">
+                    <span className="w-9 h-1 rounded-full bg-fg-subtle/30" />
+                  </div>
+                  <div className="flex items-center justify-between px-4 pb-2">
+                    <p className="text-[11px] font-bold text-fg-muted uppercase tracking-wide truncate">
+                      Selected: {selectionCitation}
+                    </p>
                     <button
-                      onClick={() => setShowHighlightPicker((v) => !v)}
-                      className={`flex items-center gap-2 text-sm font-semibold px-3.5 py-2.5 rounded-full transition-colors shrink-0 ${
-                        showHighlightPicker ? "text-gold bg-white/10" : "text-white/75 hover:text-white hover:bg-white/10"
-                      }`}
+                      onClick={() => setSelectedVerses(new Set())}
+                      aria-label="Cancel selection"
+                      className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors -mr-1"
                     >
-                      {activeColor ? (
-                        <span className={`w-4 h-4 rounded-full ${HIGHLIGHT_COLORS.find((c) => c.id === activeColor)?.swatch}`} />
-                      ) : (
-                        <Highlighter size={17} />
-                      )}
-                      Highlight
+                      <X size={15} />
                     </button>
-                    <div className="w-px h-6 bg-white/15 shrink-0 mx-0.5" />
+                  </div>
+                  <div className="border-t border-border" />
+                  <div className="flex items-end gap-1 px-2 pt-2.5 pb-3 overflow-x-auto no-scrollbar">
+                    {/* Highlight colors shown directly, not behind a toggle
+                        button — same change Quick Access went through on
+                        the home screen: a glance at real colors beats one
+                        more tap to reveal them. */}
+                    {HIGHLIGHT_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleApplyHighlight(c.id)}
+                        aria-label={`Highlight ${c.id}`}
+                        className="flex flex-col items-center gap-1 shrink-0 px-1.5 py-1"
+                      >
+                        <span
+                          className={`w-9 h-9 rounded-full ${c.swatch} transition-transform ${
+                            activeColor === c.id ? "ring-2 ring-offset-2 ring-fg scale-110" : ""
+                          }`}
+                          style={activeColor === c.id ? ({ "--tw-ring-offset-color": "var(--color-elevated)" } as CSSProperties) : undefined}
+                        />
+                      </button>
+                    ))}
+                    <div className="w-px h-10 bg-border shrink-0 mx-1 mb-2" />
                     <button
                       onClick={handleToggleFavorite}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                      className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                     >
-                      <Heart size={17} className={allFavorited ? "text-accent-red" : ""} fill={allFavorited ? "currentColor" : "none"} />
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--bible-rose-soft)" }}>
+                        <Heart size={16} style={{ color: "var(--bible-rose)" }} fill={allFavorited ? "currentColor" : "none"} />
+                      </span>
                       Save
                     </button>
                     {selectedVerses.size === 1 &&
@@ -1192,52 +1199,58 @@ export default function Bible() {
                               setEditingNoteVerse(soleVerse);
                               setNoteDraft(annotations[soleKey]?.note ?? "");
                             }}
-                            className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                            className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                           >
-                            <StickyNote size={17} />
+                            <span
+                              className="w-9 h-9 rounded-full flex items-center justify-center"
+                              style={{ background: "color-mix(in oklab, var(--color-gold) 18%, transparent)" }}
+                            >
+                              <StickyNote size={16} style={{ color: "var(--color-gold-dark)" }} />
+                            </span>
                             {hasNote ? "Edit note" : "Note"}
                           </button>
                         );
                       })()}
                     <button
                       onClick={handleCopySelected}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                      className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                     >
-                      {justCopied ? <Check size={17} className="text-gold" /> : <Copy size={17} />}
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--bible-blue-soft)" }}>
+                        {justCopied ? <Check size={16} style={{ color: "var(--bible-blue)" }} /> : <Copy size={16} style={{ color: "var(--bible-blue)" }} />}
+                      </span>
                       {justCopied ? "Copied" : "Copy"}
                     </button>
                     <button
                       onClick={handleShareSelected}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                      className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                     >
-                      {justShared ? <Check size={17} className="text-gold" /> : <Share2 size={17} />}
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--bible-purple-soft)" }}>
+                        {justShared ? <Check size={16} style={{ color: "var(--bible-purple)" }} /> : <Share2 size={16} style={{ color: "var(--bible-purple)" }} />}
+                      </span>
                       {justShared ? "Shared" : "Share"}
                     </button>
                     <button
                       onClick={handleImageSelected}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                      className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                     >
-                      <ImageIcon size={17} />
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--bible-green-soft)" }}>
+                        <ImageIcon size={16} style={{ color: "var(--bible-green)" }} />
+                      </span>
                       Image
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                      className="flex flex-col items-center gap-1 text-[11px] font-semibold text-fg-muted hover:text-fg shrink-0 px-1.5 py-1 rounded-xl hover:bg-hover transition-colors"
                     >
-                      <Columns2 size={17} />
+                      <span
+                        className="w-9 h-9 rounded-full flex items-center justify-center"
+                        style={{ background: "color-mix(in oklab, var(--color-fg) 8%, transparent)" }}
+                      >
+                        <Columns2 size={16} className="text-fg-muted" />
+                      </span>
                       Compare
                     </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedVerses(new Set());
-                      setShowHighlightPicker(false);
-                    }}
-                    aria-label="Cancel selection"
-                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
                 </div>
                 {showCompare && bookSlug && chapter && book && (
                   <BibleCompareModal
