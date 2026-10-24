@@ -1,10 +1,13 @@
 import { ChevronLeft, Clock, ListMusic, TrendingUp, X, type LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Card from "../components/Card";
 import TrackRow from "../components/TrackRow";
+import VirtualTrackList from "../components/VirtualTrackList";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
+import { cachedDetailFetch } from "../lib/detailCache";
+import { BOTTOM_RESERVE_PX } from "../lib/layout";
 import { renderWithAmharicStyle } from "../utils/scriptText";
 import {
   albumsApi,
@@ -82,6 +85,26 @@ export default function Search() {
   const q = query.trim();
   const activeTile = BROWSE_TILES.find((tile) => tile.kind === browseKind && tile.value === browseValue);
 
+  // A mood/language browse tile has no server-side cap (unlike search
+  // results, which are limited to 25 per category) — the catalog import
+  // pipeline already reaches into the thousands of songs, so this list
+  // needs the same windowed rendering AllSongs.tsx/Library.tsx use rather
+  // than mounting a TrackRow per song.
+  const browseHeaderRef = useRef<HTMLDivElement>(null);
+  const [browseListHeight, setBrowseListHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight - BOTTOM_RESERVE_PX - 160 : 400
+  );
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!browseHeaderRef.current) return;
+      const top = browseHeaderRef.current.getBoundingClientRect().bottom;
+      setBrowseListHeight(Math.max(200, window.innerHeight - top - BOTTOM_RESERVE_PX));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   useEffect(() => {
     playlistsApi.list().then(setSections);
   }, []);
@@ -149,7 +172,7 @@ export default function Search() {
     results.tracks.length || results.artists.length || results.albums.length || results.playlists.length;
 
   const playArtist = async (id: string) => {
-    const full = await artistsApi.get(id);
+    const full = await cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id));
     // Single Releases when the artist has any, their top-played tracks
     // otherwise — same fallback ArtistDetail's own Songs section uses.
     const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;
@@ -157,12 +180,12 @@ export default function Search() {
   };
 
   const playAlbum = async (id: string) => {
-    const full = await albumsApi.get(id);
+    const full = await cachedDetailFetch(`album:${id}`, () => albumsApi.get(id));
     if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
   };
 
   const playPlaylist = async (id: string) => {
-    const full = await playlistsApi.get(id);
+    const full = await cachedDetailFetch(`playlist:${id}`, () => playlistsApi.get(id));
     if (full.tracks?.[0]) playTrack(full.tracks[0], full.tracks);
   };
 
@@ -190,7 +213,7 @@ export default function Search() {
   if (browseKind) {
     return (
       <div className="px-6 py-6">
-        <div className="flex items-center gap-2 mb-6 -ml-2">
+        <div ref={browseHeaderRef} className="flex items-center gap-2 mb-6 -ml-2">
           <button
             onClick={() => setSearchParams({})}
             className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors shrink-0"
@@ -205,11 +228,7 @@ export default function Search() {
           <p className="text-fg-muted">{t("loading")}</p>
         ) : browseTracks ? (
           browseTracks.length > 0 ? (
-            <div>
-              {browseTracks.map((track, i) => (
-                <TrackRow key={track.id} track={track} index={i + 1} queue={browseTracks} />
-              ))}
-            </div>
+            <VirtualTrackList tracks={browseTracks} queue={browseTracks} height={browseListHeight} />
           ) : (
             <p className="text-fg-muted text-sm">No songs found in this category yet.</p>
           )

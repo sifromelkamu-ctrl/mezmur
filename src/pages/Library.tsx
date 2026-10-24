@@ -24,6 +24,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import { getAvatarColor, useTheme } from "../context/ThemeContext";
 import { albumsApi, artistsApi, playlistsApi, type ApiAlbum, type ApiArtist, type ApiPlaylist } from "../lib/api";
+import { cachedDetailFetch } from "../lib/detailCache";
 import { BOTTOM_RESERVE_PX } from "../lib/layout";
 
 type Filter = "artists" | "albums" | "playlists" | "favorites";
@@ -31,6 +32,18 @@ type ArtistSort = "name" | "popular";
 
 const validFilters = new Set<string>(["artists", "albums", "playlists", "favorites"]);
 const ARTIST_SORT_KEY = "mezmur:library-artist-sort";
+
+// Same reasoning as Home's homeDataCache: Library fully unmounts on every
+// tab switch, so without this a return visit re-ran all 3 list fetches from
+// an empty state and flashed "Loading..." even seconds after last viewing
+// it. A remount seeds its state from here synchronously, then re-fetches in
+// the background and swaps in silently once it resolves.
+interface LibraryData {
+  playlists: ApiPlaylist[];
+  artists: ApiArtist[];
+  albums: ApiAlbum[];
+}
+let libraryDataCache: LibraryData | null = null;
 
 // Defined at module scope (not inside Library) so its identity stays stable
 // across Library re-renders — a component redefined inline on every render
@@ -148,11 +161,14 @@ export default function Library() {
   const [filter, setFilter] = useState<Filter>(
     initialFilter && validFilters.has(initialFilter) ? (initialFilter as Filter) : "artists"
   );
-  const [playlists, setPlaylists] = useState<ApiPlaylist[]>([]);
+  const [playlists, setPlaylists] = useState<ApiPlaylist[]>(() => libraryDataCache?.playlists ?? []);
   const [myPlaylists, setMyPlaylists] = useState<ApiPlaylist[]>([]);
-  const [artists, setArtists] = useState<ApiArtist[]>([]);
-  const [albums, setAlbums] = useState<ApiAlbum[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [artists, setArtists] = useState<ApiArtist[]>(() => libraryDataCache?.artists ?? []);
+  const [albums, setAlbums] = useState<ApiAlbum[]>(() => libraryDataCache?.albums ?? []);
+  // Only the very first fetch this session (no cache yet) should show the
+  // loading state — a background refresh on a remount swaps data in
+  // silently once it resolves, never blanking what's already on screen.
+  const [loading, setLoading] = useState(!libraryDataCache);
   const [query, setQuery] = useState("");
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -183,6 +199,7 @@ export default function Library() {
   useEffect(() => {
     Promise.all([playlistsApi.list(), artistsApi.list(), albumsApi.list()])
       .then(([pl, ar, al]) => {
+        libraryDataCache = { playlists: pl, artists: ar, albums: al };
         setPlaylists(pl);
         setArtists(ar);
         setAlbums(al);
@@ -212,7 +229,7 @@ export default function Library() {
   const filteredAlbums = q ? nonConcertAlbums.filter((a) => a.title.toLowerCase().includes(q)) : nonConcertAlbums;
 
   const playArtist = async (id: string) => {
-    const full = await artistsApi.get(id);
+    const full = await cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id));
     // Single Releases when the artist has any, their top-played tracks
     // otherwise — same fallback ArtistDetail's own Songs section uses.
     const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;
@@ -220,7 +237,7 @@ export default function Library() {
   };
 
   const playAlbum = async (id: string) => {
-    const full = await albumsApi.get(id);
+    const full = await cachedDetailFetch(`album:${id}`, () => albumsApi.get(id));
     if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
   };
 

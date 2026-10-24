@@ -15,6 +15,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import { isConcertAlbumItem, isConcertSongItem } from "../lib/concerts";
+import { cachedDetailFetch } from "../lib/detailCache";
 import {
   albumsApi,
   artistsApi,
@@ -194,7 +195,7 @@ export default function Home() {
 
   const playAlbum = useCallback(
     async (id: string) => {
-      const full = await albumsApi.get(id);
+      const full = await cachedDetailFetch(`album:${id}`, () => albumsApi.get(id));
       if (full.tracks[0]) playTrack(full.tracks[0], full.tracks);
     },
     [playTrack]
@@ -202,7 +203,7 @@ export default function Home() {
 
   const playArtist = useCallback(
     async (id: string) => {
-      const full = await artistsApi.get(id);
+      const full = await cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id));
       // Single Releases when the artist has any, their top-played tracks
       // otherwise — same fallback ArtistDetail's own Songs section uses.
       const tracks = full.singleReleases.length > 0 ? full.singleReleases : full.topTracks;

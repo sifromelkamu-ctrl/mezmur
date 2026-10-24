@@ -1,5 +1,5 @@
 import { Music2, Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import defaultAlbumArt from "../assets/default-album-art.jpg";
 import { useAuth } from "../context/useAuth";
 import { useArtworkPalette } from "../hooks/useArtworkPalette";
@@ -116,7 +116,31 @@ export default function CoverArt({
   // artwork elsewhere on screen pick it up whenever they next re-fetch).
   const [savedOverride, setSavedOverride] = useState<ArtworkFrame | undefined>(undefined);
   const showPhoto = Boolean(photoUrl) && !photoFailed;
-  const palette = useArtworkPalette(showPhoto ? photoUrl : undefined, gradient);
+
+  // Smart-crop/palette analysis (a crossOrigin fetch + canvas decode each)
+  // used to fire for every mounted card regardless of scroll position —
+  // fine for a short row, costly for a long Library/Search grid where
+  // hundreds of off-screen cards queued the same work as the handful
+  // actually on screen. Deferring it until the card is within rootMargin
+  // of the viewport means only what's about to be seen pays for it; the
+  // real `<img>` byte fetch below is untouched — that still uses the
+  // browser's own native `loading="lazy"`, independent of this.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || isVisible) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setIsVisible(true);
+      },
+      { rootMargin: "300px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  const palette = useArtworkPalette(showPhoto && isVisible ? photoUrl : undefined, gradient);
 
   const canFrame = showPhoto && Boolean(entityType && entityId) && !rounded;
   // Only worth analyzing when there's no saved/override frame to use
@@ -124,7 +148,7 @@ export default function CoverArt({
   // already-curated piece of artwork would still pay for a second,
   // crossOrigin-mode fetch + decode of the full-resolution image just to
   // compute a result that gets thrown away below.
-  const needsSmartFrame = canFrame && !savedOverride && !artworkFrame;
+  const needsSmartFrame = canFrame && !savedOverride && !artworkFrame && isVisible;
   const smartFrame = useSmartFrame(needsSmartFrame ? photoUrl : undefined);
   const activeFrame = savedOverride ?? artworkFrame ?? smartFrame;
   const frameReady = canFrame && Boolean(natural) && Boolean(activeFrame);
@@ -235,6 +259,7 @@ export default function CoverArt({
 
   return (
     <div
+      ref={containerRef}
       className={`group/art relative overflow-hidden ${resolvedSizeClass} ${roundedClass} flex items-center justify-center shrink-0 ${framed ? "" : "shadow-lg"} ${className}`}
       style={frameStyle}
     >

@@ -270,7 +270,7 @@ export default function ArtistDetail() {
   }
 
   const handlePlayAlbum = async (albumId: string) => {
-    const album = await albumsApi.get(albumId);
+    const album = await cachedDetailFetch(`album:${albumId}`, () => albumsApi.get(albumId));
     if (album.tracks[0]) playTrack(album.tracks[0], album.tracks);
   };
 
