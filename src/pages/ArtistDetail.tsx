@@ -4,6 +4,7 @@ import {
   Link2,
   MoreHorizontal,
   Music2,
+  Pause,
   Pencil,
   Play,
   Plus,
@@ -18,10 +19,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import defaultAlbumArt from "../assets/default-album-art.jpg";
 import BackButton from "../components/BackButton";
 import CoverArt from "../components/CoverArt";
+import EqualizerBars from "../components/EqualizerBars";
 import HeroTopScrim from "../components/HeroTopScrim";
-import TrackRow from "../components/TrackRow";
 import { useAuth } from "../context/useAuth";
 import { usePlayer } from "../context/PlayerContext";
+import { useTheme } from "../context/ThemeContext";
 import {
   adminApi,
   albumsApi,
@@ -29,8 +31,16 @@ import {
   type ApiAlbum,
   type ApiAlbumType,
   type ApiArtistDetail,
+  type ApiTrack,
 } from "../lib/api";
 import { cachedDetailFetch } from "../lib/detailCache";
+import { formatDuration } from "../utils/format";
+
+// The hero stays this one fixed teal gradient regardless of the app's
+// light/dark toggle (explicitly kept "exactly as it is" per the split-theme
+// redesign) — only the content surface below it now follows the real theme.
+const TEAL = "#14b8a6";
+const TEAL_DEEP = "#134e4a";
 
 // The content surface below the hero used to carry its own bespoke
 // white/#121212 palette here, independent of the app's real theme (a past
@@ -75,27 +85,27 @@ function albumSubtitle(album: ApiAlbum): string {
 // just a sliver of a third peeking in to signal it scrolls) rather than the
 // shared Card component, whose non-portrait variant does the opposite
 // (1-line title, 2-line subtitle). Same shadow/hover-scale/play-button
-// language as Card, snap-x child. No frame/background/border around the
-// art itself (an earlier version wrapped it in a padded, bordered card,
-// which made 160px-wide art read as noticeably smaller inside a "gray
-// frame") — just the art and its own shadow, so the artwork itself stays
-// the visually prominent element.
+// language as Card, snap-x child. Wrapped in its own light/dark card surface
+// per the split-theme redesign (white+#ECECEC border / #1A1A1A card).
 function AlbumCard({
   album,
   to,
   playing,
   onPlay,
+  isLight,
 }: {
   album: ApiAlbum;
   to: string;
   playing: boolean;
   onPlay: () => void;
+  isLight: boolean;
 }) {
   const navigate = useNavigate();
   return (
     <div
       onClick={() => navigate(to)}
-      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-100"
+      className="snap-start shrink-0 w-40 group cursor-pointer active:scale-[0.97] transition-transform duration-100 rounded-[20px] p-2.5 bg-elevated border border-border"
+      style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.06)" : "none" }}
     >
       <div className="relative rounded-xl overflow-hidden shadow-lg shadow-black/40">
         <CoverArt
@@ -106,7 +116,7 @@ function AlbumCard({
           entityId={album.id}
           artworkFrame={album.artworkFrame}
           className={`w-full aspect-square transition-transform duration-300 group-hover:scale-105 ${
-            playing ? "ring-2 ring-brand/60 shadow-[0_0_14px_rgba(242,183,5,0.55)]" : ""
+            playing ? "ring-2 ring-[#14b8a6] shadow-[0_0_14px_rgba(20,184,166,0.55)]" : ""
           }`}
         />
         <button
@@ -114,7 +124,8 @@ function AlbumCard({
             e.stopPropagation();
             onPlay();
           }}
-          className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-brand flex items-center justify-center text-black opacity-0 group-hover:opacity-100 active:scale-90 transition-all shadow-lg"
+          className="absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center text-black opacity-0 group-hover:opacity-100 active:scale-90 transition-all shadow-lg"
+          style={{ backgroundColor: TEAL }}
           aria-label={`Play ${album.title}`}
         >
           <Play size={14} fill="black" className="ml-0.5" />
@@ -124,6 +135,63 @@ function AlbumCard({
         <p className="text-sm font-semibold leading-snug line-clamp-2 text-fg">{album.title}</p>
         <p className="text-xs truncate mt-1 text-fg-muted">{albumSubtitle(album)}</p>
       </div>
+    </div>
+  );
+}
+
+// Bespoke Single Releases row for the split-theme content surface — the
+// shared TrackRow reads the app's generic text-fg/text-fg-muted tokens,
+// which don't match this section's exact spec'd hex values (#111111 title /
+// #6B7280 artist / #9CA3AF duration in light mode), so this mirrors
+// TrackRow's play/pause/queue behavior with its own themed markup instead.
+function SongRow({
+  track,
+  index,
+  queue,
+}: {
+  track: ApiTrack;
+  index: number;
+  queue: ApiTrack[];
+}) {
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const isCurrent = currentTrack?.id === track.id;
+
+  const handleClick = () => {
+    if (isCurrent) togglePlay();
+    else playTrack(track, queue);
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="group grid grid-cols-[24px_1fr_auto] items-center gap-4 px-4 rounded-2xl cursor-pointer transition-colors mb-3 last:mb-0 bg-panel border border-border"
+      style={{ paddingBlock: "10px" }}
+    >
+      <div className="flex items-center justify-center text-sm w-6 text-fg-subtle">
+        <span className="group-hover:hidden">{isCurrent && isPlaying ? <EqualizerBars /> : index}</span>
+        <span className="hidden group-hover:flex">
+          {isCurrent && isPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3 min-w-0">
+        <CoverArt
+          gradient={track.gradient}
+          size="sm"
+          photoUrl={track.coverUrl}
+          entityType="track"
+          entityId={track.id}
+          artworkFrame={track.artworkFrame}
+        />
+        <p
+          className={`text-sm font-medium truncate ${isCurrent ? "" : "text-fg"}`}
+          style={isCurrent ? { color: TEAL } : undefined}
+        >
+          {track.title}
+        </p>
+      </div>
+
+      <span className="text-sm tabular-nums text-right text-fg-subtle">{formatDuration(track.duration)}</span>
     </div>
   );
 }
@@ -142,7 +210,7 @@ export default function ArtistDetail() {
   const [saving, setSaving] = useState(false);
   const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false);
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"albums" | "songs">("albums");
+  const [showAllSongs, setShowAllSongs] = useState(false);
   const [addingAlbum, setAddingAlbum] = useState(false);
   const [newAlbumTitle, setNewAlbumTitle] = useState("");
   const [newAlbumType, setNewAlbumType] = useState<ApiAlbumType>("album");
@@ -151,6 +219,8 @@ export default function ArtistDetail() {
   const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
+  const { mode } = useTheme();
+  const isLight = mode === "light";
 
   useEffect(() => {
     if (!id) return;
@@ -161,7 +231,7 @@ export default function ArtistDetail() {
     setEditing(false);
     setHeroPhotoLoaded(false);
     setHeroPhotoFailed(false);
-    setActiveTab("albums");
+    setShowAllSongs(false);
     cachedDetailFetch(`artist:${id}`, () => artistsApi.get(id))
       .then(setArtist)
       .catch(() => setArtist(null))
@@ -173,6 +243,13 @@ export default function ArtistDetail() {
     for (const album of artist?.albums ?? []) grouped[album.albumType].push(album);
     return grouped;
   }, [artist]);
+
+  // Stats card figures — derived from data already fetched (each album
+  // already carries its own trackCount).
+  const totalSongCount = useMemo(
+    () => (artist?.albums ?? []).reduce((sum, a) => sum + (a.trackCount ?? 0), 0),
+    [artist]
+  );
 
   if (loading) {
     return (
@@ -295,34 +372,25 @@ export default function ArtistDetail() {
   };
 
   const showHeroPhoto = Boolean(artist.photoUrl) && !heroPhotoFailed;
-  const previewSongs = songsSectionTracks.slice(0, 5);
+  const visibleSongs = showAllSongs ? songsSectionTracks : songsSectionTracks.slice(0, 5);
 
   return (
-    // Flat, not a gradient — the hero→dark transition lives entirely on the
-    // hero below, scoped to its own fixed height (see comment there).
-    // Keeping a second, page-length-based gradient here was the bug: its
-    // color stops are percentages of the *whole page*, so on a shorter page
-    // (short bio, few albums) the hero's fixed-height bottom edge landed
-    // mid-transition, producing a visible hard seam. A flat fill always
-    // matches exactly.
-    //
-    // Tinted by this artist's gradient (same color the hero wash below
-    // fades into) rather than a theme token — this area also backs the
-    // action-button row right below the hero, whose white/translucent
-    // icons need a consistently dark backdrop regardless of light/dark
-    // mode. Theme-following colors only start at the content surface
-    // further down (see the transition strip right above it).
-    //
-    // No paddingTop to compensate the negative margin above — the hero
-    // photo (this div's first child) is meant to bleed all the way under
-    // the status bar/notch, not stop short of it behind a flat strip of
-    // this background color. BackButton's "glass" variant and the "..."
-    // menu button already position themselves with their own explicit
-    // `top-[calc(env(safe-area-inset-top)+1.25rem)]` offset for exactly
-    // this reason — they don't need this wrapper to push content down for
-    // them.
-    <div style={{ backgroundColor: artist.gradient[1], marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
-      <div className="relative w-full overflow-hidden" style={{ height: "min(36vh, 320px)" }}>
+    // Flat, not a gradient — the teal→black transition now lives entirely
+    // on the hero below, scoped to its own fixed height (see comment
+    // there). Keeping a second, page-length-based gradient here was the
+    // bug: its color stops are percentages of the *whole page*, so on a
+    // shorter page (short bio, few albums) the hero's fixed-height bottom
+    // edge landed mid-transition — still greenish, not yet black — right
+    // where the photo's own overlay above it was already solid black,
+    // producing a visible hard seam. A flat fill always matches exactly.
+    <div
+      style={{
+        backgroundColor: "#050707",
+        marginTop: "calc(-1 * env(safe-area-inset-top))",
+        paddingTop: "env(safe-area-inset-top)",
+      }}
+    >
+      <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
             <img
@@ -340,25 +408,16 @@ export default function ArtistDetail() {
             <img src={defaultAlbumArt} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        {/* Tinted by this artist's own gradient (same idea as AlbumDetail's
-            hero wash using album.gradient) rather than one fixed hue for
-            every artist — stays fully transparent for the top half of the
-            photo (an earlier version started darkening at 18% and stacked a
+        {/* Teal→black wash — stays fully transparent for the top half of the
+            photo (previous version started darkening at 18% and stacked a
             second black overlay on top, washing out most of the picture)
-            and only darkens the bottom quarter, resolving to solid
-            artist.gradient[1] by its own bottom edge — the exact same color
-            the flat page background below uses, so there's no seam between
-            the photo and the action-button row sitting on that background.
-            Softened twice now (33/80/b3, then this) — for a vivid/warm
-            gradient color (orange, red) even the first softened ramp still
-            read as a strong wash competing with the name; this pushes the
-            transparent region further down and caps mid-ramp opacity much
-            lower, so only a thin band right behind the text actually
-            darkens and the photo stays visible through most of the hero. */}
+            and only darkens the bottom third, still fully resolving to
+            solid #050707 by its own bottom edge so it stays flush with the
+            flat page background right below it regardless of page length. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 58%, ${artist.gradient[1]}1a 70%, ${artist.gradient[1]}4d 82%, ${artist.gradient[1]}8c 93%, ${artist.gradient[1]} 100%)`,
+            backgroundImage: `linear-gradient(180deg, transparent 0%, transparent 48%, ${TEAL_DEEP}4d 62%, #0d2f2c99 75%, #0a1614dd 90%, #050707 100%)`,
           }}
         />
 
@@ -443,24 +502,18 @@ export default function ArtistDetail() {
           />
         </div>
 
-        {/* select-none: without it, a long-press anywhere in here (common on
-            a touch device, even unintentionally) triggers the browser's own
-            native text-selection UI — a blue caret, drag handles, the whole
-            "select/copy" affordance — over what's meant to read as plain
-            app chrome, not a selectable web page. */}
-        <div className="absolute bottom-0 inset-x-0 p-6 select-none">
-          {/* No checkmark/"verified" framing — this app has no real
-              verification concept for artists (no such field exists on the
-              model), so a checkmark here would only ever be a fabricated
-              signal. Still a useful "this is an artist profile" type badge,
-              same idea as AlbumDetail's plain "Album" badge. */}
-          <div className="inline-flex items-center rounded-full border border-brand/50 bg-brand-dark/40 px-3 py-1 mb-3 backdrop-blur-sm">
-            <span className="text-xs font-bold uppercase tracking-wide text-brand-glow">Artist</span>
+        <div className="absolute bottom-0 inset-x-0 p-6">
+          <div
+            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 mb-3 backdrop-blur-sm"
+            style={{ borderColor: `${TEAL}80`, backgroundColor: `${TEAL_DEEP}66` }}
+          >
+            <Check size={12} style={{ color: TEAL }} strokeWidth={3} />
+            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: TEAL }}>
+              Artist
+            </span>
           </div>
           <h1 className="text-4xl font-black tracking-tight break-words text-white">{artist.name}</h1>
-          {artist.monthlyListeners > 0 && (
-            <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
-          )}
+          <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
       </div>
 
@@ -468,7 +521,8 @@ export default function ArtistDetail() {
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={handlePlayAll}
-            className="flex items-center gap-2 bg-brand text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg shadow-brand/40 hover:scale-105 transition-transform"
+            className="flex items-center gap-2 text-black font-bold rounded-full pl-5 pr-6 py-3 shadow-lg hover:scale-105 transition-transform"
+            style={{ backgroundColor: TEAL, boxShadow: `0 10px 30px -8px ${TEAL}66` }}
             aria-label="Play"
           >
             <Play size={18} fill="black" />
@@ -476,18 +530,16 @@ export default function ArtistDetail() {
           </button>
           <button
             onClick={handleShuffle}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15 ${
-              shuffle ? "text-brand-glow" : "text-white/75"
-            }`}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
+            style={{ color: shuffle ? TEAL : "rgba(255,255,255,0.75)" }}
             aria-label="Shuffle"
           >
             <Shuffle size={18} />
           </button>
           <button
             onClick={() => setFollowing((f) => !f)}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15 ${
-              following ? "text-brand-glow" : "text-white/75"
-            }`}
+            className="w-11 h-11 rounded-full flex items-center justify-center transition-colors bg-white/10 hover:bg-white/15"
+            style={{ color: following ? TEAL : "rgba(255,255,255,0.75)" }}
             aria-label={following ? "Unfollow artist" : "Follow artist"}
           >
             <Heart size={17} fill={following ? "currentColor" : "none"} />
@@ -497,29 +549,21 @@ export default function ArtistDetail() {
             className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center text-white/75 transition-colors"
             aria-label="Share artist"
           >
-            {copied ? <Check size={18} className="text-brand-glow" /> : <Share2 size={18} />}
+            {copied ? <Check size={18} style={{ color: TEAL }} /> : <Share2 size={18} />}
           </button>
         </div>
       </div>
 
-      {/* Bridges the artist-tinted area above (hero + action-button row,
-          deliberately dark regardless of theme — see the wrapper's own
-          comment) into the content surface's real light/dark background
-          right below, instead of jumping straight from one to the other —
-          that hard cut was the actual seam; the button row and the content
-          surface were always two genuinely different colors, never
-          supposed to match outright. */}
-      <div
-        aria-hidden="true"
-        style={{ height: "28px", backgroundImage: `linear-gradient(180deg, ${artist.gradient[1]}, var(--color-panel))` }}
-      />
-
       {/* Bright content surface — everything from here down follows the
-          app's real light/dark theme (unlike the hero and button row
-          above, which stay tinted by this artist's own gradient always). */}
+          app's real light/dark theme (unlike the hero above, which stays
+          this one fixed teal gradient always). The negative top margin
+          exactly cancels the action row's own mb-6 above, so the rounded
+          top corners sit flush against the buttons with no dead gap, while
+          the gradient still shows through the rounded corners themselves
+          (it extends behind this whole container). */}
       <div
         className="relative rounded-t-[32px] px-5 sm:px-6 pt-6 pb-10 bg-panel"
-        style={{ boxShadow: "0 -12px 32px rgba(0,0,0,0.12)" }}
+        style={{ marginTop: "-24px", boxShadow: "0 -12px 32px rgba(0,0,0,0.28)" }}
       >
         {editing ? (
           <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
@@ -565,34 +609,27 @@ export default function ArtistDetail() {
           )
         )}
 
-        {/* Replaces an old static album/song-count card with real
-            navigation — the content below now only ever shows one of the
-            two, so the switch doubles as an at-a-glance summary of which
-            you're looking at. Brand-colored underline matches every other
-            "now playing"/active-state accent elsewhere in the app. */}
-        <div className="flex items-center gap-6 mb-6 border-b border-border">
-          {(
-            [
-              { id: "albums" as const, label: "Albums" },
-              { id: "songs" as const, label: "Songs" },
-            ]
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative pb-3 text-base font-semibold transition-colors ${
-                activeTab === tab.id ? "text-fg" : "text-fg-muted hover:text-fg"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <span className="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-brand" />
-              )}
-            </button>
-          ))}
+        <div
+          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8 bg-elevated border border-border"
+          style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none" }}
+        >
+          <div className="flex flex-col items-center gap-1 text-center">
+            <div className="flex items-center gap-1.5">
+              <Music2 size={15} style={{ color: TEAL }} />
+              <span className="text-lg font-bold text-fg">{artist.albums.length}</span>
+            </div>
+            <span className="text-xs text-fg-muted">Albums</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <div className="flex items-center gap-1.5">
+              <Music2 size={15} style={{ color: TEAL }} />
+              <span className="text-lg font-bold text-fg">{totalSongCount}</span>
+            </div>
+            <span className="text-xs text-fg-muted">Songs</span>
+          </div>
         </div>
 
-        {activeTab === "albums" && isAdmin &&
+        {isAdmin &&
           (addingAlbum ? (
             <div className="text-left space-y-3 bg-elevated rounded-xl p-4 mb-8">
               <div>
@@ -657,97 +694,65 @@ export default function ArtistDetail() {
             </button>
           ))}
 
-        {activeTab === "albums" && (
-          <>
-            {artist.albums.length === 0 && !addingAlbum && (
-              <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
-                <Music2 size={18} />
-                No albums yet{isAdmin ? " — add one above." : " — check back soon."}
-              </div>
-            )}
-
-            {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
-              <section key={type} className="mb-8">
-                {/* The plain "album" type's own section label is literally
-                    "Albums" — the exact same word the active tab right above
-                    already says, so showing it again here read as a flat-out
-                    duplicate heading. EPs/Singles/Compilations keep theirs
-                    since those genuinely need their own label to tell them
-                    apart from each other within this same tab. */}
-                {type !== "album" && (
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                    <h2 className="text-xl font-bold tracking-tight text-fg">
-                      {ALBUM_TYPE_SECTION_LABEL[type]}
-                    </h2>
-                  </div>
-                )}
-                {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
-                    edge inset of its own — negative margin cancels the parent's
-                    padding (bleeding the scrollable hit-area to the true
-                    viewport edge), +16px brings the visible cards back in from
-                    there. */}
-                <div
-                  className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-4 pb-1"
-                  style={{ marginInline: "-20px", paddingInline: "16px", scrollPaddingInline: "16px" }}
-                >
-                  {albumsByType[type].map((album) => (
-                    <AlbumCard
-                      key={album.id}
-                      album={album}
-                      to={`/album/${album.id}`}
-                      playing={isPlaying && currentTrack?.albumId === album.id}
-                      onPlay={() => handlePlayAlbum(album.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-
-            {/* A preview, not the full list — "See All" jumps to the Songs
-                tab rather than expanding in place, so this tab stays a
-                short overview of both an artist's albums and their songs
-                (matching what each tab's own label promises). */}
-            {previewSongs.length > 0 && (
-              <section className="mb-2">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-                    <h2 className="text-xl font-bold tracking-tight text-fg">{songsSectionTitle}</h2>
-                  </div>
-                  {songsSectionTracks.length > 5 && (
-                    <button
-                      onClick={() => setActiveTab("songs")}
-                      className="text-sm font-semibold text-brand hover:text-brand-glow transition-colors"
-                    >
-                      See All
-                    </button>
-                  )}
-                </div>
-                {previewSongs.map((track, i) => (
-                  <TrackRow key={track.id} track={track} index={i + 1} queue={songsSectionTracks} showArtistName={false} showActions />
-                ))}
-              </section>
-            )}
-          </>
+        {artist.albums.length === 0 && !addingAlbum && (
+          <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md mb-10 text-fg-muted bg-elevated border border-border">
+            <Music2 size={18} />
+            No albums yet{isAdmin ? " — add one above." : " — check back soon."}
+          </div>
         )}
 
-        {activeTab === "songs" && (
-          <section className="mb-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
-              <h2 className="text-xl font-bold tracking-tight text-fg">{songsSectionTitle}</h2>
+        {ALBUM_TYPE_ORDER.filter((type) => albumsByType[type].length > 0).map((type) => (
+          <section key={type} className="mb-8">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="w-1 h-5 rounded-full" style={{ backgroundColor: TEAL }} />
+              <h2 className="text-xl font-bold tracking-tight text-fg">
+                {ALBUM_TYPE_SECTION_LABEL[type]}
+              </h2>
             </div>
-            {songsSectionTracks.length > 0 ? (
-              songsSectionTracks.map((track, i) => (
-                <TrackRow key={track.id} track={track} index={i + 1} queue={songsSectionTracks} showArtistName={false} showActions />
-              ))
-            ) : (
-              <div className="flex items-center gap-3 text-sm rounded-lg p-4 max-w-md text-fg-muted bg-elevated border border-border">
-                <Music2 size={18} />
-                No songs yet.
+            {/* Breaks out of the surface's own px-5/6 to a smaller, 16px
+                edge inset of its own — negative margin cancels the parent's
+                padding (bleeding the scrollable hit-area to the true
+                viewport edge), +16px brings the visible cards back in from
+                there. */}
+            <div
+              className="flex overflow-x-auto overscroll-x-contain no-scrollbar snap-x snap-mandatory scroll-smooth gap-4 pb-1"
+              style={{ marginInline: "-20px", paddingInline: "16px", scrollPaddingInline: "16px" }}
+            >
+              {albumsByType[type].map((album) => (
+                <AlbumCard
+                  key={album.id}
+                  album={album}
+                  to={`/album/${album.id}`}
+                  playing={isPlaying && currentTrack?.albumId === album.id}
+                  onPlay={() => handlePlayAlbum(album.id)}
+                  isLight={isLight}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+
+        {songsSectionTracks.length > 0 && (
+          <section className="mb-2">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="w-1 h-5 rounded-full bg-gradient-to-b from-brand to-brand-dark" />
+                <h2 className="text-xl font-bold tracking-tight text-fg">
+                  {songsSectionTitle}
+                </h2>
               </div>
-            )}
+              {songsSectionTracks.length > 5 && (
+                <button
+                  onClick={() => setShowAllSongs((s) => !s)}
+                  className="text-sm font-semibold text-brand hover:text-brand-glow transition-colors"
+                >
+                  {showAllSongs ? "Show less" : "View all"}
+                </button>
+              )}
+            </div>
+            {visibleSongs.map((track, i) => (
+              <SongRow key={track.id} track={track} index={i + 1} queue={visibleSongs} />
+            ))}
           </section>
         )}
       </div>
