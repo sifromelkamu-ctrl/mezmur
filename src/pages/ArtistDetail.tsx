@@ -1,7 +1,9 @@
 import {
   Check,
+  Disc3,
   Heart,
   Link2,
+  ListMusic,
   MoreHorizontal,
   Music2,
   Pause,
@@ -622,23 +624,40 @@ export default function ArtistDetail() {
           )
         )}
 
+        {/* Redesigned from a plain flat row (small inline icon + number +
+            label, all the same weight) into something with real visual
+            hierarchy: a colored icon badge, a large bold number as the
+            actual focal point, and a divider that reads as two distinct
+            stats rather than one blurred row. Distinct icons (Disc3 for
+            albums, ListMusic for songs) instead of reusing the same icon
+            for both. */}
         <div
-          className="grid grid-cols-2 gap-3 rounded-2xl p-4 mb-8 bg-elevated border border-border"
+          className="relative grid grid-cols-2 rounded-2xl mb-8 bg-elevated border border-border overflow-hidden"
           style={{ boxShadow: isLight ? "0 4px 14px rgba(0,0,0,0.05)" : "none" }}
         >
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{artist.albums.length}</span>
-            </div>
-            <span className="text-xs text-fg-muted">Albums</span>
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-border"
+          />
+          <div className="flex flex-col items-center gap-2 text-center py-5">
+            <span
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${TEAL}1f` }}
+            >
+              <Disc3 size={17} style={{ color: TEAL }} />
+            </span>
+            <span className="text-2xl font-extrabold tracking-tight text-fg">{artist.albums.length}</span>
+            <span className="text-xs font-semibold text-fg-muted uppercase tracking-wide">Albums</span>
           </div>
-          <div className="flex flex-col items-center gap-1 text-center">
-            <div className="flex items-center gap-1.5">
-              <Music2 size={15} style={{ color: TEAL }} />
-              <span className="text-lg font-bold text-fg">{totalSongCount}</span>
-            </div>
-            <span className="text-xs text-fg-muted">Songs</span>
+          <div className="flex flex-col items-center gap-2 text-center py-5">
+            <span
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${TEAL}1f` }}
+            >
+              <ListMusic size={17} style={{ color: TEAL }} />
+            </span>
+            <span className="text-2xl font-extrabold tracking-tight text-fg">{totalSongCount}</span>
+            <span className="text-xs font-semibold text-fg-muted uppercase tracking-wide">Songs</span>
           </div>
         </div>
 
