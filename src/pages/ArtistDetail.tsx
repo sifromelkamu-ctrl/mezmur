@@ -313,13 +313,15 @@ export default function ArtistDetail() {
     // behind the content surface's rounded-corner gaps, instead of a fixed
     // near-black that only happened to look intentional in dark mode and
     // read as a flat-out mismatch in light mode.
-    <div
-      className="bg-panel"
-      style={{
-        marginTop: "calc(-1 * env(safe-area-inset-top))",
-        paddingTop: "env(safe-area-inset-top)",
-      }}
-    >
+    // No paddingTop to compensate the negative margin above — the hero
+    // photo (this div's first child) is meant to bleed all the way under
+    // the status bar/notch, not stop short of it behind a flat strip of
+    // this background color. BackButton's "glass" variant and the "..."
+    // menu button already position themselves with their own explicit
+    // `top-[calc(env(safe-area-inset-top)+1.25rem)]` offset for exactly
+    // this reason — they don't need this wrapper to push content down for
+    // them.
+    <div className="bg-panel" style={{ marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
       <div className="relative w-full overflow-hidden" style={{ height: "min(46vh, 380px)" }}>
         <div className="absolute inset-0">
           {showHeroPhoto ? (
