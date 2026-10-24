@@ -29,6 +29,7 @@ import { useTheme } from "../context/ThemeContext";
 import {
   adminApi,
   albumsApi,
+  API_ORIGIN,
   artistsApi,
   type ApiAlbum,
   type ApiAlbumType,
@@ -277,7 +278,13 @@ export default function ArtistDetail() {
     if (album.tracks[0]) playTrack(album.tracks[0], album.tracks);
   };
 
-  const artistUrl = `${window.location.origin}${window.location.pathname}#/artist/${artist.id}`;
+  // window.location.origin inside the Capacitor app is capacitor://localhost
+  // (or similar) — not a real, publicly-reachable address, so sharing that
+  // did nothing useful for whoever received it. This is the actual public
+  // landing page (server/src/routes/share.ts): a real HTTPS URL with a rich
+  // preview that opens straight into the app via a mezmur:// deep link if
+  // the recipient already has it installed.
+  const artistUrl = `${API_ORIGIN}/share/artist/${artist.id}`;
 
   const flashCopied = () => {
     setCopied(true);

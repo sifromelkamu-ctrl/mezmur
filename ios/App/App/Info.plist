@@ -24,6 +24,38 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Custom URL scheme for deep links — a share link's landing page
+	     (server/src/routes/share.ts) opens mezmur://artist/<id> to jump
+	     straight into the app on a device that already has it installed,
+	     handled by the appUrlOpen listener in src/App.tsx. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mezmur</string>
+			</array>
+		</dict>
+	</array>
+	<!--
+	  Blanket cleartext (plain HTTP) allowance, not scoped to one IP — the
+	  app loads over https://localhost (Capacitor's WebView origin), which
+	  iOS blocks plain-HTTP requests from by default (App Transport
+	  Security). This app talks to whatever Mac IP VITE_API_URL was built
+	  with (see .env.production.local), and that IP has already changed
+	  twice in one session (different WiFi, hotspot) — a scoped exception
+	  domain meant re-editing this file and rebuilding the native app every
+	  time the network changed, which is exactly what caused a real "login
+	  crashing" report when the old scoped IP went stale. This build is
+	  debug-only and never distributed, so NSAllowsArbitraryLoads is an
+	  acceptable, pragmatic tradeoff here — a real release build would need
+	  proper HTTPS instead.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<!-- iOS 27 turned "no Scene lifecycle adoption" from a logged

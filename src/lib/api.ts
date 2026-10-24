@@ -2,6 +2,20 @@ import { supabase } from "./supabase";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
+// The server's own root origin (API_URL minus its trailing /api) — used for
+// public, non-API routes served from the same backend, like the share-link
+// landing pages in server/src/routes/share.ts (mounted at /share, not
+// /api/share). Exported rather than duplicating the VITE_API_URL env read
+// elsewhere.
+export const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+
+// A stalled connection (common on flaky mobile networks) otherwise leaves
+// fetch() neither resolving nor rejecting — every "Loading…" screen in the
+// app that awaits request() would then wait forever with no way to recover,
+// since nothing ever reaches their .catch()/.finally(). This bounds every
+// call through request() so a hang becomes a normal, catchable failure.
+const REQUEST_TIMEOUT_MS = 15000;
+
 async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
@@ -27,7 +41,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new ApiError(0, "Request timed out. Check your connection and try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (res.status === 204) return undefined as T;
 

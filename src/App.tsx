@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from "react";
-import { HashRouter, Route, Routes, useLocation } from "react-router-dom";
+import { App as CapacitorApp } from "@capacitor/app";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { HashRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import BibleAudioBar from "./components/BibleAudioBar";
 import MobileNav from "./components/MobileNav";
 import PlayerBar from "./components/PlayerBar";
@@ -11,11 +12,11 @@ import { BibleAudioProvider } from "./context/BibleAudioContext";
 import { CustomArtistsProvider } from "./context/CustomArtistsContext";
 import { FavoritesProvider } from "./context/FavoritesContext";
 import { LanguageProvider } from "./context/LanguageContext";
-import { LyricsProvider } from "./context/LyricsContext";
 import { PlayerProvider } from "./context/PlayerContext";
 import { SleepTimerProvider } from "./context/SleepTimerContext";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { useKeyboardOpen } from "./hooks/useKeyboardOpen";
 import { routeLoaders } from "./lib/routeLoaders";
 // Home is the initial route on every fresh load, so it stays a static
 // import — lazy-loading it would only add an extra async hop with no
@@ -62,7 +63,27 @@ const YoutubeImport = lazy(routeLoaders.youtubeImport);
 // PlayerBar/MobileNav chrome that every other route gets.
 function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAuthRoute = location.pathname === "/auth";
+  const isKeyboardOpen = useKeyboardOpen();
+
+  // A share link's landing page (server/src/routes/share.ts) opens
+  // mezmur://artist/<id> to jump straight into an already-installed app
+  // instead of just showing the web preview — this is the other end of
+  // that link, routing it to the matching in-app page. Plain string strip
+  // rather than the URL constructor: a non-standard scheme's host/path
+  // split isn't worth relying on when the route we want is right there
+  // after the "mezmur://" prefix either way.
+  useEffect(() => {
+    const listener = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      if (!url.startsWith("mezmur://")) return;
+      const path = url.replace("mezmur://", "/");
+      navigate(path);
+    });
+    return () => {
+      listener.then((handle) => handle.remove());
+    };
+  }, [navigate]);
 
   const routes = (
     <Suspense fallback={null}>
@@ -123,7 +144,20 @@ function AppShell() {
           {routes}
         </div>
       </main>
-      <div className="fixed inset-x-0 bottom-0 z-30">
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 transition-transform duration-150 ${
+          isKeyboardOpen ? "translate-y-full pointer-events-none" : ""
+        }`}
+      >
+        {/* `fixed` anchors to the layout viewport, not the visual one — on
+            Android Chrome (and older iOS Safari), opening the on-screen
+            keyboard shrinks the visual viewport without moving this bar's
+            layout-viewport anchor, so it used to end up floating mid-screen
+            just above the keyboard instead of off-screen. useKeyboardOpen
+            (VisualViewport-based, no reliable CSS-only signal exists for
+            this) slides it fully below the fold while the keyboard is up,
+            same as most native-feeling apps do — it slides back the instant
+            the keyboard closes. */}
         {/* One continuous frosted zone spanning the whole bottom band, edge
             to edge — covers the corner slivers beside the nav pill (its own
             side margins/rounding otherwise leave scrolling content peeking
@@ -165,17 +199,15 @@ export default function App() {
           <SubscriptionProvider>
             <CustomArtistsProvider>
               <FavoritesProvider>
-                <LyricsProvider>
-                  <PlayerProvider>
-                    <BibleAudioProvider>
-                      <SleepTimerProvider>
-                        <HashRouter>
-                          <AppShell />
-                        </HashRouter>
-                      </SleepTimerProvider>
-                    </BibleAudioProvider>
-                  </PlayerProvider>
-                </LyricsProvider>
+                <PlayerProvider>
+                  <BibleAudioProvider>
+                    <SleepTimerProvider>
+                      <HashRouter>
+                        <AppShell />
+                      </HashRouter>
+                    </SleepTimerProvider>
+                  </BibleAudioProvider>
+                </PlayerProvider>
               </FavoritesProvider>
             </CustomArtistsProvider>
           </SubscriptionProvider>

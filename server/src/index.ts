@@ -19,6 +19,7 @@ import podcastsRouter from "./routes/podcasts.js";
 import pushRouter from "./routes/push.js";
 import searchRouter from "./routes/search.js";
 import sermonsRouter from "./routes/sermons.js";
+import shareRouter from "./routes/share.js";
 import singlesRouter from "./routes/singles.js";
 import stripeWebhookRouter from "./routes/stripeWebhook.js";
 import subscriptionRouter from "./routes/subscription.js";
@@ -96,6 +97,11 @@ app.use("/api/admin/media-migration", adminMediaMigrationRouter);
 app.use("/api/admin/artwork-thumbs", adminArtworkThumbsRouter);
 app.use("/api/admin/youtube-import", youtubeImportRouter);
 app.use("/api/admin/telegram-import", telegramImportRouter);
+
+// Not under /api — these are public HTML landing pages (real Open Graph
+// previews + a deep-link attempt into the app), meant to be opened directly
+// in a browser from a shared link, not called as a JSON API.
+app.use("/share", shareRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
