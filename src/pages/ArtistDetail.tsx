@@ -433,15 +433,15 @@ export default function ArtistDetail() {
         />
 
         <HeroTopScrim />
-        <BackButton variant="glass" topOffsetRem={0.75} />
+        <BackButton variant="glass" topOffsetRem={0.35} />
         {/* Same reasoning as BackButton's "glass" variant: this floats near
             the true top of the screen inside a hero whose negative margin
             cancels the page's ambient safe-area padding, so it needs its
             own explicit inset to clear the system UI touch zone up there
             (status bar on Android, Dynamic Island on newer iPhones). Kept
-            in sync with BackButton's own topOffsetRem={0.75} above so the
+            in sync with BackButton's own topOffsetRem={0.35} above so the
             two stay aligned. */}
-        <div className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] right-4">
+        <div className="absolute top-[calc(env(safe-area-inset-top)+0.35rem)] right-4">
           <button
             onClick={() => setShowMenu((m) => !m)}
             className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-xl ring-1 ring-white/15 shadow-lg flex items-center justify-center text-white hover:bg-white/20 transition-colors"
