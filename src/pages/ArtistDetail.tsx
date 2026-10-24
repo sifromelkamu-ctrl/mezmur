@@ -540,13 +540,26 @@ export default function ArtistDetail() {
               actually loaded (index.html) only go up to 700; asking for
               900 would just make the browser synthetically (fake-)bold
               the 700 weight instead of rendering a real one. Amharic names
-              keep font-black — that's the default sans's own real 900. */}
+              keep font-black — that's the default sans's own real 900.
+
+              Wrapped in the same glass-pill treatment as the "Artist"
+              badge above (teal border, backdrop-blur, translucent teal-
+              tinted background) — inline-block so it hugs the text
+              instead of stretching the full row width, rounded-2xl rather
+              than rounded-full since a name (especially a wrapped
+              two-line one) isn't a single short label the way the badge
+              is. */}
           <h1
-            className={`text-4xl tracking-tight break-words text-white ${
-              hasEthiopicScript(artist.name) ? "font-black" : "font-eb-garamond font-bold"
-            }`}
+            className="inline-block max-w-full rounded-2xl border px-4 py-1.5 backdrop-blur-sm"
+            style={{ borderColor: `${TEAL}80`, backgroundColor: `${TEAL_DEEP}66` }}
           >
-            {artist.name}
+            <span
+              className={`text-4xl tracking-tight break-words text-white ${
+                hasEthiopicScript(artist.name) ? "font-black" : "font-eb-garamond font-bold"
+              }`}
+            >
+              {artist.name}
+            </span>
           </h1>
           <p className="text-sm text-white/70 mt-1">{artist.monthlyListeners.toLocaleString()} monthly listeners</p>
         </div>
