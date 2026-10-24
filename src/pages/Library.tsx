@@ -24,6 +24,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { usePlayer } from "../context/PlayerContext";
 import { getAvatarColor, useTheme } from "../context/ThemeContext";
 import { albumsApi, artistsApi, playlistsApi, type ApiAlbum, type ApiArtist, type ApiPlaylist } from "../lib/api";
+import { BOTTOM_RESERVE_PX } from "../lib/layout";
 
 type Filter = "artists" | "albums" | "playlists" | "favorites";
 type ArtistSort = "name" | "popular";
@@ -91,9 +92,11 @@ function ArtistCard({
         subtitle={artist.isGroup ? "Worship Team" : "Artist"}
         gradient={artist.gradient}
         to={`/artist/${artist.id}`}
-        portrait
-        fullWidth
+        large
         photoUrl={artist.photoUrl}
+        entityType="artist"
+        entityId={artist.id}
+        artworkFrame={artist.artworkFrame}
         onPlay={() => onPlay(artist.id)}
       />
       {openMenuFor === artist.id && (
@@ -234,7 +237,7 @@ export default function Library() {
     const measure = () => {
       if (!headerRef.current) return;
       const top = headerRef.current.getBoundingClientRect().bottom;
-      setFavoritesListHeight(Math.max(200, window.innerHeight - top - 192));
+      setFavoritesListHeight(Math.max(200, window.innerHeight - top - BOTTOM_RESERVE_PX));
     };
     measure();
     window.addEventListener("resize", measure);
@@ -365,7 +368,7 @@ export default function Library() {
                   </>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 {filteredArtists.map((artist) => (
                   <ArtistCard
                     key={artist.id}
