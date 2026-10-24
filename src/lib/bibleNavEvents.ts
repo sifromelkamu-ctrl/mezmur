@@ -1,5 +1,5 @@
 // BibleModeNav lives in App.tsx, outside Bible.tsx — but every one of its
-// destinations (home, book browse, reading plan, settings) is internal
+// destinations (home, book browse, audio settings, settings) is internal
 // React state inside the single Bible.tsx component (no sub-routes exist
 // for /bible, see that file's own comment on why), so navigate("/bible")
 // alone can't reach them, and does nothing at all when already on that
@@ -7,7 +7,7 @@
 // same reason: simpler and more React-idiomatic here than a DOM
 // CustomEvent for a signal that only ever has one subscriber (the mounted
 // Bible page) at a time.
-export type BibleNavAction = "home" | "browse" | "plans" | "settings";
+export type BibleNavAction = "home" | "browse" | "audio" | "settings";
 
 type Listener = (action: BibleNavAction) => void;
 const listeners = new Set<Listener>();

@@ -1,4 +1,4 @@
-import { BookOpen, Home, ListChecks, Plus, Settings2 } from "lucide-react";
+import { BookOpen, Home, Plus, Settings2, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { emitBibleNavAction } from "../lib/bibleNavEvents";
@@ -26,12 +26,12 @@ export default function BibleModeNav() {
   // two hex values are just repeated directly.
   const purple = isLight ? "#5B3FE0" : "#8B6CFF";
 
-  const items: { id: "home" | "browse" | "plans" | "settings"; label: string; icon: typeof Home }[] = [
+  const items: { id: "home" | "browse" | "audio" | "settings"; label: string; icon: typeof Home }[] = [
     { id: "home", label: "Home", icon: Home },
     { id: "browse", label: "Bible", icon: BookOpen },
   ];
-  const itemsEnd: { id: "plans" | "settings"; label: string; icon: typeof Home }[] = [
-    { id: "plans", label: "Plans", icon: ListChecks },
+  const itemsEnd: { id: "audio" | "settings"; label: string; icon: typeof Home }[] = [
+    { id: "audio", label: "Audio", icon: Volume2 },
     { id: "settings", label: "More", icon: Settings2 },
   ];
 
