@@ -525,16 +525,23 @@ export default function ArtistDetail() {
               Artist
             </span>
           </div>
-          {/* font-playfair — the same premium serif display font already
-              used for Home's greeting, section headers, and the splash
-              logo elsewhere in the app — rather than the plain default
-              sans. Gated on script: Playfair Display has no Ethiopic
-              glyphs, so an Amharic name would otherwise silently fall
-              through to the browser's generic serif instead of the app's
-              own Abyssinica SIL; those names keep the default sans. */}
+          {/* font-eb-garamond — switched from font-playfair (Playfair
+              Display's heavy, high-contrast editorial look wasn't it) to
+              EB Garamond, a classic, refined serif with a softer,
+              old-style character — already loaded and wired as one of the
+              app's Bible-reading font options, reused here rather than
+              introducing a new font. Gated on script, same reasoning as
+              before: EB Garamond has no Ethiopic glyphs, so an Amharic
+              name keeps the default sans instead of silently falling
+              through to the browser's generic serif. font-bold, not
+              font-black, for the Latin case — the EB Garamond weights
+              actually loaded (index.html) only go up to 700; asking for
+              900 would just make the browser synthetically (fake-)bold
+              the 700 weight instead of rendering a real one. Amharic names
+              keep font-black — that's the default sans's own real 900. */}
           <h1
-            className={`text-4xl font-black tracking-tight break-words text-white ${
-              hasEthiopicScript(artist.name) ? "" : "font-playfair"
+            className={`text-4xl tracking-tight break-words text-white ${
+              hasEthiopicScript(artist.name) ? "font-black" : "font-eb-garamond font-bold"
             }`}
           >
             {artist.name}
