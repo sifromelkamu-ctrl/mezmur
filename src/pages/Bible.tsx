@@ -32,9 +32,11 @@ import { useTheme } from "../context/ThemeContext";
 import BibleCompareModal from "../components/bible/BibleCompareModal";
 import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
 import BibleSettingsModal from "../components/bible/BibleSettingsModal";
+import VerseImageComposer from "../components/bible/VerseImageComposer";
 import NotificationsPanel from "../components/home/NotificationsPanel";
 import TextAreaField from "../components/form/TextAreaField";
 import TextField from "../components/form/TextField";
+import { HERO_IMAGES } from "../data/bibleHeroImages";
 import { MORNING_VERSES } from "../data/morningVerses";
 import { BOTTOM_RESERVE_PX } from "../lib/layout";
 import { isDailyVerseSubscribed, pushSupported, subscribeToDailyVerse, unsubscribeFromDailyVerse } from "../lib/pushNotifications";
@@ -50,7 +52,6 @@ import {
   type HighlightColor,
   type VerseAnnotation,
 } from "../utils/bibleAnnotations";
-import { shareVerseAsImage } from "../utils/bibleVerseImage";
 import {
   ENGLISH_FONT_FAMILY_CLASSES,
   ENGLISH_VERSION_LABELS,
@@ -193,38 +194,6 @@ function dailyVerseIndexFor(date: Date): number {
 
 // The hero photo rotates daily too, independently of which verse is shown —
 // a separate salted hash so the two don't cycle in lockstep.
-const HERO_IMAGES = [
-  "/bible/hero/sunset-verse.jpg",
-  "/bible/hero/wheat-field.jpg",
-  "/bible/hero/three-crosses.jpg",
-  "/bible/hero/beach-sunset.jpg",
-  "/bible/hero/holy-bible.jpg",
-  "/bible/hero/aerial-village-sunset.jpg",
-  "/bible/hero/hebrew-scripture.jpg",
-  "/bible/hero/golden-sunset-sky.jpg",
-  "/bible/hero/misty-road-cross.jpg",
-  "/bible/hero/starry-night-galaxy.jpg",
-  "/bible/hero/double-rainbow-field.jpg",
-  "/bible/hero/forest-waterfall.jpg",
-  "/bible/hero/alpine-peaks-sunrise.jpg",
-  "/bible/hero/desert-dunes-sunset.jpg",
-  "/bible/hero/praying-silhouette-sunset.jpg",
-  "/bible/hero/stained-glass-cathedral.jpg",
-  "/bible/hero/lighthouse-storm.jpg",
-  "/bible/hero/misty-autumn-path.jpg",
-  "/bible/hero/candle-flame-dark.jpg",
-  "/bible/hero/mountain-cross-sunrise.jpg",
-  "/bible/hero/ocean-waves-rocks.jpg",
-  "/bible/hero/aurora-norway.jpg",
-  "/bible/hero/misty-mountain-valley.jpg",
-  "/bible/hero/rain-window-bokeh.jpg",
-  "/bible/hero/gothic-church-tower.jpg",
-  "/bible/hero/bird-flock-sunset.jpg",
-  "/bible/hero/grand-canyon-sunset.jpg",
-  "/bible/hero/pink-dahlias-garden.jpg",
-  "/bible/hero/alberta-lake-sunrise.jpg",
-];
-
 function dailyHeroImageIndexFor(date: Date): number {
   const dayKey = `img:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
   let hash = 0;
@@ -276,7 +245,7 @@ export default function Bible() {
   const [justCopied, setJustCopied] = useState(false);
   const [justShared, setJustShared] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
-  const [generatingImage, setGeneratingImage] = useState(false);
+  const [verseImageComposer, setVerseImageComposer] = useState<{ text: string; citation: string } | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadReadingPrefs());
   const [showSettings, setShowSettings] = useState(false);
@@ -684,15 +653,10 @@ export default function Bible() {
     }
   };
 
-  const handleImageSelected = async () => {
+  const handleImageSelected = () => {
     const selection = getSelectionText();
-    if (!selection || !selection.citation || generatingImage) return;
-    setGeneratingImage(true);
-    try {
-      await shareVerseAsImage(selection.text, selection.citation);
-    } finally {
-      setGeneratingImage(false);
-    }
+    if (!selection || !selection.citation) return;
+    setVerseImageComposer({ text: selection.text, citation: selection.citation });
   };
 
   const handleSaveNote = (i: number) => {
@@ -1105,6 +1069,21 @@ export default function Bible() {
           </div>
         ) : null}
 
+        {/* Rendered here (sibling of the selection toolbar below, not
+            nested inside it) so it stays mounted on its own captured
+            text/citation even if selectedVerses changes or clears while
+            it's open — the toolbar's own block unmounts the instant the
+            selection does. */}
+        {verseImageComposer && (
+          <VerseImageComposer
+            text={verseImageComposer.text}
+            citation={verseImageComposer.citation}
+            language={prefs.language}
+            initialFontFamily={prefs.englishFontFamily}
+            onClose={() => setVerseImageComposer(null)}
+          />
+        )}
+
         {selectedVerses.size > 0 &&
           (() => {
             const colorsInSelection = new Set(
@@ -1235,10 +1214,9 @@ export default function Bible() {
                     </button>
                     <button
                       onClick={handleImageSelected}
-                      disabled={generatingImage}
-                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0 disabled:opacity-60"
+                      className="flex items-center gap-2 text-sm font-semibold text-white/75 hover:text-white px-3.5 py-2.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
                     >
-                      {generatingImage ? <Loader2 size={17} className="animate-spin" /> : <ImageIcon size={17} />}
+                      <ImageIcon size={17} />
                       Image
                     </button>
                     <button

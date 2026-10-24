@@ -1,0 +1,35 @@
+// Shared bible-themed photo library — the Bible home screen's "verse of
+// the day" hero rotates through these (Bible.tsx), and VerseImageComposer
+// reuses the exact same set as its background gallery, so there's one
+// photo library instead of two separately-curated ones.
+export const HERO_IMAGES = [
+  "/bible/hero/sunset-verse.jpg",
+  "/bible/hero/wheat-field.jpg",
+  "/bible/hero/three-crosses.jpg",
+  "/bible/hero/beach-sunset.jpg",
+  "/bible/hero/holy-bible.jpg",
+  "/bible/hero/aerial-village-sunset.jpg",
+  "/bible/hero/hebrew-scripture.jpg",
+  "/bible/hero/golden-sunset-sky.jpg",
+  "/bible/hero/misty-road-cross.jpg",
+  "/bible/hero/starry-night-galaxy.jpg",
+  "/bible/hero/double-rainbow-field.jpg",
+  "/bible/hero/forest-waterfall.jpg",
+  "/bible/hero/alpine-peaks-sunrise.jpg",
+  "/bible/hero/desert-dunes-sunset.jpg",
+  "/bible/hero/praying-silhouette-sunset.jpg",
+  "/bible/hero/stained-glass-cathedral.jpg",
+  "/bible/hero/lighthouse-storm.jpg",
+  "/bible/hero/misty-autumn-path.jpg",
+  "/bible/hero/candle-flame-dark.jpg",
+  "/bible/hero/mountain-cross-sunrise.jpg",
+  "/bible/hero/ocean-waves-rocks.jpg",
+  "/bible/hero/aurora-norway.jpg",
+  "/bible/hero/misty-mountain-valley.jpg",
+  "/bible/hero/rain-window-bokeh.jpg",
+  "/bible/hero/gothic-church-tower.jpg",
+  "/bible/hero/bird-flock-sunset.jpg",
+  "/bible/hero/grand-canyon-sunset.jpg",
+  "/bible/hero/pink-dahlias-garden.jpg",
+  "/bible/hero/alberta-lake-sunrise.jpg",
+];
