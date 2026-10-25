@@ -28,8 +28,11 @@ import { useNavigate } from "react-router-dom";
 import { BIBLE_BOOKS, type BibleBookMeta } from "../data/bibleBooks";
 import { useAuth } from "../context/useAuth";
 import { useTheme } from "../context/ThemeContext";
+import BibleBookmarksModal, { type BookmarkEntry } from "../components/bible/BibleBookmarksModal";
 import BibleCompareModal from "../components/bible/BibleCompareModal";
-import BibleListModal, { type BibleListModalRow } from "../components/bible/BibleListModal";
+import BibleFavoritesModal, { type FavoriteEntry } from "../components/bible/BibleFavoritesModal";
+import BibleHistoryModal, { type HistoryEntry } from "../components/bible/BibleHistoryModal";
+import BibleNotesModal, { type NoteEntry } from "../components/bible/BibleNotesModal";
 import BibleSettingsModal from "../components/bible/BibleSettingsModal";
 import VerseImageComposer from "../components/bible/VerseImageComposer";
 import NotificationsPanel from "../components/home/NotificationsPanel";
@@ -1556,59 +1559,36 @@ export default function Bible() {
   };
 
   // Bookmarks/Notes/Favorites/History quick-access lists — small whole-
-  // library scans (see getAllAnnotations' own comment) mapped into the
-  // shared BibleListModal row shape.
+  // library scans (see getAllAnnotations' own comment), mapped into raw
+  // entries (not BibleListModalRow) for their own bespoke modals
+  // (BibleBookmarksModal/BibleNotesModal/BibleFavoritesModal/
+  // BibleHistoryModal), which need bookSlug/chapter/verseIndex directly
+  // to fetch each verse's real text.
   const allAnnotations = getAllAnnotations();
-  const bookmarkRows: BibleListModalRow[] = allAnnotations
+  const bookmarkEntries: BookmarkEntry[] = allAnnotations
     .filter(({ annotation }) => annotation.color)
     .map(({ key, annotation }) => {
-      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
-      const b = bookFromSlug(s);
-      const swatch = HIGHLIGHT_COLORS.find((h) => h.id === annotation.color);
-      return {
-        key,
-        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
-        subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
-        badge: <span className={`w-3 h-3 rounded-full shrink-0 ${swatch?.swatch ?? "bg-gold"}`} />,
-        onClick: () => openVerse(s, c, v),
-      };
+      const { bookSlug, chapter, verseIndex } = parseVerseKey(key);
+      return { key, bookSlug, chapter, verseIndex, color: annotation.color! };
     });
-  const noteRows: BibleListModalRow[] = allAnnotations
+  const noteEntries: NoteEntry[] = allAnnotations
     .filter(({ annotation }) => annotation.note)
     .map(({ key, annotation }) => {
-      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
-      const b = bookFromSlug(s);
-      return {
-        key,
-        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
-        subtitle: annotation.note,
-        badge: <StickyNote size={16} className="text-gold shrink-0" />,
-        onClick: () => openVerse(s, c, v),
-      };
+      const { bookSlug, chapter, verseIndex } = parseVerseKey(key);
+      return { key, bookSlug, chapter, verseIndex, note: annotation.note! };
     });
-  const favoriteRows: BibleListModalRow[] = allAnnotations
+  const favoriteEntries: FavoriteEntry[] = allAnnotations
     .filter(({ annotation }) => annotation.favorite)
     .map(({ key }) => {
-      const { bookSlug: s, chapter: c, verseIndex: v } = parseVerseKey(key);
-      const b = bookFromSlug(s);
-      return {
-        key,
-        title: `${b?.nameAm ?? s} ${c}:${v + 1}`,
-        subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
-        badge: <Heart size={16} className="text-red-400 shrink-0" fill="currentColor" />,
-        onClick: () => openVerse(s, c, v),
-      };
+      const { bookSlug, chapter, verseIndex } = parseVerseKey(key);
+      return { key, bookSlug, chapter, verseIndex };
     });
-  const historyRows: BibleListModalRow[] = getRecentHistory(30).map((entry) => {
-    const b = bookFromSlug(entry.bookSlug);
-    return {
-      key: `${entry.bookSlug}-${entry.chapter}`,
-      title: `${b?.nameAm ?? entry.bookSlug} ${entry.chapter}`,
-      subtitle: b ? TESTAMENT_THEME[b.testament].label : undefined,
-      badge: <Clock size={16} className="text-fg-subtle shrink-0" />,
-      onClick: () => openVerse(entry.bookSlug, entry.chapter),
-    };
-  });
+  const historyEntries: HistoryEntry[] = getRecentHistory(30).map((entry) => ({
+    key: `${entry.bookSlug}-${entry.chapter}`,
+    bookSlug: entry.bookSlug,
+    chapter: entry.chapter,
+    readAt: entry.readAt,
+  }));
 
   // Each action gets its own accent (bg/fg) instead of all four sharing
   // one gold tint — a quick, legible color code (purple=bookmarks,
@@ -1725,7 +1705,7 @@ export default function Bible() {
       prefs.language === "en"
         ? id === "old"
           ? "Law and Prophets"
-          : "Teaching of the Messiah"
+          : "Teaching of Messiah"
         : id === "old"
           ? "ሕግና ነቢያት"
           : "የመሲሁ ትምህርት";
@@ -2163,34 +2143,38 @@ export default function Bible() {
       </div>
 
       {activeModal === "bookmarks" && (
-        <BibleListModal
-          title="የመጽሐፍ ምልክት"
-          emptyLabel="እስካሁን ምንም ምልክት አልተደረገም።"
-          rows={bookmarkRows}
+        <BibleBookmarksModal
+          entries={bookmarkEntries}
+          language={prefs.language}
+          englishVersion={prefs.englishVersion}
+          onOpenVerse={(s, c, v) => openVerse(s, c, v)}
           onClose={() => setActiveModal(null)}
         />
       )}
       {activeModal === "notes" && (
-        <BibleListModal
-          title="ማስታወሻዎች"
-          emptyLabel="እስካሁን ምንም ማስታወሻ የለም።"
-          rows={noteRows}
+        <BibleNotesModal
+          entries={noteEntries}
+          language={prefs.language}
+          englishVersion={prefs.englishVersion}
+          onOpenVerse={(s, c, v) => openVerse(s, c, v)}
           onClose={() => setActiveModal(null)}
         />
       )}
       {activeModal === "favorites" && (
-        <BibleListModal
-          title="የሚወደዱ"
-          emptyLabel="እስካሁን ምንም የተወደደ ጥቅስ የለም።"
-          rows={favoriteRows}
+        <BibleFavoritesModal
+          entries={favoriteEntries}
+          language={prefs.language}
+          englishVersion={prefs.englishVersion}
+          onOpenVerse={(s, c, v) => openVerse(s, c, v)}
           onClose={() => setActiveModal(null)}
         />
       )}
       {activeModal === "history" && (
-        <BibleListModal
-          title="ታሪክ"
-          emptyLabel="እስካሁን ምንም አልተነበበም።"
-          rows={historyRows}
+        <BibleHistoryModal
+          entries={historyEntries}
+          language={prefs.language}
+          englishVersion={prefs.englishVersion}
+          onOpenVerse={(s, c, v) => openVerse(s, c, v)}
           onClose={() => setActiveModal(null)}
         />
       )}
