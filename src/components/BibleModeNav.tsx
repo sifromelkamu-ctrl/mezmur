@@ -72,18 +72,19 @@ export default function BibleModeNav() {
           app's own dark/gold premium look, carried onto this one button
           so it reads as unmistakably "Mezmur" against the Bible section's
           own purple/green bar around it.
-          Wrapped in its own flex-1 slot (same as the other four) rather
-          than a fixed shrink-0 width, so it claims an equal fifth of the
-          row's width and its circle centers inside that — true 5-column
-          alignment instead of a fixed-size badge floating off-center
-          between two flex-1 groups. Sized to the row's own natural
-          height (44px, down from 52px) so it reads as part of the row's
-          proportions, not oversized next to the real icon buttons. */}
-      <div className="flex-1 flex items-center justify-center">
-        <button
-          onClick={() => navigate("/")}
-          aria-label="Back to Mezmur"
-          className="relative flex items-center justify-center w-11 h-11 rounded-full shrink-0 overflow-hidden active:scale-90 transition-transform shadow-lg"
+          Same flex-1/icon+label button shape as the other four (badge is
+          now a plain <span>, not a nested button, with the outer button
+          carrying the click + active-scale) — "Home" underneath reads the
+          same way "Bible"/"OT"/"NT"/"More" do, just with a styled badge
+          in place of a bare icon. Sized to the row's own natural icon
+          height (44px) so it doesn't dwarf the real icons next to it. */}
+      <button
+        onClick={() => navigate("/")}
+        aria-label="Back to Mezmur"
+        className="flex-1 flex flex-col items-center gap-[2.5px] py-1.5 rounded-2xl active:scale-[0.94] transition-transform"
+      >
+        <span
+          className="relative flex items-center justify-center w-11 h-11 rounded-full shrink-0 overflow-hidden shadow-lg"
           style={{
             backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2b2b2b 0%, #141414 55%, #000000 100%)",
             boxShadow: `0 8px 20px -6px rgba(0,0,0,0.85), inset 0 0 0 1.5px ${gold}`,
@@ -99,8 +100,9 @@ export default function BibleModeNav() {
             className="relative"
             style={{ color: gold, filter: `drop-shadow(0 0 6px ${goldGlow}66) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}
           />
-        </button>
-      </div>
+        </span>
+        <span className="text-[11px] font-semibold text-fg-subtle">Home</span>
+      </button>
 
       {itemsEnd.map(({ id, label, icon: Icon }) => (
         <button
