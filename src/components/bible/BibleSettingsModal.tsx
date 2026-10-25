@@ -83,6 +83,11 @@ export default function BibleSettingsModal({
   const { sleepOption, sleepRemainingLabel, setSleepOption } = useBibleAudio();
   const [sleepExpanded, setSleepExpanded] = useState(false);
   const sleepSummary = sleepOption === "off" ? "Off" : sleepRemainingLabel ?? BIBLE_SLEEP_TIMER_LABELS[sleepOption];
+  const [languageExpanded, setLanguageExpanded] = useState(false);
+  const languageSummary =
+    prefs.language === "am"
+      ? `አማርኛ · ${FONT_FAMILY_LABELS[prefs.fontFamily]}`
+      : `English · ${prefs.englishVersion.toUpperCase()} · ${ENGLISH_FONT_FAMILY_LABELS[prefs.englishFontFamily]}`;
   return createPortal(
     <div
       className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain p-5 pb-10"
@@ -164,82 +169,97 @@ export default function BibleSettingsModal({
         </Section>
 
         <Section icon={Languages} label="ቋንቋ · Language">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => updatePrefs({ language: "am" })}
-              className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-                prefs.language === "am" ? SELECTED : UNSELECTED
-              }`}
-            >
-              አማርኛ
-            </button>
-            <button
-              onClick={() => updatePrefs({ language: "en" })}
-              className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
-                prefs.language === "en" ? SELECTED : UNSELECTED
-              }`}
-            >
-              English
-            </button>
-          </div>
+          <button
+            onClick={() => setLanguageExpanded((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-border hover:bg-hover transition-colors"
+          >
+            <span className="text-sm font-bold text-fg truncate">{languageSummary}</span>
+            <ChevronDown
+              size={15}
+              className={`shrink-0 text-fg-muted transition-transform ${languageExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {languageExpanded && (
+            <div className="mt-2.5 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => updatePrefs({ language: "am" })}
+                  className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
+                    prefs.language === "am" ? SELECTED : UNSELECTED
+                  }`}
+                >
+                  አማርኛ
+                </button>
+                <button
+                  onClick={() => updatePrefs({ language: "en" })}
+                  className={`flex-1 py-2.5 rounded-md font-semibold text-sm border transition-colors ${
+                    prefs.language === "en" ? SELECTED : UNSELECTED
+                  }`}
+                >
+                  English
+                </button>
+              </div>
+
+              {prefs.language === "en" && (
+                <div>
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold text-fg-muted uppercase tracking-wide mb-1.5">
+                    <BookOpenText size={11} />
+                    Version
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ENGLISH_VERSION_OPTIONS.map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => updatePrefs({ englishVersion: v })}
+                        className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                          prefs.englishVersion === v ? SELECTED : UNSELECTED
+                        }`}
+                      >
+                        <span className="block text-xs font-bold uppercase">{v}</span>
+                        <span className="block text-[10px] font-semibold opacity-80 leading-tight">{ENGLISH_VERSION_LABELS[v]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="flex items-center gap-1.5 text-[10px] font-bold text-fg-muted uppercase tracking-wide mb-1.5">
+                  <Type size={11} />
+                  {prefs.language === "am" ? "የፊደል ቅርፅ · Font" : "Font"}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {prefs.language === "am"
+                    ? FONT_FAMILY_OPTIONS.map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => updatePrefs({ fontFamily: f })}
+                          className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                            prefs.fontFamily === f ? SELECTED : UNSELECTED
+                          }`}
+                        >
+                          <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
+                          <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
+                        </button>
+                      ))
+                    : ENGLISH_FONT_FAMILY_OPTIONS.map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => updatePrefs({ englishFontFamily: f })}
+                          className={`rounded-md border px-2 py-2 text-left transition-colors ${
+                            prefs.englishFontFamily === f ? SELECTED : UNSELECTED
+                          }`}
+                        >
+                          <span className={`block text-[1rem] leading-none mb-1 ${ENGLISH_FONT_FAMILY_CLASSES[f]}`}>Aa</span>
+                          <span className="block text-[10px] font-semibold opacity-80">{ENGLISH_FONT_FAMILY_LABELS[f]}</span>
+                        </button>
+                      ))}
+                </div>
+              </div>
+            </div>
+          )}
         </Section>
-
-        {prefs.language === "en" && (
-          <Section icon={BookOpenText} label="Version">
-            <div className="grid grid-cols-2 gap-2">
-              {ENGLISH_VERSION_OPTIONS.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => updatePrefs({ englishVersion: v })}
-                  className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.englishVersion === v ? SELECTED : UNSELECTED
-                  }`}
-                >
-                  <span className="block text-xs font-bold uppercase">{v}</span>
-                  <span className="block text-[10px] font-semibold opacity-80 leading-tight">{ENGLISH_VERSION_LABELS[v]}</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {prefs.language === "en" && (
-          <Section icon={Type} label="Font">
-            <div className="grid grid-cols-2 gap-2">
-              {ENGLISH_FONT_FAMILY_OPTIONS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => updatePrefs({ englishFontFamily: f })}
-                  className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.englishFontFamily === f ? SELECTED : UNSELECTED
-                  }`}
-                >
-                  <span className={`block text-[1rem] leading-none mb-1 ${ENGLISH_FONT_FAMILY_CLASSES[f]}`}>Aa</span>
-                  <span className="block text-[10px] font-semibold opacity-80">{ENGLISH_FONT_FAMILY_LABELS[f]}</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {prefs.language === "am" && (
-          <Section icon={Type} label="የፊደል ቅርፅ · Amharic font">
-            <div className="grid grid-cols-2 gap-2">
-              {FONT_FAMILY_OPTIONS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => updatePrefs({ fontFamily: f })}
-                  className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                    prefs.fontFamily === f ? SELECTED : UNSELECTED
-                  }`}
-                >
-                  <span className={`block text-[1rem] leading-none mb-1 ${FONT_FAMILY_CLASSES[f]}`}>ብርሃን</span>
-                  <span className="block text-[10px] font-semibold opacity-80">{FONT_FAMILY_LABELS[f]}</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        )}
 
         <Section icon={ALargeSmall} label="የፊደል መጠን · Text size">
           <div className="flex items-center gap-2">
