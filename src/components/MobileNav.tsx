@@ -32,9 +32,12 @@ function NavIcon({
   // getting the same treatment.
   // Badge itself matches BibleModeNav's own center emblem treatment (same
   // 48px size, same radial gradient-depth + glossy top highlight + glow
-  // shadow, just brand purple instead of that emblem's black/gold) rather
-  // than the flat single-tone fill this used to be, so the one active icon
-  // across either bottom bar reads as the same crafted badge.
+  // shadow) rather than the flat single-tone fill this used to be, so the
+  // one active icon across either bottom bar reads as the same crafted
+  // badge. Ocean teal instead of brand purple — this app's own established
+  // premium teal (the same #2dd4bf/#14b8a6/#0f8f7e family NowPlaying's
+  // background and SplashScreen already use), not a new color introduced
+  // just for this badge.
   return (
     <span className="flex flex-col items-center justify-center gap-[2.5px]">
       <span
@@ -42,10 +45,8 @@ function NavIcon({
         style={
           isActive
             ? {
-                backgroundImage:
-                  "radial-gradient(120% 120% at 30% 20%, var(--color-brand-glow) 0%, var(--color-brand) 55%, var(--color-brand-dark) 100%)",
-                boxShadow:
-                  "0 8px 20px -6px color-mix(in oklab, var(--color-brand) 55%, transparent), inset 0 0 0 1px rgba(255,255,255,0.25)",
+                backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2dd4bf 0%, #14b8a6 55%, #0f8f7e 100%)",
+                boxShadow: "0 8px 20px -6px rgba(20,184,166,0.55), inset 0 0 0 1px rgba(255,255,255,0.25)",
               }
             : undefined
         }
