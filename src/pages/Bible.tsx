@@ -1431,6 +1431,8 @@ export default function Bible() {
                     chapter={chapter}
                     verseIndices={sortedSelection}
                     reference={`${bookDisplayName(book, prefs.language)} ${chapter}:${formatVerseNumbers(sortedSelection)}`}
+                    language={prefs.language}
+                    englishVersion={prefs.englishVersion}
                     onClose={() => setShowCompare(false)}
                   />
                 )}
