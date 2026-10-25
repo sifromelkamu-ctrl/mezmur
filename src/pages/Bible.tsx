@@ -1745,10 +1745,25 @@ export default function Bible() {
     const radius = 26;
     const circumference = 2 * Math.PI * radius;
     const dashOffset = circumference * (1 - percent / 100);
+    // The continue-reading pill below needs its own click (open the
+    // actual chapter) independent of the card's own toggle-the-book-list
+    // click — a <button> can't nest inside another <button>, so the card
+    // itself is a div (role="button" + onKeyDown keeps it keyboard-
+    // operable the way a real button is) and the pill is the one real
+    // nested <button>.
+    const toggleExpanded = () => setExpandedTestament((prev) => (prev === id ? null : id));
     return (
-      <button
-        onClick={() => setExpandedTestament((prev) => (prev === id ? null : id))}
-        className="relative overflow-hidden text-center rounded-[28px] pt-2 px-4 pb-1 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04]"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={toggleExpanded}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleExpanded();
+          }
+        }}
+        className="relative overflow-hidden text-center rounded-[28px] pt-2 px-4 pb-1 transition-transform active:scale-[0.98] shadow-[0_14px_32px_-16px_rgba(36,28,61,0.32)] ring-1 ring-black/[0.04] cursor-pointer"
         style={{
           backgroundImage: `radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, ${accentVar} 32%, transparent) 0%, transparent 65%), linear-gradient(180deg, ${softVar} 0%, var(--color-elevated) 75%)`,
         }}
@@ -1801,9 +1816,24 @@ export default function Bible() {
             icon badge rather than a flat divided grid. The badge (filled
             circle, white glyph) matches how every other icon on this page
             is styled — Quick Access, the category tiles — instead of a
-            bare outline icon floating loose in the pill. */}
-        <div
-          className="relative overflow-hidden flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5"
+            bare outline icon floating loose in the pill.
+            Its own real click (stopPropagation so it doesn't also fire
+            the card's toggle-the-book-list click): opens straight into
+            the actual last-read chapter, or chapter 1 of this
+            testament's first book when there's no history yet — "Start
+            reading" should actually start reading, not just expand a
+            list. */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (lastInTestament) {
+              openVerse(lastInTestament.entry.bookSlug, lastInTestament.entry.chapter);
+            } else {
+              const firstBook = id === "old" ? oldTestament[0] : newTestament[0];
+              if (firstBook) openVerse(firstBook.slug, 1);
+            }
+          }}
+          className="relative w-full overflow-hidden flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 active:scale-95 transition-transform"
           style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}
         >
           <span
@@ -1816,12 +1846,12 @@ export default function Bible() {
           >
             <BookOpen size={11} strokeWidth={2.4} className="text-white" />
           </span>
-          <span className="relative flex-1 min-w-0 text-[11px] font-black leading-none truncate" style={{ color: "var(--bible-text)" }}>
+          <span className="relative flex-1 min-w-0 text-[11px] font-black leading-none truncate text-left" style={{ color: "var(--bible-text)" }}>
             {continueLabel}
           </span>
           <ChevronRight size={13} strokeWidth={2.4} className="relative shrink-0" style={{ color: accentVar }} />
-        </div>
-      </button>
+        </button>
+      </div>
     );
   };
 
