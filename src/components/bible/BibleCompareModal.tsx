@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { ChevronDown, Loader2, SlidersHorizontal, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -97,6 +97,7 @@ export default function BibleCompareModal({
   const [rightVersion, setRightVersion] = useState<VersionId>(currentVersion === "am" ? "kjv" : "am");
   const [fontScale, setFontScale] = useState<FontScale>("md");
   const [splitPercent, setSplitPercent] = useState(50);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const selectedVerseSet = new Set(verseIndices);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
@@ -159,30 +160,53 @@ export default function BibleCompareModal({
           </button>
         </div>
         <p className="text-xs text-fg-muted mb-3 truncate">{reference}</p>
-        <div className="flex flex-col gap-2 mb-2.5">
-          <VersionPicker side="Left" value={leftVersion} onChange={setLeftVersion} />
-          <VersionPicker side="Right" value={rightVersion} onChange={setRightVersion} />
-        </div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="w-10 shrink-0 text-[10px] font-bold text-fg-muted uppercase tracking-wide">Size</span>
-          <div className="flex gap-1">
-            {(["sm", "md", "lg"] as FontScale[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setFontScale(s)}
-                className={`shrink-0 px-3 py-1 rounded-full font-bold border transition-colors ${
-                  s === "sm" ? "text-[10px]" : s === "md" ? "text-[12px]" : "text-[14px]"
-                } ${
-                  fontScale === s
-                    ? "bg-[var(--color-gold)] text-black border-transparent"
-                    : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle"
-                }`}
-              >
-                Aa
-              </button>
-            ))}
+
+        {/* One row owns all three settings (left/right version + text size)
+            — tap to expand the full controls, collapsed by default so the
+            reading panes below get the space instead of three permanent
+            rows of chips. */}
+        <button
+          onClick={() => setSettingsOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-border hover:bg-hover transition-colors mb-3"
+        >
+          <span className="flex items-center gap-2 min-w-0 text-[12px] font-bold text-fg">
+            <SlidersHorizontal size={13} className="text-gold shrink-0" />
+            <span className="truncate">
+              {VERSION_SHORT_LABELS[leftVersion]} vs {VERSION_SHORT_LABELS[rightVersion]} · {fontScale.toUpperCase()}
+            </span>
+          </span>
+          <ChevronDown
+            size={15}
+            className={`shrink-0 text-fg-muted transition-transform ${settingsOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {settingsOpen && (
+          <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-elevated-hover/60 ring-1 ring-border mb-3">
+            <VersionPicker side="Left" value={leftVersion} onChange={setLeftVersion} />
+            <VersionPicker side="Right" value={rightVersion} onChange={setRightVersion} />
+            <div className="flex items-center gap-2">
+              <span className="w-10 shrink-0 text-[10px] font-bold text-fg-muted uppercase tracking-wide">Size</span>
+              <div className="flex gap-1">
+                {(["sm", "md", "lg"] as FontScale[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFontScale(s)}
+                    className={`shrink-0 px-3 py-1 rounded-full font-bold border transition-colors ${
+                      s === "sm" ? "text-[10px]" : s === "md" ? "text-[12px]" : "text-[14px]"
+                    } ${
+                      fontScale === s
+                        ? "bg-[var(--color-gold)] text-black border-transparent"
+                        : "border-border text-fg-muted hover:text-fg hover:border-fg-subtle"
+                    }`}
+                  >
+                    Aa
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {chapters === null ? (
