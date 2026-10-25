@@ -68,11 +68,13 @@ export default function BibleModeNav() {
           Mezmur" there is. Black-to-black gradient + a bright gold ring,
           gold "M" — this app's own dark/gold premium look, carried onto
           this one button so it reads as unmistakably "Mezmur" against
-          the Bible section's own purple/green bar around it. */}
+          the Bible section's own purple/green bar around it. Sits level
+          with the other four buttons (no raised/floating offset) — the
+          bar's own `items-center` centers it against their height. */}
       <button
         onClick={() => navigate("/")}
         aria-label="Back to Mezmur"
-        className="relative -mt-7 flex items-center justify-center w-[52px] h-[52px] rounded-full shrink-0 overflow-hidden active:scale-90 transition-transform shadow-lg"
+        className="relative flex items-center justify-center w-[52px] h-[52px] rounded-full shrink-0 overflow-hidden active:scale-90 transition-transform shadow-lg"
         style={{
           backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2b2b2b 0%, #141414 55%, #000000 100%)",
           boxShadow: `0 10px 24px -6px rgba(0,0,0,0.85), inset 0 0 0 1.5px ${gold}`,
