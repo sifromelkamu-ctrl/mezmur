@@ -1797,21 +1797,29 @@ export default function Bible() {
 
         {/* Replaces the old Books/Chapters/Verses stat row — real last-
             read-in-this-testament chapter instead of three static counts,
-            styled as a pill with a soft directional glow behind the
-            accent-colored icon rather than a flat divided grid. */}
+            styled as a pill with a soft directional glow behind a solid
+            icon badge rather than a flat divided grid. The badge (filled
+            circle, white glyph) matches how every other icon on this page
+            is styled — Quick Access, the category tiles — instead of a
+            bare outline icon floating loose in the pill. */}
         <div
-          className="relative overflow-hidden flex items-center justify-center gap-1.5 rounded-full py-1.5 px-2"
+          className="relative overflow-hidden flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5"
           style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}
         >
           <span
             className="absolute -left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full blur-md pointer-events-none"
             style={{ background: `color-mix(in oklab, ${accentVar} 55%, transparent)` }}
           />
-          <BookOpen size={12} className="relative shrink-0" style={{ color: accentVar }} />
-          <span className="relative text-[11px] font-black leading-none truncate" style={{ color: "var(--bible-text)" }}>
+          <span
+            className="relative shrink-0 w-5 h-5 rounded-full flex items-center justify-center shadow-[0_2px_6px_-1px_rgba(0,0,0,0.35)]"
+            style={{ background: accentVar }}
+          >
+            <BookOpen size={11} strokeWidth={2.4} className="text-white" />
+          </span>
+          <span className="relative flex-1 min-w-0 text-[11px] font-black leading-none truncate" style={{ color: "var(--bible-text)" }}>
             {continueLabel}
           </span>
-          <ChevronRight size={12} className="relative shrink-0 text-fg-subtle" />
+          <ChevronRight size={13} strokeWidth={2.4} className="relative shrink-0" style={{ color: accentVar }} />
         </div>
       </button>
     );
