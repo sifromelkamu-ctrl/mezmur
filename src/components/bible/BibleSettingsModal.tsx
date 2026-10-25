@@ -1,6 +1,7 @@
 import { ALargeSmall, Bell, BookOpenText, Languages, Moon, Palette, Sun, Type, X } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { BIBLE_SLEEP_TIMER_LABELS, useBibleAudio, type BibleSleepTimerOption } from "../../context/BibleAudioContext";
 import type { ThemeMode } from "../../context/ThemeContext";
 import {
   ENGLISH_FONT_FAMILY_CLASSES,
@@ -29,6 +30,19 @@ interface BibleSettingsModalProps {
 const SELECTED =
   "bg-[var(--color-gold)] text-black border-transparent font-bold shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4)]";
 const UNSELECTED = "border-border text-fg-muted hover:text-fg hover:border-fg-subtle";
+
+// Duration options first (shortest to longest), "End of current chapter"
+// last — same ordering SleepTimerContext's own music sleep timer uses for
+// its analogous options.
+const BIBLE_SLEEP_TIMER_OPTIONS: BibleSleepTimerOption[] = [
+  "off",
+  "10min",
+  "15min",
+  "30min",
+  "45min",
+  "1hour",
+  "end_of_chapter",
+];
 
 function Section({ icon: Icon, label, children }: { icon: ComponentType<{ size?: number }>; label: string; children: ReactNode }) {
   return (
@@ -66,6 +80,7 @@ export default function BibleSettingsModal({
   onToggleNotifications,
   onClose,
 }: BibleSettingsModalProps) {
+  const { sleepOption, sleepRemainingLabel, setSleepOption } = useBibleAudio();
   return createPortal(
     <div
       className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain p-5 pb-10"
@@ -105,6 +120,30 @@ export default function BibleSettingsModal({
               </span>
             </span>
           </button>
+        </Section>
+
+        <Section icon={Moon} label="የእንቅልፍ ሰዓት · Sleep timer">
+          <p className="text-xs text-fg-muted mb-2.5">
+            Stop listening automatically — picks up again fresh next time, not from where it left off.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {BIBLE_SLEEP_TIMER_OPTIONS.map((o) => (
+              <button
+                key={o}
+                onClick={() => setSleepOption(o)}
+                className={`rounded-md border px-2 py-2.5 text-left transition-colors ${
+                  sleepOption === o ? SELECTED : UNSELECTED
+                }`}
+              >
+                <span className="block text-xs font-bold">{BIBLE_SLEEP_TIMER_LABELS[o]}</span>
+              </button>
+            ))}
+          </div>
+          {sleepOption !== "off" && sleepRemainingLabel && (
+            <p className="text-xs font-semibold mt-2.5" style={{ color: "var(--color-gold-dark)" }}>
+              {sleepRemainingLabel}
+            </p>
+          )}
         </Section>
 
         <Section icon={Languages} label="ቋንቋ · Language">
