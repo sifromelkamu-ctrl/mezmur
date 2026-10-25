@@ -1,4 +1,4 @@
-import { BookOpen, Home, Leaf, Music, Settings2 } from "lucide-react";
+import { BookOpen, Leaf, type LucideIcon, Music, Scroll, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { emitBibleNavAction } from "../lib/bibleNavEvents";
@@ -33,14 +33,18 @@ export default function BibleModeNav() {
   const gold = isLight ? "#f3c969" : "#d4af37";
   const goldGlow = isLight ? "#ffe3a3" : "#e4c765";
 
+  // A scroll, not a house — this is the Bible section's own home, and a
+  // house icon reads as "go to the app's home" (confusable with the
+  // music-note badge, which actually does that). A scroll is unambiguous
+  // about which "home" this one is.
   // OT/NT icons match TESTAMENT_THEME's own old/new icons in Bible.tsx
   // (BookOpen / Leaf) — same real Old/New Testament progress + book list
   // those cards already show, just reachable from the bottom bar too.
-  const items: { id: "home" | "ot"; label: string; icon: typeof Home }[] = [
-    { id: "home", label: "Bible", icon: Home },
+  const items: { id: "home" | "ot"; label: string; icon: LucideIcon }[] = [
+    { id: "home", label: "Bible", icon: Scroll },
     { id: "ot", label: "OT", icon: BookOpen },
   ];
-  const itemsEnd: { id: "nt" | "settings"; label: string; icon: typeof Home }[] = [
+  const itemsEnd: { id: "nt" | "settings"; label: string; icon: LucideIcon }[] = [
     { id: "nt", label: "NT", icon: Leaf },
     { id: "settings", label: "More", icon: Settings2 },
   ];
