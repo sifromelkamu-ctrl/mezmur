@@ -1289,9 +1289,9 @@ export default function Bible() {
               // pages already use to clear that band), keeps it in the same
               // place on screen regardless of scroll position or selection.
               //
-              // Restyled as a light bottom sheet (drag handle, "Selected:
-              // <citation>" header, colors shown inline instead of behind a
-              // toggle) matching the native Bible app's own selection sheet,
+              // Restyled as a light bottom sheet ("Selected: <citation>"
+              // header, colors shown inline instead of behind a toggle)
+              // matching the native Bible app's own selection sheet,
               // in this page's own surface tokens rather than a dark navy/
               // gold floating pill — so it reads as part of the page, not a
               // separately-designed overlay dropped on top of it.
@@ -1300,10 +1300,7 @@ export default function Bible() {
                   className="relative rounded-t-3xl shadow-2xl ring-1 ring-black/[0.06] overflow-hidden"
                   style={{ background: "var(--color-elevated)" }}
                 >
-                  <div className="flex justify-center pt-2 pb-1">
-                    <span className="w-9 h-1 rounded-full bg-fg-subtle/30" />
-                  </div>
-                  <div className="flex items-center justify-between px-4 pb-2">
+                  <div className="flex items-center justify-between px-4 pt-3 pb-2">
                     <p className="text-[11px] font-bold text-fg-muted uppercase tracking-wide truncate">
                       Selected: {selectionCitation}
                     </p>
