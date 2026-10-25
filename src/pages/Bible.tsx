@@ -15,7 +15,6 @@ import {
   Leaf,
   Loader2,
   Pause,
-  ScrollText,
   Search,
   Settings2,
   Share2,
@@ -1429,10 +1428,6 @@ export default function Bible() {
   const newTotalChapters = newTestament.reduce((s, b) => s + b.chapterCount, 0);
   const oldPercent = oldTotalChapters ? Math.round((oldReadCount / oldTotalChapters) * 100) : 0;
   const newPercent = newTotalChapters ? Math.round((newReadCount / newTotalChapters) * 100) : 0;
-  // Standard verse counts (structural facts about the Bible, not per-app
-  // data) — the same figures the reference design's stat footer used.
-  const oldTotalVerses = 23145;
-  const newTotalVerses = 7959;
 
   const openVerse = (slug: string, chapterNum: number, verseIndex: number | null = null) => {
     setActiveModal(null);
@@ -1635,26 +1630,19 @@ export default function Bible() {
         : id === "old"
           ? "ሕግና ነቢያት"
           : "የመሲሁ ትምህርት";
-    const stats = [
-      {
-        icon: Book,
-        value: (id === "old" ? oldTestament.length : newTestament.length).toLocaleString(),
-        label: prefs.language === "en" ? "Books" : "መጻሕፍት",
-        color: "var(--color-gold)",
-      },
-      {
-        icon: ScrollText,
-        value: (id === "old" ? oldTotalChapters : newTotalChapters).toLocaleString(),
-        label: prefs.language === "en" ? "Chapters" : "ምዕራፍ",
-        color: "#C97A46",
-      },
-      {
-        icon: Bookmark,
-        value: (id === "old" ? oldTotalVerses : newTotalVerses).toLocaleString(),
-        label: prefs.language === "en" ? "Verses" : "ጥቅሶች",
-        color: "#CBAE72",
-      },
-    ];
+    // Real last-read chapter in THIS testament (not just overall recent
+    // history — Continuing on the Old Testament card should point at the
+    // Old Testament, even if the very last thing read was in the New) —
+    // falls back to an honest "Start reading" rather than a fabricated
+    // suggestion when there's no history for this testament yet.
+    const lastInTestament = getRecentHistory(30)
+      .map((entry) => ({ entry, book: bookFromSlug(entry.bookSlug) }))
+      .find(({ book }) => book?.testament === id);
+    const continueLabel = lastInTestament
+      ? `${bookDisplayName(lastInTestament.book!, prefs.language)} ${lastInTestament.entry.chapter}`
+      : prefs.language === "en"
+        ? "Start reading"
+        : "ንባብ ጀምር";
     const radius = 26;
     const circumference = 2 * Math.PI * radius;
     const dashOffset = circumference * (1 - percent / 100);
@@ -1699,16 +1687,23 @@ export default function Bible() {
 
         <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1 line-clamp-2">{subtitle}</p>
 
-        <div className="grid grid-cols-3 rounded-xl py-1" style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}>
-          {stats.map((s, i) => (
-            <div key={s.label} className={`flex flex-col items-center gap-0.5 ${i > 0 ? "border-l border-black/10" : ""}`}>
-              <s.icon size={12} style={{ color: s.color }} />
-              <span className="text-xs font-black leading-none" style={{ color: "var(--bible-text)" }}>
-                {s.value}
-              </span>
-              <span className="text-[7px] font-bold uppercase tracking-wide text-fg-subtle">{s.label}</span>
-            </div>
-          ))}
+        {/* Replaces the old Books/Chapters/Verses stat row — real last-
+            read-in-this-testament chapter instead of three static counts,
+            styled as a pill with a soft directional glow behind the
+            accent-colored icon rather than a flat divided grid. */}
+        <div
+          className="relative overflow-hidden flex items-center justify-center gap-1.5 rounded-full py-1.5 px-2"
+          style={{ background: `color-mix(in oklab, ${accentDeepVar} 18%, transparent)` }}
+        >
+          <span
+            className="absolute -left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full blur-md pointer-events-none"
+            style={{ background: `color-mix(in oklab, ${accentVar} 55%, transparent)` }}
+          />
+          <BookOpen size={12} className="relative shrink-0" style={{ color: accentVar }} />
+          <span className="relative text-[11px] font-black leading-none truncate" style={{ color: "var(--bible-text)" }}>
+            {continueLabel}
+          </span>
+          <ChevronRight size={12} className="relative shrink-0 text-fg-subtle" />
         </div>
       </button>
     );
