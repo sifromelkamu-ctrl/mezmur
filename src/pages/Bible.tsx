@@ -1157,7 +1157,9 @@ export default function Bible() {
                         return next;
                       })
                     }
-                    className={`${FONT_SIZE_CLASSES[prefs.fontSize]} ${
+                    // Suppresses the WebView's native selection callout so only our bottom sheet shows.
+                    style={{ WebkitTouchCallout: "none" } as CSSProperties}
+                    className={`select-none ${FONT_SIZE_CLASSES[prefs.fontSize]} ${
                       prefs.language === "en" ? ENGLISH_FONT_FAMILY_CLASSES[prefs.englishFontFamily] : FONT_FAMILY_CLASSES[prefs.fontFamily]
                     } text-fg leading-loose cursor-pointer rounded-xl px-3 -mx-1.5 py-2 transition-all duration-200 ${
                       highlightMeta ? highlightMeta.bg : "hover:bg-hover"
