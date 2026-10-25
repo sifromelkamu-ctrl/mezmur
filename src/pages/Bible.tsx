@@ -1270,9 +1270,6 @@ export default function Bible() {
               return annotations[k]?.favorite;
             });
             const sortedSelection = [...selectedVerses].sort((a, b) => a - b);
-            const selectionCitation = book
-              ? `${bookDisplayName(book, prefs.language)} ${chapter}:${formatVerseNumbers(sortedSelection)}`
-              : "";
             return (
               // `fixed`, not `sticky`: this used to sit inside <main>'s own
               // scroll box, and since <main> spans the full viewport height
@@ -1289,34 +1286,29 @@ export default function Bible() {
               // pages already use to clear that band), keeps it in the same
               // place on screen regardless of scroll position or selection.
               //
-              // Restyled as a light bottom sheet ("Selected: <citation>"
-              // header, colors shown inline instead of behind a toggle)
-              // matching the native Bible app's own selection sheet,
-              // in this page's own surface tokens rather than a dark navy/
-              // gold floating pill — so it reads as part of the page, not a
-              // separately-designed overlay dropped on top of it.
+              // Restyled as a light bottom sheet (colors shown inline
+              // instead of behind a toggle) matching the native Bible app's
+              // own selection sheet, in this page's own surface tokens
+              // rather than a dark navy/gold floating pill — so it reads as
+              // part of the page, not a separately-designed overlay dropped
+              // on top of it. No citation header: the action row is the
+              // whole sheet, with only a small floating close button.
               <div className="fixed inset-x-0 z-20 px-3 max-w-2xl mx-auto" style={{ bottom: BOTTOM_RESERVE_PX }}>
                 <div
                   className="relative rounded-t-3xl shadow-2xl ring-1 ring-black/[0.06] overflow-hidden"
                   style={{ background: "var(--color-elevated)" }}
                 >
-                  <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                    <p className="text-[11px] font-bold text-fg-muted uppercase tracking-wide truncate">
-                      Selected: {selectionCitation}
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSelectedVerses(new Set());
-                        setShowHighlightColors(false);
-                      }}
-                      aria-label="Cancel selection"
-                      className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors -mr-1"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                  <div className="border-t border-border" />
-                  <div className="flex items-end gap-1 px-2 pt-2.5 pb-3 overflow-x-auto no-scrollbar">
+                  <button
+                    onClick={() => {
+                      setSelectedVerses(new Set());
+                      setShowHighlightColors(false);
+                    }}
+                    aria-label="Cancel selection"
+                    className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded-full text-fg-subtle hover:text-fg hover:bg-hover transition-colors"
+                  >
+                    <X size={13} />
+                  </button>
+                  <div className="flex items-end gap-1 px-2 pt-3 pb-3 overflow-x-auto no-scrollbar">
                     {/* Condensed into one "Highlight" button, same shape as
                         every other action here, until tapped — then it
                         expands in place into the real color swatches.
