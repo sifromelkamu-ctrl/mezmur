@@ -65,43 +65,41 @@ export default function BibleModeNav() {
         </button>
       ))}
 
-      {/* Center action — back to the main Mezmur app. A music note instead
-          of the "M" wordmark letter — Mezmur is a music app first, so the
-          note is a more direct "this is the music app" than a monogram.
-          Black-to-black gradient + a bright gold ring, gold note — this
-          app's own dark/gold premium look, carried onto this one button
-          so it reads as unmistakably "Mezmur" against the Bible section's
-          own purple/green bar around it.
-          Same flex-1/icon+label button shape as the other four (badge is
-          now a plain <span>, not a nested button, with the outer button
-          carrying the click + active-scale) — "Home" underneath reads the
-          same way "Bible"/"OT"/"NT"/"More" do, just with a styled badge
-          in place of a bare icon. Sized to the row's own natural icon
-          height (44px) so it doesn't dwarf the real icons next to it. */}
+      {/* Center action — back to the main Mezmur app. Just the note badge,
+          no "Home" caption underneath — the icon alone is the point, not
+          a labeled nav item like the other four. Black-to-black gradient,
+          a bright gold ring, an outer gold halo, and a glossy top
+          highlight — this app's own dark/gold premium look, built up
+          further now that it isn't sharing its slot with a text label,
+          so it reads as a crafted emblem rather than just another nav
+          icon. */}
       <button
         onClick={() => navigate("/")}
         aria-label="Back to Mezmur"
-        className="flex-1 flex flex-col items-center gap-[2.5px] py-1.5 rounded-2xl active:scale-[0.94] transition-transform"
+        className="relative flex-1 flex items-center justify-center py-1.5 active:scale-90 transition-transform"
       >
         <span
-          className="relative flex items-center justify-center w-11 h-11 rounded-full shrink-0 overflow-hidden shadow-lg"
+          className="absolute w-14 h-14 rounded-full pointer-events-none"
+          style={{ background: `radial-gradient(circle, ${goldGlow}33 0%, transparent 70%)` }}
+        />
+        <span
+          className="relative flex items-center justify-center w-12 h-12 rounded-full shrink-0 overflow-hidden"
           style={{
-            backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2b2b2b 0%, #141414 55%, #000000 100%)",
-            boxShadow: `0 8px 20px -6px rgba(0,0,0,0.85), inset 0 0 0 1.5px ${gold}`,
+            backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2f2f2f 0%, #161616 55%, #000000 100%)",
+            boxShadow: `0 10px 22px -6px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.4), inset 0 0 0 1.5px ${gold}, inset 0 0 0 2.5px rgba(0,0,0,0.5)`,
           }}
         >
           <span
             className="absolute inset-x-1 top-0.5 h-1/2 rounded-full pointer-events-none"
-            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.18), transparent)" }}
+            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.22), transparent)" }}
           />
           <Music
-            size={19}
+            size={20}
             strokeWidth={2}
             className="relative"
-            style={{ color: gold, filter: `drop-shadow(0 0 6px ${goldGlow}66) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}
+            style={{ color: gold, filter: `drop-shadow(0 0 7px ${goldGlow}80) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}
           />
         </span>
-        <span className="text-[11px] font-semibold text-fg-subtle">Home</span>
       </button>
 
       {itemsEnd.map(({ id, label, icon: Icon }) => (
