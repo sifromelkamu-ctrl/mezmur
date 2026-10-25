@@ -202,21 +202,110 @@ function dailyHeroImageIndexFor(date: Date): number {
   return hash % HERO_IMAGES.length;
 }
 
-// A distinct, thematically-chosen cover photo per curated book (not the
-// same HERO_IMAGES set reused elsewhere on this page) — each picked to
-// actually evoke its book: light through trees for Genesis' creation,
-// a shepherd's flock for Psalms, scripture by candlelight for Proverbs'
-// wisdom, a dove for John, a fishing boat for Matthew calling fishermen,
-// literal Roman ruins for Romans, a dramatic sky for Revelation. `position`
-// overrides the default center crop for photos whose subject sits low in
-// frame, so it isn't cropped out of the small square tile.
+// Picks `count` books out of all 66 for the Books carousel, reshuffled
+// once per calendar day (same mix32 day-seeding dailyVerseIndexFor uses,
+// salted differently so the two don't cycle together) rather than a fixed
+// handful forever — the row only fits so many at once, but which books
+// land in it changes daily, so most of the 66 surface over time instead
+// of the same 7 every single day.
+function dailyBookSlugsFor(date: Date, count: number): string[] {
+  const daySeed = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+  return [...BIBLE_BOOKS]
+    .map((b, i) => ({ slug: b.slug, rank: mix32(daySeed * 131 + i * 977) }))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, count)
+    .map((b) => b.slug);
+}
+
+// A thematically-chosen cover photo for every one of the 66 books (not
+// just a curated handful) — the 7 with their own `/bible/books/` photo
+// were each picked to directly evoke that specific book (light through
+// trees for Genesis' creation, a shepherd's flock for Psalms, scripture
+// by candlelight for Proverbs' wisdom, a dove for John, a fishing boat
+// for Matthew calling fishermen, literal Roman ruins for Romans, a
+// dramatic sky for Revelation). Every other book reuses the closest fit
+// already in HERO_IMAGES by theme/genre (e.g. wilderness photos for the
+// wandering-in-the-desert books, a storm for Jonah, ancient
+// Jerusalem for the kingdom-history books, a scroll for the epistles)
+// rather than one generic photo repeated 59 times. `position` overrides
+// the default center crop for photos whose subject sits low in frame.
 const BOOK_COVER_PHOTOS: Record<string, { src: string; position?: string }> = {
+  // Pentateuch
   genesis: { src: "/bible/books/genesis.jpg" },
+  exodus: { src: "/bible/hero/desert-dunes-sunset.jpg" },
+  leviticus: { src: "/bible/hero/ancient-papyrus-scroll.jpg" },
+  numbers: { src: "/bible/hero/desert-night-milkyway.jpg" },
+  deuteronomy: { src: "/bible/hero/rocky-desert-storm.jpg" },
+  // Historical books
+  joshua: { src: "/bible/hero/jerusalem-old-city.jpg" },
+  judges: { src: "/bible/hero/rocky-desert-storm.jpg" },
+  ruth: { src: "/bible/hero/wheat-sheaves-harvest.jpg" },
+  "1-samuel": { src: "/bible/hero/shepherd-staff-rural.jpg" },
+  "2-samuel": { src: "/bible/hero/jerusalem-old-city.jpg" },
+  "1-kings": { src: "/bible/hero/church-wooden-doors-carved.jpg" },
+  "2-kings": { src: "/bible/hero/jerusalem-old-city.jpg" },
+  "1-chronicles": { src: "/bible/hero/ancient-papyrus-scroll.jpg" },
+  "2-chronicles": { src: "/bible/hero/church-interior-wooden-pews.jpg" },
+  ezra: { src: "/bible/hero/ancient-papyrus-scroll.jpg" },
+  nehemiah: { src: "/bible/hero/jerusalem-old-city.jpg" },
+  esther: { src: "/bible/hero/candlelight-vigil-street.jpg" },
+  // Wisdom / poetry
+  job: { src: "/bible/hero/lightning-purple-sky.jpg" },
   psalms: { src: "/bible/books/psalms.jpg", position: "center 85%" },
   proverbs: { src: "/bible/books/proverbs.jpg" },
-  john: { src: "/bible/books/john.jpg" },
+  ecclesiastes: { src: "/bible/hero/window-light-curtain-room.jpg" },
+  "song-of-solomon": { src: "/bible/hero/pink-dahlias-garden.jpg" },
+  // Major prophets
+  isaiah: { src: "/bible/hero/dramatic-sunrise-clouds.jpg" },
+  jeremiah: { src: "/bible/hero/rain-window-bokeh.jpg" },
+  lamentations: { src: "/bible/hero/misty-autumn-path.jpg" },
+  ezekiel: { src: "/bible/hero/aurora-norway.jpg" },
+  daniel: { src: "/bible/hero/starry-night-galaxy.jpg" },
+  // Minor prophets
+  hosea: { src: "/bible/hero/wheat-field-sunrise-poland.jpg" },
+  joel: { src: "/bible/hero/rocky-desert-storm.jpg" },
+  amos: { src: "/bible/hero/golden-wheat-closeup-summer.jpg" },
+  obadiah: { src: "/bible/hero/mountain-cross-sunrise.jpg" },
+  jonah: { src: "/bible/hero/ocean-waves-rocks.jpg" },
+  micah: { src: "/bible/hero/rolling-green-hills-sky.jpg" },
+  nahum: { src: "/bible/hero/lightning-purple-sky.jpg" },
+  habakkuk: { src: "/bible/hero/misty-mountain-valley.jpg" },
+  zephaniah: { src: "/bible/hero/dramatic-sunrise-clouds.jpg" },
+  haggai: { src: "/bible/hero/church-wooden-doors-carved.jpg" },
+  zechariah: { src: "/bible/hero/starry-night-galaxy.jpg" },
+  malachi: { src: "/bible/hero/golden-sunset-sky.jpg" },
+  // Gospels
   matthew: { src: "/bible/books/matthew.jpg", position: "center 90%" },
+  mark: { src: "/bible/hero/fishermen-nets-sunrise-sea.jpg" },
+  luke: { src: "/bible/hero/praying-silhouette-sunset.jpg" },
+  john: { src: "/bible/books/john.jpg" },
+  // Acts
+  acts: { src: "/bible/hero/olive-grove-mediterranean.jpg" },
+  // Pauline epistles
   romans: { src: "/bible/books/romans.jpg" },
+  "1-corinthians": { src: "/bible/hero/ancient-papyrus-scroll.jpg" },
+  "2-corinthians": { src: "/bible/hero/coastline-waves-cliffs.jpg" },
+  galatians: { src: "/bible/hero/rolling-green-hills-sky.jpg" },
+  ephesians: { src: "/bible/hero/stained-glass-cathedral.jpg" },
+  philippians: { src: "/bible/hero/candle-flame-dark.jpg" },
+  colossians: { src: "/bible/hero/forest-canopy-rays.jpg" },
+  "1-thessalonians": { src: "/bible/hero/starry-night-galaxy.jpg" },
+  "2-thessalonians": { src: "/bible/hero/dramatic-sunrise-clouds.jpg" },
+  // Pastoral epistles
+  "1-timothy": { src: "/bible/hero/hands-holding-bible.jpg" },
+  "2-timothy": { src: "/bible/hero/candle-flame-dark.jpg" },
+  titus: { src: "/bible/hero/church-interior-wooden-pews.jpg" },
+  philemon: { src: "/bible/hero/hand-reaching-sunlight.jpg" },
+  // General epistles
+  hebrews: { src: "/bible/hero/church-wooden-doors-carved.jpg" },
+  james: { src: "/bible/hero/wheat-stalks-bundle-ribbon.jpg" },
+  "1-peter": { src: "/bible/hero/lighthouse-storm.jpg" },
+  "2-peter": { src: "/bible/hero/starry-night-galaxy.jpg" },
+  "1-john": { src: "/bible/hero/dove-earth-olive-branch.jpg" },
+  "2-john": { src: "/bible/hero/hands-holding-bible.jpg" },
+  "3-john": { src: "/bible/hero/hands-holding-bible.jpg" },
+  jude: { src: "/bible/hero/lightning-purple-sky.jpg" },
+  // Apocalyptic
   revelation: { src: "/bible/books/revelation.jpg" },
 };
 
@@ -316,6 +405,16 @@ export default function Bible() {
 
   const book = BIBLE_BOOKS.find((b) => b.slug === bookSlug) ?? null;
   const verses = chapter ? bookText?.[chapter] : undefined;
+
+  // 14 of the 66 books, reshuffled daily (dailyBookSlugsFor) — the Books
+  // carousel row can't fit more than a handful at once, but which handful
+  // changes each day instead of showing the same 7 forever, so most of
+  // the 66 surface in rotation rather than being permanently hidden.
+  // Declared here (before this component's several early `return`s below)
+  // rather than down by CATEGORY_TILES — a Hook can't be called
+  // conditionally, and that spot only runs on the branch that reaches the
+  // final, non-early-return JSX.
+  const booksOfTheDay = useMemo(() => dailyBookSlugsFor(new Date(), 14), []);
 
   // Search across every chapter of the currently open book — bookText already
   // holds the whole book client-side, so no extra fetching is needed. Can be
@@ -1968,9 +2067,9 @@ export default function Bible() {
         </div>
       </div>
 
-      {/* Books — a curated set of commonly-read books, not a ranked
-          "Popular Books" list (there's no real popularity/read-count data
-          to rank by — see bibleReadingHistory.ts). */}
+      {/* Books — 14 of the 66, reshuffled daily (booksOfTheDay), not a
+          ranked "Popular Books" list (there's no real popularity/read-
+          count data to rank by — see bibleReadingHistory.ts). */}
       <div className="mb-1.5">
         <div className="flex items-center gap-2 mb-2">
           <Book size={16} style={{ color: "var(--color-gold-dark)" }} />
@@ -1979,7 +2078,7 @@ export default function Bible() {
           </h2>
         </div>
         <div className="flex gap-3 overflow-x-auto overscroll-x-contain no-scrollbar pb-0.5">
-          {["genesis", "psalms", "proverbs", "john", "matthew", "romans", "revelation"].map((slug) => {
+          {booksOfTheDay.map((slug) => {
             const b = bookFromSlug(slug);
             if (!b) return null;
             const cover = BOOK_COVER_PHOTOS[slug];
