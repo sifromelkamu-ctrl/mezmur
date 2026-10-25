@@ -1,4 +1,4 @@
-import { BookOpen, Home, Leaf, Settings2 } from "lucide-react";
+import { BookOpen, Home, Leaf, Music, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { emitBibleNavAction } from "../lib/bibleNavEvents";
@@ -61,12 +61,13 @@ export default function BibleModeNav() {
         </button>
       ))}
 
-      {/* Center action — back to the main Mezmur app. The same "M"
-          wordmark letter the Bible home header's own avatar badge uses
-          (Bible.tsx). Black-to-black gradient + a bright gold ring, gold
-          "M" — this app's own dark/gold premium look, carried onto this
-          one button so it reads as unmistakably "Mezmur" against the
-          Bible section's own purple/green bar around it.
+      {/* Center action — back to the main Mezmur app. A music note instead
+          of the "M" wordmark letter — Mezmur is a music app first, so the
+          note is a more direct "this is the music app" than a monogram.
+          Black-to-black gradient + a bright gold ring, gold note — this
+          app's own dark/gold premium look, carried onto this one button
+          so it reads as unmistakably "Mezmur" against the Bible section's
+          own purple/green bar around it.
           Wrapped in its own flex-1 slot (same as the other four) rather
           than a fixed shrink-0 width, so it claims an equal fifth of the
           row's width and its circle centers inside that — true 5-column
@@ -88,12 +89,12 @@ export default function BibleModeNav() {
             className="absolute inset-x-1 top-0.5 h-1/2 rounded-full pointer-events-none"
             style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.18), transparent)" }}
           />
-          <span
-            className="relative font-playfair font-bold text-base"
-            style={{ color: gold, textShadow: `0 0 8px ${goldGlow}66, 0 1px 4px rgba(0,0,0,0.6)` }}
-          >
-            M
-          </span>
+          <Music
+            size={19}
+            strokeWidth={2}
+            className="relative"
+            style={{ color: gold, filter: `drop-shadow(0 0 6px ${goldGlow}66) drop-shadow(0 1px 3px rgba(0,0,0,0.6))` }}
+          />
         </button>
       </div>
 
