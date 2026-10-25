@@ -1774,7 +1774,14 @@ export default function Bible() {
           </span>
         </div>
 
-        <p className="relative font-abyssinica text-xl font-black leading-tight" style={{ color: "var(--bible-text)" }}>
+        {/* font-agbalumo — the same display font this page's own Bible
+            modals (BibleListModal/BibleCompareModal/BibleSettingsModal
+            titles) already use for a premium look, swapped in here for
+            the testament name instead of the plain reading font
+            (Abyssinica) every verse of body text uses. Colored with this
+            card's own accent (purple/green) rather than those modals'
+            flat gold, so Old/New stay visually distinct from each other. */}
+        <p className="relative font-agbalumo text-xl font-bold leading-tight" style={{ color: accentVar }}>
           {theme.label}
         </p>
 
@@ -1784,7 +1791,9 @@ export default function Bible() {
           <span className="h-px w-6" style={{ background: accentVar }} />
         </div>
 
-        <p className="font-abyssinica font-bold text-xs leading-snug text-fg-muted px-1 mb-1 line-clamp-2">{subtitle}</p>
+        <p className="font-abyssinica font-semibold text-[11px] uppercase tracking-wide leading-snug text-fg-muted px-1 mb-1 line-clamp-2">
+          {subtitle}
+        </p>
 
         {/* Replaces the old Books/Chapters/Verses stat row — real last-
             read-in-this-testament chapter instead of three static counts,
