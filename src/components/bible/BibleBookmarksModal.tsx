@@ -1,10 +1,10 @@
-import { X } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { BIBLE_BOOKS } from "../../data/bibleBooks";
 import type { HighlightColor } from "../../utils/bibleAnnotations";
 import type { BibleLanguage, EnglishVersion } from "../../utils/bibleReadingPrefs";
 import { fetchVerseText } from "../../utils/bibleVerseLookup";
+import BibleModalShell from "./BibleModalShell";
 
 export interface BookmarkEntry {
   key: string;
@@ -40,7 +40,9 @@ interface BibleBookmarksModalProps {
 // colored highlight, so showing the real color the reader picked is more
 // honest than recoloring it to match a generic "bookmarks" brand color —
 // with the real verse text (fetched on open, see bibleVerseLookup.ts)
-// striped underneath like a literal highlighter mark across the page.
+// striped underneath like a literal highlighter mark across the page. The
+// shell's own header/empty-state chrome uses purple throughout, matching
+// this action's color on the Quick Access row itself.
 export default function BibleBookmarksModal({ entries, language, englishVersion, onOpenVerse, onClose }: BibleBookmarksModalProps) {
   const [verseTexts, setVerseTexts] = useState<Record<string, string | null>>({});
   const cacheRef = useRef<Map<string, Record<string, string[]> | null>>(new Map());
@@ -60,64 +62,46 @@ export default function BibleBookmarksModal({ entries, language, englishVersion,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, language, englishVersion]);
 
-  return createPortal(
-    <div
-      className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain"
-      style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.25rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+  return (
+    <BibleModalShell
+      icon={Bookmark}
+      title="Bookmarks"
+      count={entries.length}
+      countLabel={{ singular: "passage", plural: "passages" }}
+      accent="var(--bible-purple)"
+      accentSoft="var(--bible-purple-soft)"
+      emptyIcon={Bookmark}
+      emptyLabel="እስካሁን ምንም ምልክት አልተደረገም።"
+      onClose={onClose}
     >
-      <div className="max-w-2xl mx-auto px-5">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-agbalumo text-2xl font-bold text-gold leading-none">Bookmarks</h2>
-            <p className="text-xs text-fg-muted mt-1">
-              {entries.length} {entries.length === 1 ? "passage" : "passages"}
-            </p>
-          </div>
+      {entries.map((entry) => {
+        const book = BIBLE_BOOKS.find((b) => b.slug === entry.bookSlug);
+        const citation = `${book?.nameAm ?? entry.bookSlug} ${entry.chapter}:${entry.verseIndex + 1}`;
+        const verseText = verseTexts[entry.key];
+        const accent = COLOR_HEX[entry.color];
+        return (
           <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-hover transition-colors"
-            aria-label="Close"
+            key={entry.key}
+            onClick={() => onOpenVerse(entry.bookSlug, entry.chapter, entry.verseIndex)}
+            className="relative w-full text-left rounded-2xl pl-4 pr-3 py-3.5 overflow-hidden shadow-[0_10px_28px_-18px_rgba(0,0,0,0.4)] ring-1 ring-black/[0.05] active:scale-[0.98] transition-transform"
+            style={{ background: "var(--color-elevated)" }}
           >
-            <X size={18} />
+            <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: accent }} />
+            <div className="relative flex items-center gap-2 mb-1.5">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: accent }} />
+              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: accent }}>
+                {citation}
+              </span>
+            </div>
+            <p
+              className="relative font-abyssinica text-[0.95rem] leading-snug text-fg rounded-lg px-1 -mx-1 py-0.5"
+              style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)` }}
+            >
+              {verseText ?? "..."}
+            </p>
           </button>
-        </div>
-
-        {entries.length === 0 ? (
-          <p className="text-sm text-fg-muted py-16 text-center">እስካሁን ምንም ምልክት አልተደረገም።</p>
-        ) : (
-          <div className="space-y-3">
-            {entries.map((entry) => {
-              const book = BIBLE_BOOKS.find((b) => b.slug === entry.bookSlug);
-              const citation = `${book?.nameAm ?? entry.bookSlug} ${entry.chapter}:${entry.verseIndex + 1}`;
-              const verseText = verseTexts[entry.key];
-              const accent = COLOR_HEX[entry.color];
-              return (
-                <button
-                  key={entry.key}
-                  onClick={() => onOpenVerse(entry.bookSlug, entry.chapter, entry.verseIndex)}
-                  className="relative w-full text-left rounded-2xl pl-4 pr-3 py-3.5 overflow-hidden shadow-[0_10px_28px_-18px_rgba(0,0,0,0.4)] ring-1 ring-black/[0.05] active:scale-[0.98] transition-transform"
-                  style={{ background: "var(--color-elevated)" }}
-                >
-                  <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: accent }} />
-                  <div className="relative flex items-center gap-2 mb-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: accent }} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: accent }}>
-                      {citation}
-                    </span>
-                  </div>
-                  <p
-                    className="relative font-abyssinica text-[0.95rem] leading-snug text-fg rounded-lg px-1 -mx-1 py-0.5"
-                    style={{ background: `color-mix(in oklab, ${accent} 16%, transparent)` }}
-                  >
-                    {verseText ?? "..."}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body
+        );
+      })}
+    </BibleModalShell>
   );
 }
