@@ -4,6 +4,7 @@ import { readdir } from "node:fs/promises";
 import { existsSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { notifyAdminsPush } from "../push.js";
 import { CancelledImportError, GENERIC_IMPORT_ERROR, isInternalErrorMessage } from "./safeError.js";
 
 // Optional: a real YouTube account's cookies (Netscape cookies.txt format,
@@ -183,6 +184,39 @@ export class YtDlpError extends Error {
   }
 }
 
+// The one substring yt-dlp's error consistently carries when YouTube's
+// bot-check blocks the request (see the cookiesArgs comment above) — this
+// is the specific, actionable condition ("cookies are missing or stale"),
+// distinct from every other yt-dlp content error (deleted video, geo-block,
+// copyright claim, ...) that isn't fixed by touching cookies at all.
+const BOT_CHECK_SIGNATURE = "Sign in to confirm you're not a bot";
+
+export function isBotCheckError(message: string): boolean {
+  return message.includes(BOT_CHECK_SIGNATURE);
+}
+
+// A stale/missing cookie blocks every single video in a catalog batch —
+// without a cooldown, a 50-video playlist failing one-by-one would fire 50
+// pushes back to back. One push per window instead, however many imports
+// hit it in the meantime. Also doubles as the proactive canary's own alert
+// path (jobs/youtubeCookieHealth.ts calls fetchYoutubeMetadata on a
+// schedule against a known-stable video — its failure funnels through this
+// same toYtDlpError, so a dead cookie gets caught and reported even on a
+// day nobody happens to run an import).
+const BOT_CHECK_NOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+let lastBotCheckNotifyAt = 0;
+
+function notifyAdminsOfBotCheckIfDue(): void {
+  const now = Date.now();
+  if (now - lastBotCheckNotifyAt < BOT_CHECK_NOTIFY_COOLDOWN_MS) return;
+  lastBotCheckNotifyAt = now;
+  void notifyAdminsPush({
+    title: "YouTube import blocked — cookies needed",
+    body: "YouTube's bot-check is blocking downloads. Export fresh cookies and update YTDLP_COOKIES_B64 on Render (see README's Gotcha note).",
+    url: "/#/admin/youtube-catalog-import",
+  });
+}
+
 // Every yt-dlp invocation funnels its failure through here. The message
 // stored on a job row / returned to the client is always short (yt-dlp's
 // own last stderr line, or a generic fallback for OS/environment failures —
@@ -204,6 +238,9 @@ function toYtDlpError(rawStderr: string, rawStdout: string, exitCode: number | n
       `stderr:\n${rawStderr.trim() || "(empty)"}` +
       (rawStdout.trim() ? `\nstdout:\n${rawStdout.trim()}` : "")
   );
+  if (isBotCheckError(message)) {
+    notifyAdminsOfBotCheckIfDue();
+  }
   if (isInternalErrorMessage(message)) {
     return new YtDlpError(GENERIC_IMPORT_ERROR);
   }

@@ -30,6 +30,7 @@ import { resumeAllInterrupted } from "./youtube/catalogWorker.js";
 import { resumeAllInterrupted as resumeAllInterruptedTelegram } from "./telegram/worker.js";
 import { startDailyVersePushSchedule } from "./jobs/dailyVerse.js";
 import { startPickedForYouPushSchedule } from "./jobs/pickedForYou.js";
+import { startYoutubeCookieHealthSchedule } from "./jobs/youtubeCookieHealth.js";
 
 // Backstop for the whole process. Without this, any unhandled promise
 // rejection anywhere — including in fire-and-forget background work like
@@ -131,3 +132,4 @@ resumeAllInterruptedTelegram().catch((err) => {
 
 startDailyVersePushSchedule();
 startPickedForYouPushSchedule();
+startYoutubeCookieHealthSchedule();
