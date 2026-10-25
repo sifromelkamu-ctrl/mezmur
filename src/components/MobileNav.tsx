@@ -34,10 +34,10 @@ function NavIcon({
   // 48px size, same radial gradient-depth + glossy top highlight + glow
   // shadow) rather than the flat single-tone fill this used to be, so the
   // one active icon across either bottom bar reads as the same crafted
-  // badge. Ocean teal instead of brand purple — this app's own established
-  // premium teal (the same #2dd4bf/#14b8a6/#0f8f7e family NowPlaying's
-  // background and SplashScreen already use), not a new color introduced
-  // just for this badge.
+  // badge. Deep Emerald instead of brand purple/ocean teal — the exact
+  // brand/brandDark/brandGlow hex this app's own "Deep Emerald" accent
+  // theme preset already uses (ThemeContext.tsx's ACCENT_THEMES), not a
+  // new color invented just for this badge.
   return (
     <span className="flex flex-col items-center justify-center gap-[2.5px]">
       <span
@@ -45,8 +45,8 @@ function NavIcon({
         style={
           isActive
             ? {
-                backgroundImage: "radial-gradient(120% 120% at 30% 20%, #2dd4bf 0%, #14b8a6 55%, #0f8f7e 100%)",
-                boxShadow: "0 8px 20px -6px rgba(20,184,166,0.55), inset 0 0 0 1px rgba(255,255,255,0.25)",
+                backgroundImage: "radial-gradient(120% 120% at 30% 20%, #34d399 0%, #059669 55%, #047857 100%)",
+                boxShadow: "0 8px 20px -6px rgba(5,150,105,0.55), inset 0 0 0 1px rgba(255,255,255,0.25)",
               }
             : undefined
         }
