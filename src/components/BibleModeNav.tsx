@@ -37,7 +37,7 @@ export default function BibleModeNav() {
   // (BookOpen / Leaf) — same real Old/New Testament progress + book list
   // those cards already show, just reachable from the bottom bar too.
   const items: { id: "home" | "ot"; label: string; icon: typeof Home }[] = [
-    { id: "home", label: "Home", icon: Home },
+    { id: "home", label: "Bible", icon: Home },
     { id: "ot", label: "OT", icon: BookOpen },
   ];
   const itemsEnd: { id: "nt" | "settings"; label: string; icon: typeof Home }[] = [
