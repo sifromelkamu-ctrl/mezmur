@@ -70,10 +70,11 @@ function VersionPicker({
 
 // Every version this reader has data for (Amharic + the four public-domain
 // English translations — see bibleReadingPrefs.ts's own note on why no
-// modern/copyrighted translation like NIV is bundled) fetched once, then
-// shown two at a time in a split-screen layout — pick any version per side,
-// each side scrolling independently — rather than all five stacked in one
-// long list.
+// modern/copyrighted translation like NIV is bundled) fetched once for the
+// *whole* chapter, then shown two at a time in a split-screen layout — pick
+// any version per side, each side scrolling independently — with the
+// verse(s) the reader originally selected picked out so they stay oriented
+// while reading the chapter around them for context.
 export default function BibleCompareModal({
   bookSlug,
   chapter,
@@ -83,14 +84,14 @@ export default function BibleCompareModal({
   englishVersion,
   onClose,
 }: BibleCompareModalProps) {
-  const [texts, setTexts] = useState<Record<VersionId, string | null> | null>(null);
+  const [chapters, setChapters] = useState<Record<VersionId, string[] | null> | null>(null);
   const currentVersion: VersionId = language === "am" ? "am" : englishVersion;
   const [leftVersion, setLeftVersion] = useState<VersionId>(currentVersion);
   const [rightVersion, setRightVersion] = useState<VersionId>(currentVersion === "am" ? "kjv" : "am");
+  const selectedVerseSet = new Set(verseIndices);
 
   useEffect(() => {
     let cancelled = false;
-    const sorted = [...verseIndices].sort((a, b) => a - b);
 
     const load = async () => {
       const targets = VERSION_ORDER.map((id) => ({
@@ -100,18 +101,16 @@ export default function BibleCompareModal({
       const settled = await Promise.all(
         targets.map(async (t) => {
           const data = await fetchBookOrNull(t.path);
-          const verses = data?.[chapter];
-          const text = verses ? sorted.map((i) => verses[i]).filter(Boolean).join(" ") : null;
-          return [t.id, text || null] as const;
+          return [t.id, data?.[chapter] ?? null] as const;
         })
       );
-      if (!cancelled) setTexts(Object.fromEntries(settled) as Record<VersionId, string | null>);
+      if (!cancelled) setChapters(Object.fromEntries(settled) as Record<VersionId, string[] | null>);
     };
     load();
     return () => {
       cancelled = true;
     };
-  }, [bookSlug, chapter, verseIndices]);
+  }, [bookSlug, chapter]);
 
   return createPortal(
     <div
@@ -136,7 +135,7 @@ export default function BibleCompareModal({
         </div>
       </div>
 
-      {texts === null ? (
+      {chapters === null ? (
         <div className="flex-1 flex items-center justify-center text-fg-muted">
           <Loader2 size={22} className="animate-spin" />
         </div>
@@ -145,21 +144,42 @@ export default function BibleCompareModal({
           className="flex-1 min-h-0 flex gap-2 px-5 pb-5"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}
         >
-          {[leftVersion, rightVersion].map((id, i) => (
-            <div
-              key={`${id}-${i}`}
-              className="flex-1 min-w-0 flex flex-col rounded-2xl bg-elevated-hover/60 ring-1 ring-border overflow-hidden"
-            >
-              <p className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-gold px-3 pt-3 pb-1.5">
-                {VERSION_LABELS[id]}
-              </p>
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
-                <p className="text-[0.9rem] leading-relaxed text-fg">
-                  {texts[id] ?? <span className="text-fg-subtle italic">Not available for this book.</span>}
+          {[leftVersion, rightVersion].map((id, i) => {
+            const verses = chapters[id];
+            return (
+              <div
+                key={`${id}-${i}`}
+                className="flex-1 min-w-0 flex flex-col rounded-2xl bg-elevated-hover/60 ring-1 ring-border overflow-hidden"
+              >
+                <p className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-gold px-3 pt-3 pb-1.5">
+                  {VERSION_LABELS[id]}
                 </p>
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-3">
+                  {verses ? (
+                    verses.map((verse, vi) => {
+                      if (!verse) return null;
+                      const isSelected = selectedVerseSet.has(vi);
+                      return (
+                        <p
+                          key={vi}
+                          className={`text-[0.9rem] leading-relaxed text-fg mb-2 ${
+                            isSelected ? "bg-gold/10 rounded-lg px-1.5 -mx-1.5 py-0.5" : ""
+                          }`}
+                        >
+                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gold/15 text-gold text-[9px] font-bold mr-1.5 align-middle">
+                            {vi + 1}
+                          </span>
+                          {verse}
+                        </p>
+                      );
+                    })
+                  ) : (
+                    <span className="text-fg-subtle italic text-[0.9rem]">Not available for this book.</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>,
