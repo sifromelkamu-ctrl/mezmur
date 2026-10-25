@@ -63,6 +63,21 @@ interface PreviewResult {
 
 const POLL_INTERVAL_MS = 1000;
 
+// A bare playlist link (list= param, no v=) has no single video for
+// extractYoutubeVideoId (server/src/youtube/validate.ts) to find — the
+// preview/import calls below would just fail (or, if the admin session
+// check happens to be slow that moment, eventually time out) with no clue
+// why. Catching it client-side, instantly, with a pointer to the screen
+// that actually handles playlists is much clearer than either outcome.
+function isPlaylistOnlyUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim());
+    return u.searchParams.has("list") && !u.searchParams.has("v");
+  } catch {
+    return false;
+  }
+}
+
 export default function YoutubeImport() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -173,6 +188,7 @@ export default function YoutubeImport() {
 
   const validateForm = () => {
     if (!url.trim()) return "Paste a YouTube URL first";
+    if (isPlaylistOnlyUrl(url)) return "That's a playlist link — use Catalog Import (see the note above) to bring in a whole playlist.";
     if (!confirmRights) return "You must confirm you have permission to use this content";
     if (destination === "album" && !albumId) return "Select which album this track belongs to";
     if (destination === "live" && concertMode === "existing" && !albumId) return "Select which concert this track belongs to";
@@ -360,6 +376,23 @@ export default function YoutubeImport() {
             variant="panel"
             className="px-3 py-2 text-base"
           />
+
+          {isPlaylistOnlyUrl(url) && (
+            <div className="flex items-start gap-2 rounded-lg bg-panel px-3 py-2.5 text-sm text-fg-muted">
+              <Ticket size={15} className="shrink-0 mt-0.5 text-accent-cyan" />
+              <p>
+                That's a playlist link — this screen imports one video at a time. Use{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/youtube-catalog-import?destination=concert")}
+                  className="underline font-semibold text-fg"
+                >
+                  Catalog Import
+                </button>{" "}
+                to bring in the whole playlist as one concert instead.
+              </p>
+            </div>
+          )}
 
           <div>
             <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide mb-2">Import as</p>
