@@ -27,21 +27,40 @@ function NavIcon({
   // Matches the reference iOS 26 tab bar: the active item sits inside a
   // raised, lightly-frosted capsule (the parent NavLink's own glass gradient
   // + inset highlight, see itemClass), with its icon further picked out in
-  // a solid accent-filled circle badge (white icon on brand color) —
-  // inactive items stay plain, no circle, so the one active badge reads as
-  // a clear focal point rather than every tab getting the same treatment.
+  // an accent badge — inactive items stay plain, no circle, so the one
+  // active badge reads as a clear focal point rather than every tab
+  // getting the same treatment.
+  // Badge itself matches BibleModeNav's own center emblem treatment (same
+  // 48px size, same radial gradient-depth + glossy top highlight + glow
+  // shadow, just brand purple instead of that emblem's black/gold) rather
+  // than the flat single-tone fill this used to be, so the one active icon
+  // across either bottom bar reads as the same crafted badge.
   return (
     <span className="flex flex-col items-center justify-center gap-[2.5px]">
       <span
-        className={`flex items-center justify-center w-[46px] h-[46px] rounded-full transition-all duration-300 ${
-          isActive ? "bg-brand/70 shadow-[0_2px_8px_-1px_color-mix(in_oklab,var(--color-brand)_45%,transparent)]" : ""
-        }`}
+        className="relative flex items-center justify-center w-12 h-12 rounded-full overflow-hidden transition-all duration-300"
+        style={
+          isActive
+            ? {
+                backgroundImage:
+                  "radial-gradient(120% 120% at 30% 20%, var(--color-brand-glow) 0%, var(--color-brand) 55%, var(--color-brand-dark) 100%)",
+                boxShadow:
+                  "0 8px 20px -6px color-mix(in oklab, var(--color-brand) 55%, transparent), inset 0 0 0 1px rgba(255,255,255,0.25)",
+              }
+            : undefined
+        }
       >
+        {isActive && (
+          <span
+            className="absolute inset-x-1 top-0.5 h-1/2 rounded-full pointer-events-none"
+            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.3), transparent)" }}
+          />
+        )}
         <Icon
           size={19}
           strokeWidth={isActive ? 2.2 : 1.9}
           fill={isActive ? "currentColor" : "none"}
-          className={`transition-all duration-200 ${isActive ? "text-white scale-105" : "text-fg-subtle"}`}
+          className={`relative transition-all duration-200 ${isActive ? "text-white scale-105" : "text-fg-subtle"}`}
         />
       </span>
       <span
