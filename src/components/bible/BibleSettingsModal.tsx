@@ -1,5 +1,5 @@
-import { ALargeSmall, Bell, BookOpenText, Languages, Moon, Palette, Sun, Type, X } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { ALargeSmall, Bell, BookOpenText, ChevronDown, Languages, Moon, Palette, Sun, Type, X } from "lucide-react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { BIBLE_SLEEP_TIMER_LABELS, useBibleAudio, type BibleSleepTimerOption } from "../../context/BibleAudioContext";
 import type { ThemeMode } from "../../context/ThemeContext";
@@ -81,6 +81,8 @@ export default function BibleSettingsModal({
   onClose,
 }: BibleSettingsModalProps) {
   const { sleepOption, sleepRemainingLabel, setSleepOption } = useBibleAudio();
+  const [sleepExpanded, setSleepExpanded] = useState(false);
+  const sleepSummary = sleepOption === "off" ? "Off" : sleepRemainingLabel ?? BIBLE_SLEEP_TIMER_LABELS[sleepOption];
   return createPortal(
     <div
       className="bible-scope fixed inset-0 z-50 bg-elevated overflow-y-auto overscroll-y-contain p-5 pb-10"
@@ -123,26 +125,41 @@ export default function BibleSettingsModal({
         </Section>
 
         <Section icon={Moon} label="የእንቅልፍ ሰዓት · Sleep timer">
-          <p className="text-xs text-fg-muted mb-2.5">
-            Stop listening automatically — picks up again fresh next time, not from where it left off.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {BIBLE_SLEEP_TIMER_OPTIONS.map((o) => (
-              <button
-                key={o}
-                onClick={() => setSleepOption(o)}
-                className={`rounded-md border px-2 py-2.5 text-left transition-colors ${
-                  sleepOption === o ? SELECTED : UNSELECTED
-                }`}
-              >
-                <span className="block text-xs font-bold">{BIBLE_SLEEP_TIMER_LABELS[o]}</span>
-              </button>
-            ))}
-          </div>
-          {sleepOption !== "off" && sleepRemainingLabel && (
-            <p className="text-xs font-semibold mt-2.5" style={{ color: "var(--color-gold-dark)" }}>
-              {sleepRemainingLabel}
-            </p>
+          <button
+            onClick={() => setSleepExpanded((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-border hover:bg-hover transition-colors"
+          >
+            <span
+              className="text-sm font-bold truncate"
+              style={{ color: sleepOption === "off" ? "var(--color-fg)" : "var(--color-gold-dark)" }}
+            >
+              {sleepSummary}
+            </span>
+            <ChevronDown
+              size={15}
+              className={`shrink-0 text-fg-muted transition-transform ${sleepExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {sleepExpanded && (
+            <div className="mt-2.5">
+              <p className="text-xs text-fg-muted mb-2.5">
+                Stop listening automatically — picks up again fresh next time, not from where it left off.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {BIBLE_SLEEP_TIMER_OPTIONS.map((o) => (
+                  <button
+                    key={o}
+                    onClick={() => setSleepOption(o)}
+                    className={`rounded-md border px-2 py-2.5 text-left transition-colors ${
+                      sleepOption === o ? SELECTED : UNSELECTED
+                    }`}
+                  >
+                    <span className="block text-xs font-bold">{BIBLE_SLEEP_TIMER_LABELS[o]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </Section>
 
