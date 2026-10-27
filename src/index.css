@@ -336,6 +336,48 @@ input:-webkit-autofill:focus {
   --color-hover-strong: rgba(0, 0, 0, 0.1);
 }
 
+/* The admin website's own identity — deliberately cool and editorial where
+   the listener app is warm (cream light / neutral-gray dark, gold accents):
+   deep charcoal-navy in dark mode, clean cool-white in light mode, refined
+   blue throughout. Overriding --color-brand/-dark/-glow here too (not just
+   the surface/text tokens .bible-scope overrides) means every existing
+   bg-brand/text-brand/ring-brand utility already used across the app's
+   admin pages renders this fixed blue automatically, regardless of which
+   ACCENT_THEMES color the logged-in admin has personally picked for their
+   own listener-app experience — an admin tool reading as consistently
+   "Mezmur Admin" rather than whatever personal accent they happen to have
+   selected. */
+.admin-scope {
+  --color-base: #0a0d14;
+  --color-panel: #0f1420;
+  --color-elevated: #141a28;
+  --color-elevated-hover: #1b2333;
+  --color-fg: #f2f4f8;
+  --color-fg-muted: #99a2b5;
+  --color-fg-subtle: #5e6678;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-hover: rgba(255, 255, 255, 0.06);
+  --color-hover-strong: rgba(255, 255, 255, 0.1);
+  --color-brand: #3b82f6;
+  --color-brand-dark: #2563eb;
+  --color-brand-glow: #60a5fa;
+}
+:root.light .admin-scope {
+  --color-base: #f6f7fa;
+  --color-panel: #ffffff;
+  --color-elevated: #ffffff;
+  --color-elevated-hover: #eef1f6;
+  --color-fg: #10131a;
+  --color-fg-muted: #5b6472;
+  --color-fg-subtle: #8a93a3;
+  --color-border: rgba(16, 19, 26, 0.08);
+  --color-hover: rgba(16, 19, 26, 0.04);
+  --color-hover-strong: rgba(16, 19, 26, 0.07);
+  --color-brand: #2563eb;
+  --color-brand-dark: #1d4ed8;
+  --color-brand-glow: #3b82f6;
+}
+
 @property --color-ambient-1 {
   syntax: "<color>";
   inherits: true;

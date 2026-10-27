@@ -28,9 +28,14 @@ import Home from "./pages/Home";
 // Each loader is shared with prefetchRoute.ts (see routeLoaders.ts) so a
 // touch/hover against a nav target requests the exact same dynamic import.
 const AlbumDetail = lazy(routeLoaders.albumDetail);
+const AdminAnalytics = lazy(routeLoaders.adminAnalytics);
+const AdminArtworkStudio = lazy(routeLoaders.adminArtworkStudio);
+const AdminAuditLog = lazy(routeLoaders.adminAuditLog);
+const AdminDashboard = lazy(routeLoaders.adminDashboard);
 const AdminFeaturedBanners = lazy(routeLoaders.adminFeaturedBanners);
 const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
 const AdminMediaMigration = lazy(routeLoaders.adminMediaMigration);
+const AdminSystemHealth = lazy(routeLoaders.adminSystemHealth);
 const AdminUpload = lazy(routeLoaders.adminUpload);
 const AdminUserAccess = lazy(routeLoaders.adminUserAccess);
 const AdminContactMessages = lazy(routeLoaders.adminContactMessages);
@@ -103,6 +108,11 @@ function AppShell() {
         <Route path="/bible" element={<Bible />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/audit-log" element={<AdminAuditLog />} />
+        <Route path="/admin/artwork-studio" element={<AdminArtworkStudio />} />
+        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+        <Route path="/admin/system-health" element={<AdminSystemHealth />} />
         <Route path="/admin/upload" element={<AdminUpload />} />
         <Route path="/admin/user-access" element={<AdminUserAccess />} />
         <Route path="/admin/contact-messages" element={<AdminContactMessages />} />

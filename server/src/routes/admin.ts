@@ -912,4 +912,37 @@ router.get("/spotify-sync/:jobId", (req: AuthedRequest, res) => {
   res.json(job);
 });
 
+// GET /api/admin/users/count — the admin dashboard's "Total registered
+// users" tile. There's no general user-listing endpoint today (see
+// AdminUserAccess.tsx's own comment on why — search-by-query only), so this
+// is a minimal, admin-gated count rather than exposing a full user list the
+// dashboard doesn't need.
+router.get("/users/count", async (_req: AuthedRequest, res) => {
+  const count = await prisma.profile.count();
+  res.json({ count });
+});
+
+// GET /api/admin/audit-log — recent admin actions (logAudit above, called
+// throughout this file plus youtube/pipeline.ts and telegram/pipeline.ts)
+// for the dashboard's activity feed and the dedicated Audit Log page. Newest
+// first, capped rather than paginated — this is a glance-at-recent-activity
+// view, not a full searchable audit history yet.
+router.get("/audit-log", async (req: AuthedRequest, res) => {
+  const take = Math.min(Number(req.query.take) || 20, 100);
+  const entries = await prisma.auditLog.findMany({
+    take,
+    orderBy: { createdAt: "desc" },
+    include: { admin: { select: { name: true, email: true, username: true } } },
+  });
+  res.json({
+    entries: entries.map((e) => ({
+      id: e.id,
+      action: e.action,
+      metadata: e.metadata,
+      createdAt: e.createdAt.toISOString(),
+      adminName: e.admin.name || e.admin.username || e.admin.email || "Admin",
+    })),
+  });
+});
+
 export default router;

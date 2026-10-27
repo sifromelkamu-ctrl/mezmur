@@ -919,7 +919,20 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ enabled }),
     }),
+  // Admin dashboard's "Total registered users" tile.
+  getUserCount: () => request<{ count: number }>("/admin/users/count"),
+  // Admin dashboard's activity feed + the Audit Log page.
+  getAuditLog: (take?: number) =>
+    request<{ entries: AuditLogEntry[] }>(`/admin/audit-log${take ? `?take=${take}` : ""}`),
 };
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  adminName: string;
+}
 
 export interface ApiUserAccess {
   id: string;

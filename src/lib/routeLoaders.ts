@@ -6,11 +6,16 @@
 // separately-authored ones for the same page.
 export const routeLoaders = {
   albumDetail: () => import("../pages/AlbumDetail"),
+  adminAnalytics: () => import("../pages/admin/AdminAnalytics"),
+  adminArtworkStudio: () => import("../pages/admin/AdminArtworkStudio"),
+  adminAuditLog: () => import("../pages/admin/AdminAuditLog"),
   adminContactMessages: () => import("../pages/AdminContactMessages"),
+  adminDashboard: () => import("../pages/admin/AdminDashboard"),
   adminSubmissions: () => import("../pages/AdminSubmissions"),
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
   adminMediaMigration: () => import("../pages/AdminMediaMigration"),
+  adminSystemHealth: () => import("../pages/admin/AdminSystemHealth"),
   adminUpload: () => import("../pages/AdminUpload"),
   adminUserAccess: () => import("../pages/AdminUserAccess"),
   allConcerts: () => import("../pages/AllConcerts"),
