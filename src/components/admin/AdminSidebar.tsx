@@ -43,7 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Workspace",
     items: [
       { label: "Overview", to: "/admin", icon: LayoutDashboard },
-      { label: "Music Catalog", to: "/admin/library", icon: ListMusic },
+      { label: "Music Catalog", to: "/admin/catalog", icon: ListMusic },
       { label: "Artists", to: "/admin/library", icon: Users },
       { label: "Albums & Singles", to: "/admin/library", icon: Disc3 },
       { label: "Concerts", to: "/admin/library", icon: Ticket },

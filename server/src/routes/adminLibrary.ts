@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { isAdmin, type AuthedRequest } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
-import { toAlbumDTO, toArtistDTO } from "./artists.js";
+import { toAlbumDTO, toArtistDTO, toTrackDTO } from "./artists.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
 // Admin-only "Library Management" tools: reassigning a song's album/artist,
@@ -82,6 +82,20 @@ function toAdminTrackDTO(track: AdminTrackRow) {
     artworkFrame: artworkFrame ?? undefined,
   };
 }
+
+// GET /api/admin/library/tracks - every track, unfiltered, for the Music
+// Catalog table. Deliberately NOT the public GET /api/tracks (which
+// excludes concert songs and concert-album tracks entirely — see its own
+// comment on why those must never leak into listener browsing surfaces) —
+// an admin catalog view needs the opposite: literally everything, concerts
+// included, in one flat list.
+router.get("/tracks", async (_req: AuthedRequest, res) => {
+  const tracks = await prisma.track.findMany({
+    include: { artist: true, album: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(tracks.map((t) => toTrackDTO(t)));
+});
 
 // GET /api/admin/library/tracks/:id - full admin detail for the "Edit Song"
 // form, including the fields (lyrics, releaseYear) that the regular

@@ -35,6 +35,7 @@ const AdminDashboard = lazy(routeLoaders.adminDashboard);
 const AdminFeaturedBanners = lazy(routeLoaders.adminFeaturedBanners);
 const AdminLibraryManagement = lazy(routeLoaders.adminLibraryManagement);
 const AdminMediaMigration = lazy(routeLoaders.adminMediaMigration);
+const AdminMusicCatalog = lazy(routeLoaders.adminMusicCatalog);
 const AdminSystemHealth = lazy(routeLoaders.adminSystemHealth);
 const AdminUpload = lazy(routeLoaders.adminUpload);
 const AdminUserAccess = lazy(routeLoaders.adminUserAccess);
@@ -109,6 +110,7 @@ function AppShell() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/catalog" element={<AdminMusicCatalog />} />
         <Route path="/admin/audit-log" element={<AdminAuditLog />} />
         <Route path="/admin/artwork-studio" element={<AdminArtworkStudio />} />
         <Route path="/admin/analytics" element={<AdminAnalytics />} />

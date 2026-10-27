@@ -198,6 +198,8 @@ export interface ApiTrack {
   // toTrackDTO) — never a separate per-track value. Only standalone
   // singles (albumId: null) carry their own.
   artworkFrame?: ArtworkFrame;
+  isSingle?: boolean;
+  isConcertSong?: boolean;
 }
 
 export interface ApiPlaylist {
@@ -975,6 +977,10 @@ export interface AdminTrackEditInput {
 // possible via artistsApi/albumsApi/adminApi (rename, artwork, create album)
 // is reused as-is by the Library Management page rather than duplicated here.
 export const adminLibraryApi = {
+  // Every track, unfiltered (concert songs and concert-album tracks
+  // included) — for the Music Catalog table. Not the same as tracksApi.list,
+  // which deliberately excludes concert content from listener browsing.
+  listAllTracks: () => request<ApiTrack[]>("/admin/library/tracks"),
   getTrack: (id: string) => request<ApiAdminTrack>(`/admin/library/tracks/${id}`),
   updateTrack: (id: string, input: AdminTrackEditInput) =>
     request<ApiAdminTrack>(`/admin/library/tracks/${id}`, { method: "PATCH", body: JSON.stringify(input) }),

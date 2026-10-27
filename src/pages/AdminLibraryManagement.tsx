@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import CoverArt from "../components/CoverArt";
 import EditConcertModal from "../components/EditConcertModal";
 import { emitArtworkChanged } from "../lib/artworkEvents";
@@ -943,6 +943,7 @@ type Level = "artists" | "albums" | "tracks" | "concerts" | "singles";
 export default function AdminLibraryManagement() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [artists, setArtists] = useState<ApiArtist[]>([]);
   const [albums, setAlbums] = useState<ApiAlbum[]>([]);
@@ -963,6 +964,14 @@ export default function AdminLibraryManagement() {
   const [creatingAlbum, setCreatingAlbum] = useState(false);
 
   const [editSongId, setEditSongId] = useState<string | null>(null);
+  // Deep link from the new Music Catalog table's "Edit" button
+  // (?track=<id>) — reuses this exact same EditSongModal rather than a
+  // second editor existing anywhere else.
+  useEffect(() => {
+    const trackId = searchParams.get("track");
+    if (trackId) setEditSongId(trackId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Bundles the moving trackIds with the album they're moving *from*, so a
   // completed move can be undone by moving them straight back.
   // sourceAlbumId is absent when the tracks came from the unassigned

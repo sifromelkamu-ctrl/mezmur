@@ -15,6 +15,7 @@ export const routeLoaders = {
   adminFeaturedBanners: () => import("../pages/AdminFeaturedBanners"),
   adminLibraryManagement: () => import("../pages/AdminLibraryManagement"),
   adminMediaMigration: () => import("../pages/AdminMediaMigration"),
+  adminMusicCatalog: () => import("../pages/admin/AdminMusicCatalog"),
   adminSystemHealth: () => import("../pages/admin/AdminSystemHealth"),
   adminUpload: () => import("../pages/AdminUpload"),
   adminUserAccess: () => import("../pages/AdminUserAccess"),

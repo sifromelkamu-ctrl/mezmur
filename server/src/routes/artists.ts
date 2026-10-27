@@ -115,6 +115,12 @@ function toTrackDTO(track: {
     artworkFrame?: unknown;
   } | null;
   artworkFrame?: unknown;
+  // Present on every caller today (Prisma returns every scalar column by
+  // default unless a query narrows via `select`) — optional here only so a
+  // future narrowed `select` doesn't become a type error, defaulting to
+  // false (Track's own column default) rather than failing to compile.
+  isSingle?: boolean;
+  isConcertSong?: boolean;
 }) {
   const gradient: [string, string] = track.album?.gradientFrom
     ? [track.album.gradientFrom, track.album.gradientTo ?? "#111111"]
@@ -154,6 +160,8 @@ function toTrackDTO(track: {
     albumTitle: track.album?.title,
     gradient,
     artworkFrame: artworkFrame ?? undefined,
+    isSingle: track.isSingle ?? false,
+    isConcertSong: track.isConcertSong ?? false,
   };
 }
 
