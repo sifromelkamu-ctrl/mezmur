@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../../context/useAuth";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
@@ -20,6 +20,20 @@ export default function AdminLayout({ title, children }: AdminLayoutProps) {
   const { user, loading } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // The browser tab otherwise keeps index.html's static "Mezmur — Ethiopian
+  // Gospel Music" on every admin page too — one of the things that made
+  // this read as a tab inside the phone app rather than its own website.
+  // Restores the listener app's title on unmount so navigating back to it
+  // (the Topbar's "Back to app" link, browser back, etc.) doesn't leave the
+  // tab stuck on an admin title.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = `${title} · Mezmur Admin`;
+    return () => {
+      document.title = previous;
+    };
+  }, [title]);
 
   if (loading) {
     return (
