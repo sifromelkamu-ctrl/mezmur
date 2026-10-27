@@ -67,11 +67,19 @@ const YoutubeImport = lazy(routeLoaders.youtubeImport);
 
 // /auth is a full-screen, immersive flow (like Spotify/Apple Music's own
 // sign-in) — it deliberately renders without the persistent Topbar/
-// PlayerBar/MobileNav chrome that every other route gets.
+// PlayerBar/MobileNav chrome that every other route gets. /admin/* gets the
+// same bypass for a different reason: it's a desktop-first admin website
+// with its own full-viewport shell (AdminLayout — sidebar, topbar, .admin-
+// scope design tokens), not another screen of the listener app. Without
+// this, the consumer Topbar/PlayerBar/MobileNav below render as fixed
+// siblings on top of it regardless — the admin dashboard was visually
+// correct underneath the whole time, just with the phone app's own chrome
+// painted over it.
 function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAuthRoute = location.pathname === "/auth";
+  const isAdminRoute = location.pathname.startsWith("/admin");
   const isBibleRoute = location.pathname === "/bible";
   const isKeyboardOpen = useKeyboardOpen();
 
@@ -142,7 +150,7 @@ function AppShell() {
     </Suspense>
   );
 
-  if (isAuthRoute) {
+  if (isAuthRoute || isAdminRoute) {
     return <div className="h-dvh w-screen bg-base overflow-hidden">{routes}</div>;
   }
 
