@@ -34,8 +34,13 @@ export default function AdminTopbar({ title, user, onToggleMobileSidebar, collap
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {/* On the shared listener-app domain (no VITE_LISTENER_APP_URL set),
+            "/#/" is the listener app's own Home — same origin, same tab
+            state. On the standalone admin site, there is no listener app on
+            this origin, so that build sets VITE_LISTENER_APP_URL to its
+            full external URL instead. */}
         <a
-          href="/#/"
+          href={import.meta.env.VITE_LISTENER_APP_URL || "/#/"}
           className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-fg-muted hover:text-fg px-2.5 py-1.5 rounded-lg hover:bg-hover transition-colors"
         >
           Back to app

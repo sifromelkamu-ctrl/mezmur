@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:admin": "vite build --config vite.admin.config.ts && mv dist-admin/admin.html dist-admin/index.html",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mezmur Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Album/artist/track artwork thumbnails in the catalog table load from
+         this R2 origin — same preconnect index.html uses, same reasoning. -->
+    <link rel="preconnect" href="https://pub-7be0ddfdea8e41ada4199173d068f872.r2.dev" crossorigin />
+    <!-- Only Inter — the admin UI never touches the listener app's Ethiopic/
+         decorative font set (Agbalumo, Menbere, Noto Sans Ethiopic, ...),
+         all of which index.html loads for the catalog's own typography. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    </noscript>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/admin-main.tsx"></script>
+  </body>
+</html>

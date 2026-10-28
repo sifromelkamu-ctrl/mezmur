@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
@@ -43,7 +44,34 @@ export default function AdminLayout({ title, children }: AdminLayoutProps) {
     );
   }
 
-  if (user?.role !== "admin") {
+  // Same VITE_LISTENER_APP_URL signal AdminTopbar's "Back to app" link
+  // uses: set only on the standalone admin build, where /admin/login is a
+  // real route (see AdminApp.tsx) because there's no shared session with
+  // the listener app to fall back on (separate origin, separate storage).
+  // On the shared listener-app domain that route doesn't exist at all — a
+  // "Sign in" link there would be dead, so this stays a plain denial.
+  const isStandaloneAdminSite = Boolean(import.meta.env.VITE_LISTENER_APP_URL);
+
+  if (!user) {
+    return (
+      <div className="admin-scope fixed inset-0 bg-base flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-fg-muted text-sm">
+          {isStandaloneAdminSite ? "Sign in with an administrator account to continue." : "You don't have access to this page."}
+        </p>
+        {isStandaloneAdminSite && (
+          <Link
+            to="/admin/login"
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "var(--color-brand)" }}
+          >
+            Sign in
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  if (user.role !== "admin") {
     return (
       <div className="admin-scope fixed inset-0 bg-base flex items-center justify-center px-6">
         <p className="text-fg-muted text-sm">You don't have access to this page.</p>
